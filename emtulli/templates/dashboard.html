@@ -2,64 +2,53 @@
 {% block title %}Dashboard — Emtulli{% endblock %}
 
 {% block content %}
-<h2>Dashboard</h2>
-
-<div id="stats-cards"
-     hx-get="/api/stats-cards"
-     hx-trigger="load, refresh-stats from:body"
-     hx-swap="innerHTML">
+<div class="section-header">
+    <h2>Activity</h2>
 </div>
-
-<h3>Now Playing</h3>
 <div id="now-playing"
      hx-get="/api/now-playing"
      hx-trigger="load, every 10s, refresh-now-playing from:body"
      hx-swap="innerHTML">
 </div>
 
-<h3>Recent History</h3>
-<div id="recent-history"
-     hx-get="/api/recent-history"
-     hx-trigger="load, refresh-history from:body"
+<div class="section-header">
+    <h2>Watch Statistics</h2>
+    <div class="stat-controls">
+        <div class="toggle-group" id="metric-toggle">
+            <button class="toggle-btn active" data-value="plays"
+                    hx-get="/api/stats-cards?metric=plays"
+                    hx-target="#stats-cards" hx-swap="innerHTML"
+                    hx-include="#days-input"
+                    onclick="setToggle(this)">Play Count</button>
+            <button class="toggle-btn" data-value="duration"
+                    hx-get="/api/stats-cards?metric=duration"
+                    hx-target="#stats-cards" hx-swap="innerHTML"
+                    hx-include="#days-input"
+                    onclick="setToggle(this)">Play Duration</button>
+        </div>
+        <span class="stat-controls-label">Last</span>
+        <input type="number" id="days-input" name="days" value="30" min="1" max="365"
+               class="days-input"
+               hx-get="/api/stats-cards"
+               hx-trigger="change"
+               hx-target="#stats-cards" hx-swap="innerHTML"
+               hx-include="#metric-toggle .active">
+        <span class="stat-controls-label">days</span>
+    </div>
+</div>
+
+<div id="stats-cards"
+     hx-get="/api/stats-cards"
+     hx-trigger="load, refresh-stats from:body"
      hx-swap="innerHTML">
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
-document.body.addEventListener("htmx:afterSwap", function(e) {
-    if (e.detail.target.id === "stats-cards") {
-        initCharts();
-    }
-});
-
-function initCharts() {
-    const el = document.getElementById("plays-chart");
-    if (!el) return;
-    const ctx = el.getContext("2d");
-    const data = JSON.parse(el.dataset.chartData || "[]");
-    if (el._chart) el._chart.destroy();
-    el._chart = new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels: data.map(d => d.date),
-            datasets: [{
-                label: "Plays",
-                data: data.map(d => d.plays),
-                backgroundColor: "rgba(99, 102, 241, 0.7)",
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { grid: { display: false }, ticks: { color: "#9ca3af" } },
-                y: { beginAtZero: true, ticks: { color: "#9ca3af", stepSize: 1 } }
-            }
-        }
-    });
+function setToggle(btn) {
+    btn.parentElement.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
 }
 </script>
 {% endblock %}

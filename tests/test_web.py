@@ -76,14 +76,13 @@ class TestAPIRoutes:
     async def test_now_playing_empty(self, client):
         r = await client.get("/api/now-playing")
         assert r.status_code == 200
-        assert "No active streams" in r.text
+        assert "Nothing is currently being played" in r.text
 
     @pytest.mark.asyncio
     async def test_stats_cards(self, client):
         r = await client.get("/api/stats-cards")
         assert r.status_code == 200
-        assert "Total Plays" in r.text
-        assert "0" in r.text
+        assert "Most Watched Movies" in r.text
 
     @pytest.mark.asyncio
     async def test_recent_history_empty(self, client):

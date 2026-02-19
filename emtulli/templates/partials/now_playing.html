@@ -1,27 +1,34 @@
 {% if sessions %}
-<div class="grid">
+<div class="now-playing-grid">
     {% for s in sessions %}
-    <article class="now-playing-card">
-        <header>
-            <span class="user-name">{{ s.user_name or "Unknown" }}</span>
-            <span class="device-info">{{ s.client or "" }} · {{ s.device_name or "" }}</span>
-        </header>
-        <p class="title">{{ s.display_title }}</p>
-        <div class="progress-info">
-            <progress value="{{ s.progress_percent }}" max="100"></progress>
-            <small>{{ s.progress_minutes }}m / {{ s.runtime_minutes }}m ({{ s.progress_percent }}%)</small>
-        </div>
-        <footer>
-            <span class="play-method {% if s.play_method == 'Transcode' %}transcode{% elif s.play_method == 'DirectPlay' %}direct-play{% else %}direct-stream{% endif %}">
-                {{ s.play_method or "Unknown" }}
-            </span>
-            {% if s.is_paused %}
-            <span class="paused-badge">Paused</span>
+    <div class="now-playing-card">
+        <div class="now-playing-poster">
+            {% if s.item_id %}
+            <img src="/api/img/{{ s.item_id }}" alt="" loading="lazy">
             {% endif %}
-        </footer>
-    </article>
+        </div>
+        <div class="now-playing-info">
+            <div>
+                <span class="user-name">{{ s.user_name or "Unknown" }}</span>
+                <span class="device-info">{{ s.client or "" }} · {{ s.device_name or "" }}</span>
+            </div>
+            <p class="title">{{ s.display_title }}</p>
+            <div class="progress-info">
+                <progress value="{{ s.progress_percent }}" max="100"></progress>
+                <small>{{ s.progress_minutes }}m / {{ s.runtime_minutes }}m ({{ s.progress_percent }}%)</small>
+            </div>
+            <div class="now-playing-footer">
+                <span class="play-method {% if s.play_method == 'Transcode' %}transcode{% elif s.play_method == 'DirectPlay' %}direct-play{% else %}direct-stream{% endif %}">
+                    {{ s.play_method or "Unknown" }}
+                </span>
+                {% if s.is_paused %}
+                <span class="paused-badge">Paused</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
     {% endfor %}
 </div>
 {% else %}
-<p class="empty-state">No active streams</p>
+<p class="empty-state">Nothing is currently being played.</p>
 {% endif %}

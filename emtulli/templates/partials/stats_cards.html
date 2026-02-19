@@ -1,21 +1,196 @@
-<div class="grid">
-    <article>
-        <header>Total Plays</header>
-        <p class="stat-number">{{ total_plays }}</p>
-    </article>
-    <article>
-        <header>Total Watch Time</header>
-        <p class="stat-number">{{ total_duration_display }}</p>
-    </article>
-    <article>
-        <header>Active Streams</header>
-        <p class="stat-number">{{ active_streams }}</p>
-    </article>
-</div>
+<div class="stats-grid">
 
-{% if plays_per_day %}
-<article>
-    <header>Plays per Day (Last 30 Days)</header>
-    <canvas id="plays-chart" data-chart-data='{{ plays_per_day_json }}'></canvas>
-</article>
-{% endif %}
+    <!-- Most Watched Movies -->
+    <div class="stat-card">
+        <div class="stat-card-poster">
+            {% if most_watched_movies %}
+            <img src="/api/img/{{ most_watched_movies[0].item_id }}" alt="" loading="lazy">
+            {% endif %}
+        </div>
+        <div class="stat-card-content">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Most Watched Movies</span>
+                <span class="stat-card-label">{{ 'plays' if metric == 'plays' else 'duration' }}</span>
+            </div>
+            <ol class="stat-list">
+                {% for m in most_watched_movies %}
+                <li>
+                    <span class="stat-list-name">{{ m.item_name }}{% if m.year %} ({{ m.year }}){% endif %}</span>
+                    <span class="stat-list-value">{{ m.plays if metric == 'plays' else (m.total_duration // 3600) ~ 'h' }}</span>
+                </li>
+                {% endfor %}
+                {% if not most_watched_movies %}<li class="stat-empty">No data yet</li>{% endif %}
+            </ol>
+        </div>
+    </div>
+
+    <!-- Most Popular Movies -->
+    <div class="stat-card">
+        <div class="stat-card-poster">
+            {% if most_popular_movies %}
+            <img src="/api/img/{{ most_popular_movies[0].item_id }}" alt="" loading="lazy">
+            {% endif %}
+        </div>
+        <div class="stat-card-content">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Most Popular Movies</span>
+                <span class="stat-card-label">users</span>
+            </div>
+            <ol class="stat-list">
+                {% for m in most_popular_movies %}
+                <li>
+                    <span class="stat-list-name">{{ m.item_name }}</span>
+                    <span class="stat-list-value">{{ m.users }}</span>
+                </li>
+                {% endfor %}
+                {% if not most_popular_movies %}<li class="stat-empty">No data yet</li>{% endif %}
+            </ol>
+        </div>
+    </div>
+
+    <!-- Most Watched TV Shows -->
+    <div class="stat-card">
+        <div class="stat-card-poster">
+            {% if most_watched_shows %}
+            <img src="/api/img/{{ most_watched_shows[0].item_id }}" alt="" loading="lazy">
+            {% endif %}
+        </div>
+        <div class="stat-card-content">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Most Watched TV Shows</span>
+                <span class="stat-card-label">{{ 'plays' if metric == 'plays' else 'duration' }}</span>
+            </div>
+            <ol class="stat-list">
+                {% for s in most_watched_shows %}
+                <li>
+                    <span class="stat-list-name">{{ s.series_name }}</span>
+                    <span class="stat-list-value">{{ s.plays if metric == 'plays' else (s.total_duration // 3600) ~ 'h' }}</span>
+                </li>
+                {% endfor %}
+                {% if not most_watched_shows %}<li class="stat-empty">No data yet</li>{% endif %}
+            </ol>
+        </div>
+    </div>
+
+    <!-- Most Popular TV Shows -->
+    <div class="stat-card">
+        <div class="stat-card-poster">
+            {% if most_popular_shows %}
+            <img src="/api/img/{{ most_popular_shows[0].item_id }}" alt="" loading="lazy">
+            {% endif %}
+        </div>
+        <div class="stat-card-content">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Most Popular TV Shows</span>
+                <span class="stat-card-label">users</span>
+            </div>
+            <ol class="stat-list">
+                {% for s in most_popular_shows %}
+                <li>
+                    <span class="stat-list-name">{{ s.series_name }}</span>
+                    <span class="stat-list-value">{{ s.users }}</span>
+                </li>
+                {% endfor %}
+                {% if not most_popular_shows %}<li class="stat-empty">No data yet</li>{% endif %}
+            </ol>
+        </div>
+    </div>
+
+    <!-- Recently Watched -->
+    <div class="stat-card">
+        <div class="stat-card-poster">
+            {% if recently_watched %}
+            <img src="/api/img/{{ recently_watched[0].item_id }}" alt="" loading="lazy">
+            {% endif %}
+        </div>
+        <div class="stat-card-content">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Recently Watched</span>
+                <span class="stat-card-label">{{ recently_watched[0].user_name if recently_watched else '' }}</span>
+            </div>
+            <ol class="stat-list">
+                {% for r in recently_watched %}
+                <li>
+                    <span class="stat-list-name">{{ r.display_title }}</span>
+                    <span class="stat-list-value-small">{{ r.user_name }}</span>
+                </li>
+                {% endfor %}
+                {% if not recently_watched %}<li class="stat-empty">No data yet</li>{% endif %}
+            </ol>
+        </div>
+    </div>
+
+    <!-- Most Active Libraries -->
+    <div class="stat-card">
+        <div class="stat-card-poster stat-card-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>
+        </div>
+        <div class="stat-card-content">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Most Active Libraries</span>
+                <span class="stat-card-label">plays</span>
+            </div>
+            <ol class="stat-list">
+                {% for lib in most_active_libraries %}
+                <li>
+                    <span class="stat-list-name">{{ lib.label }}</span>
+                    <span class="stat-list-value">{{ lib.plays }}</span>
+                </li>
+                {% endfor %}
+                {% if not most_active_libraries %}<li class="stat-empty">No data yet</li>{% endif %}
+            </ol>
+        </div>
+    </div>
+
+    <!-- Most Active Users -->
+    <div class="stat-card">
+        <div class="stat-card-poster stat-card-icon">
+            {% if most_active_users %}
+            <img src="/api/img/user/{{ most_active_users[0].user_id }}" alt="" loading="lazy"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+                 style="border-radius:50%;object-fit:cover">
+            <div class="avatar-fallback" style="display:none">{{ (most_active_users[0].user_name or '?')[0] | upper }}</div>
+            {% else %}
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            {% endif %}
+        </div>
+        <div class="stat-card-content">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Most Active Users</span>
+                <span class="stat-card-label">plays</span>
+            </div>
+            <ol class="stat-list">
+                {% for u in most_active_users %}
+                <li>
+                    <span class="stat-list-name">{{ u.user_name or 'Unknown' }}</span>
+                    <span class="stat-list-value">{{ u.plays if metric == 'plays' else (u.total_duration // 3600) ~ 'h' }}</span>
+                </li>
+                {% endfor %}
+                {% if not most_active_users %}<li class="stat-empty">No data yet</li>{% endif %}
+            </ol>
+        </div>
+    </div>
+
+    <!-- Most Active Platforms -->
+    <div class="stat-card">
+        <div class="stat-card-poster stat-card-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7l-2 3v1h8v-1l-2-3h7c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 12H3V4h18v10z"/></svg>
+        </div>
+        <div class="stat-card-content">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Most Active Platforms</span>
+                <span class="stat-card-label">plays</span>
+            </div>
+            <ol class="stat-list">
+                {% for p in most_active_platforms %}
+                <li>
+                    <span class="stat-list-name">{{ p.client or 'Unknown' }}</span>
+                    <span class="stat-list-value">{{ p.plays }}</span>
+                </li>
+                {% endfor %}
+                {% if not most_active_platforms %}<li class="stat-empty">No data yet</li>{% endif %}
+            </ol>
+        </div>
+    </div>
+
+</div>

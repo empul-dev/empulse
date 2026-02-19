@@ -1,115 +1,448 @@
+/* === Tautulli-inspired Dark Theme === */
 :root {
-    --pico-font-size: 16px;
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-card: #1e2a45;
+    --bg-card-poster: #12182b;
+    --text-primary: #e0e0e0;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+    --accent: #c8a438;
+    --accent-dim: rgba(200, 164, 56, 0.15);
+    --border: #2a3550;
+    --success: #22c55e;
+    --warning: #eab308;
+    --danger: #ef4444;
+
+    --pico-font-size: 15px;
+    --pico-background-color: var(--bg-primary);
+    --pico-card-background-color: var(--bg-card);
+    --pico-color: var(--text-primary);
+    --pico-muted-color: var(--text-secondary);
+    --pico-primary: var(--accent);
+}
+
+html[data-theme="dark"] {
+    --pico-background-color: var(--bg-primary);
+    --pico-card-background-color: var(--bg-card);
+}
+
+body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* === Navigation === */
+nav.container-fluid {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 1.5rem;
+    margin-bottom: 0;
 }
 
 .nav-brand {
     text-decoration: none;
-    color: var(--pico-primary);
+    color: var(--accent) !important;
+    font-size: 1.3em;
+    letter-spacing: 0.5px;
+}
+
+nav a {
+    color: var(--text-secondary) !important;
+    text-decoration: none;
+    font-size: 0.9em;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+}
+
+nav a:hover {
+    color: var(--text-primary) !important;
+    background: rgba(255,255,255,0.05);
 }
 
 nav a.active {
-    font-weight: bold;
-    text-decoration: underline;
-    text-underline-offset: 4px;
+    color: var(--accent) !important;
+    font-weight: 600;
+    text-decoration: none;
 }
 
-.stat-number {
-    font-size: 2rem;
-    font-weight: bold;
+/* === Section Headers === */
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 1.5rem 0 1rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.section-header h2 {
     margin: 0;
+    font-size: 1.1em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-primary);
 }
 
-.empty-state {
+/* === Stat Controls === */
+.stat-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.stat-controls-label {
+    color: var(--text-secondary);
+    font-size: 0.85em;
+}
+
+.toggle-group {
+    display: flex;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.35rem 0.9rem;
+    font-size: 0.8em;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: 500;
+}
+
+.toggle-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.05);
+}
+
+.toggle-btn.active {
+    background: var(--accent);
+    color: #000;
+    font-weight: 700;
+}
+
+.days-input {
+    width: 60px !important;
     text-align: center;
-    padding: 2rem;
-    color: var(--pico-muted-color);
+    padding: 0.3rem 0.4rem !important;
+    margin: 0 !important;
+    font-size: 0.85em !important;
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-primary) !important;
+    border-radius: 4px;
 }
 
-/* Now Playing Cards */
-.now-playing-card header {
+/* === Stats Grid (Tautulli Layout) === */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 0.75rem;
+}
+
+/* === Stat Card === */
+.stat-card {
+    display: flex;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    min-height: 180px;
+}
+
+.stat-card-poster {
+    width: 100px;
+    min-height: 100%;
+    background: var(--bg-card-poster);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.stat-card-poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.stat-card-poster.stat-card-icon {
+    padding: 1.5rem;
+}
+
+.stat-card-poster.stat-card-icon svg {
+    width: 48px;
+    height: 48px;
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+.avatar-fallback {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+    font-weight: 700;
+}
+
+.stat-card-content {
+    flex: 1;
+    padding: 0.6rem 0.8rem;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.stat-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-bottom: 0.4rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
 }
 
-.now-playing-card .user-name {
-    font-weight: bold;
+.stat-card-title {
+    font-size: 0.75em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
 }
 
-.now-playing-card .device-info {
-    font-size: 0.85em;
-    color: var(--pico-muted-color);
+.stat-card-label {
+    font-size: 0.7em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
 }
 
-.now-playing-card .title {
-    font-size: 1.1em;
-    margin: 0.5rem 0;
+/* === Stat List (Ranked) === */
+.stat-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: stat-counter;
 }
 
-.now-playing-card .progress-info {
-    margin: 0.5rem 0;
-}
-
-.now-playing-card .progress-info small {
-    display: block;
-    margin-top: 0.25rem;
-    color: var(--pico-muted-color);
-}
-
-.now-playing-card footer {
+.stat-list li {
     display: flex;
-    gap: 0.5rem;
     align-items: center;
+    padding: 0.2rem 0;
+    font-size: 0.85em;
+    counter-increment: stat-counter;
+    gap: 0.5rem;
+}
+
+.stat-list li::before {
+    content: counter(stat-counter);
+    color: var(--text-muted);
+    font-size: 0.8em;
+    min-width: 1em;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.stat-list-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+}
+
+.stat-list li:first-child .stat-list-name {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.stat-list-value {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.95em;
+    flex-shrink: 0;
+}
+
+.stat-list-value-small {
+    color: var(--text-muted);
+    font-size: 0.8em;
+    flex-shrink: 0;
+}
+
+.stat-empty {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.stat-empty::before {
+    content: none !important;
+}
+
+/* === Now Playing Cards === */
+.now-playing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 0.75rem;
+}
+
+.now-playing-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    display: flex;
+    gap: 1rem;
+}
+
+.now-playing-poster {
+    width: 60px;
+    height: 90px;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--bg-card-poster);
+}
+
+.now-playing-poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.now-playing-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.now-playing-info .user-name {
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 0.9em;
+}
+
+.now-playing-info .device-info {
+    font-size: 0.78em;
+    color: var(--text-muted);
+    margin-left: 0.5rem;
+}
+
+.now-playing-info .title {
+    font-size: 0.95em;
+    margin: 0.3rem 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.now-playing-info .progress-info {
+    margin: 0.4rem 0;
+}
+
+.now-playing-info .progress-info progress {
+    height: 6px;
+    border-radius: 3px;
+    width: 100%;
+}
+
+.now-playing-info .progress-info small {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--text-muted);
+    font-size: 0.78em;
+}
+
+.now-playing-footer {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    margin-top: 0.3rem;
 }
 
 /* Play method badges */
 .play-method {
-    font-size: 0.8em;
+    font-size: 0.72em;
     padding: 0.15em 0.5em;
-    border-radius: 4px;
+    border-radius: 3px;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .play-method.direct-play {
-    background: rgba(34, 197, 94, 0.2);
-    color: #22c55e;
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--success);
 }
 
 .play-method.direct-stream {
-    background: rgba(234, 179, 8, 0.2);
-    color: #eab308;
+    background: rgba(234, 179, 8, 0.15);
+    color: var(--warning);
 }
 
 .play-method.transcode {
-    background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--danger);
 }
 
 .paused-badge {
-    font-size: 0.8em;
+    font-size: 0.72em;
     padding: 0.15em 0.5em;
-    border-radius: 4px;
-    background: rgba(234, 179, 8, 0.2);
-    color: #eab308;
+    border-radius: 3px;
+    background: rgba(234, 179, 8, 0.15);
+    color: var(--warning);
     font-weight: 600;
 }
 
-/* Connection test result */
-#connection-result .success {
-    color: #22c55e;
-}
-
-#connection-result .error {
-    color: #ef4444;
-}
-
-footer {
+.empty-state {
     text-align: center;
-    padding: 1rem 0;
-    color: var(--pico-muted-color);
+    padding: 1.5rem;
+    color: var(--text-muted);
+    font-size: 0.9em;
 }
 
-/* Pagination nav */
+/* === Tables === */
+table {
+    font-size: 0.88em;
+}
+
+table th {
+    color: var(--text-secondary) !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8em;
+    letter-spacing: 0.5px;
+}
+
+table a {
+    color: var(--accent);
+}
+
+/* === Connection test === */
+#connection-result .success { color: var(--success); }
+#connection-result .error { color: var(--danger); }
+
+/* === Footer === */
+footer.container {
+    text-align: center;
+    padding: 1.5rem 0;
+    color: var(--text-muted);
+    font-size: 0.8em;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+}
+
+/* === Pagination === */
 nav ul {
     display: flex;
     justify-content: center;
@@ -117,4 +450,40 @@ nav ul {
     align-items: center;
     list-style: none;
     padding: 0;
+}
+
+/* === Articles/Cards (Pico overrides) === */
+article {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+}
+
+article header {
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* === Forms in settings === */
+input[readonly] {
+    opacity: 0.7;
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    .now-playing-grid {
+        grid-template-columns: 1fr;
+    }
+    .stat-controls {
+        flex-wrap: wrap;
+    }
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 }

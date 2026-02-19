@@ -242,7 +242,7 @@ class TestStats:
                 "duration_seconds": 1800,
             })
 
-        top = await stats_db.get_top_users(db, limit=10)
+        top = await stats_db.get_top_users(db, limit=10, days=99999)
         assert len(top) == 2
         assert top[0]["user_name"] == "Alice"
         assert top[0]["plays"] == 5

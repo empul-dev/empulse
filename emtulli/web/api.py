@@ -1,7 +1,9 @@
 import json
 import logging
 from fastapi import APIRouter, Request
+from fastapi.responses import Response
 from emtulli.app import templates
+from emtulli.config import settings
 from emtulli.database import get_db
 from emtulli.db import history as history_db, stats as stats_db
 from emtulli.models import SessionInfo, HistoryRecord
@@ -22,31 +24,48 @@ async def now_playing(request: Request):
 
 
 @router.get("/stats-cards")
-async def stats_cards(request: Request):
+async def stats_cards(request: Request, days: int = 30, metric: str = "plays"):
     db = get_db()
-    total_plays = await stats_db.get_total_plays(db)
-    total_duration = await stats_db.get_total_duration(db)
-    plays_per_day = await stats_db.get_plays_per_day(db, days=30)
 
     state_tracker = getattr(request.app.state, "state_tracker", None)
     active_streams = len(state_tracker.get_all_sessions()) if state_tracker else 0
 
-    # Format duration
-    m, _ = divmod(total_duration, 60)
-    h, m = divmod(m, 60)
-    d, h = divmod(h, 24)
-    if d:
-        dur = f"{d}d {h}h"
-    else:
-        dur = f"{h}h {m}m"
+    most_watched_movies = await stats_db.get_most_watched_movies(db, limit=5, days=days, metric=metric)
+    most_popular_movies = await stats_db.get_most_popular_movies(db, limit=5, days=days)
+    most_watched_shows = await stats_db.get_most_watched_shows(db, limit=5, days=days, metric=metric)
+    most_popular_shows = await stats_db.get_most_popular_shows(db, limit=5, days=days)
+    recently_watched = await stats_db.get_recently_watched(db, limit=5)
+    most_active_users = await stats_db.get_top_users(db, limit=5, days=days, metric=metric)
+    most_active_platforms = await stats_db.get_most_active_platforms(db, limit=5, days=days)
+    most_active_libraries = await stats_db.get_most_active_libraries(db, limit=5, days=days)
+
+    # Format recently watched display titles
+    for item in recently_watched:
+        if item.get("series_name") and item.get("season_number") is not None and item.get("episode_number") is not None:
+            item["display_title"] = f"{item['series_name']} - S{item['season_number']:02d}E{item['episode_number']:02d}"
+        elif item.get("item_name") and item.get("year"):
+            item["display_title"] = f"{item['item_name']} ({item['year']})"
+        else:
+            item["display_title"] = item.get("item_name") or "Unknown"
+
+    # Map library types to readable names
+    type_labels = {"Movie": "Movies", "Episode": "TV Shows", "Audio": "Music"}
+    for lib in most_active_libraries:
+        lib["label"] = type_labels.get(lib.get("item_type"), lib.get("item_type", "Other"))
 
     return templates.TemplateResponse("partials/stats_cards.html", {
         "request": request,
-        "total_plays": total_plays,
-        "total_duration_display": dur,
         "active_streams": active_streams,
-        "plays_per_day": plays_per_day,
-        "plays_per_day_json": json.dumps(plays_per_day),
+        "most_watched_movies": most_watched_movies,
+        "most_popular_movies": most_popular_movies,
+        "most_watched_shows": most_watched_shows,
+        "most_popular_shows": most_popular_shows,
+        "recently_watched": recently_watched,
+        "most_active_users": most_active_users,
+        "most_active_platforms": most_active_platforms,
+        "most_active_libraries": most_active_libraries,
+        "days": days,
+        "metric": metric,
     })
 
 
@@ -92,6 +111,53 @@ async def history_table(
     })
 
 
+@router.get("/img/{item_id}")
+async def image_proxy(item_id: str):
+    """Proxy Emby item images so the API key stays server-side."""
+    import httpx
+    url = f"{settings.emby_url.rstrip('/')}/Items/{item_id}/Images/Primary"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(url, params={"api_key": settings.emby_api_key, "maxWidth": "150"})
+            if r.status_code == 200:
+                return Response(
+                    content=r.content,
+                    media_type=r.headers.get("content-type", "image/jpeg"),
+                    headers={"Cache-Control": "public, max-age=86400"},
+                )
+    except Exception:
+        pass
+    # 1x1 transparent pixel fallback
+    return Response(
+        content=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n\xb4\x00\x00\x00\x00IEND\xaeB`\x82",
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@router.get("/img/user/{user_id}")
+async def user_image_proxy(user_id: str):
+    """Proxy Emby user images."""
+    import httpx
+    url = f"{settings.emby_url.rstrip('/')}/Users/{user_id}/Images/Primary"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(url, params={"api_key": settings.emby_api_key, "maxWidth": "80"})
+            if r.status_code == 200:
+                return Response(
+                    content=r.content,
+                    media_type=r.headers.get("content-type", "image/jpeg"),
+                    headers={"Cache-Control": "public, max-age=86400"},
+                )
+    except Exception:
+        pass
+    return Response(
+        content=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n\xb4\x00\x00\x00\x00IEND\xaeB`\x82",
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 @router.post("/test-connection")
 async def test_connection(request: Request):
     emby_client = getattr(request.app.state, "emby_client", None)
@@ -101,7 +167,6 @@ async def test_connection(request: Request):
 
     try:
         info = await emby_client.get_server_info()
-        # Save server info
         db = get_db()
         from emtulli.db.libraries import upsert_server_info
         await upsert_server_info(db, {
