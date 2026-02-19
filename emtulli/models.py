@@ -12,6 +12,7 @@ class SessionInfo(BaseModel):
     item_name: str | None = None
     item_type: str | None = None
     series_name: str | None = None
+    series_id: str | None = None
     season_number: int | None = None
     episode_number: int | None = None
     year: int | None = None
@@ -24,6 +25,13 @@ class SessionInfo(BaseModel):
     video_decision: str | None = None
     audio_decision: str | None = None
     state: str = "playing"
+
+    @property
+    def poster_id(self) -> str | None:
+        """Use series poster for episodes, item poster for movies."""
+        if self.item_type == "Episode" and self.series_id:
+            return self.series_id
+        return self.item_id
 
     @property
     def progress_percent(self) -> float:

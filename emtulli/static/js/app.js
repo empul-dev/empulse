@@ -28,3 +28,14 @@
 
     connect();
 })();
+
+// Set --hover-bg CSS var from data-bg attribute for blur hover effect
+function initHoverBackgrounds() {
+    document.querySelectorAll("[data-bg]").forEach(function(el) {
+        el.style.setProperty("--hover-bg", "url(" + el.dataset.bg + ")");
+    });
+}
+
+// Run on load and after every HTMX swap
+initHoverBackgrounds();
+document.body.addEventListener("htmx:afterSwap", initHoverBackgrounds);

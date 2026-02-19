@@ -64,7 +64,7 @@ async def get_most_watched_shows(db: aiosqlite.Connection, limit: int = 5, days:
         f"""SELECT series_name, COUNT(*) as plays,
                   COUNT(DISTINCT user_id) as users,
                   SUM(duration_seconds) as total_duration,
-                  MIN(item_id) as item_id
+                  COALESCE(series_id, MIN(item_id)) as poster_id
            FROM history
            WHERE item_type = 'Episode' AND series_name IS NOT NULL
                  AND started_at >= datetime('now', ?)
@@ -80,7 +80,7 @@ async def get_most_popular_shows(db: aiosqlite.Connection, limit: int = 5, days:
     cursor = await db.execute(
         """SELECT series_name, COUNT(DISTINCT user_id) as users,
                   COUNT(*) as plays,
-                  MIN(item_id) as item_id
+                  COALESCE(series_id, MIN(item_id)) as poster_id
            FROM history
            WHERE item_type = 'Episode' AND series_name IS NOT NULL
                  AND started_at >= datetime('now', ?)
@@ -94,7 +94,7 @@ async def get_most_popular_shows(db: aiosqlite.Connection, limit: int = 5, days:
 
 async def get_recently_watched(db: aiosqlite.Connection, limit: int = 5) -> list[dict]:
     cursor = await db.execute(
-        """SELECT item_id, item_name, series_name, season_number, episode_number,
+        """SELECT item_id, item_name, series_name, series_id, season_number, episode_number,
                   item_type, year, user_name, started_at
            FROM history
            ORDER BY started_at DESC LIMIT ?""",

@@ -1,7 +1,10 @@
+{# Helper: poster_id for recently watched items #}
+{% macro rw_poster(item) %}{% if item.item_type == 'Episode' and item.series_id %}{{ item.series_id }}{% else %}{{ item.item_id }}{% endif %}{% endmacro %}
+
 <div class="stats-grid">
 
     <!-- Most Watched Movies -->
-    <div class="stat-card">
+    <div class="stat-card" {% if most_watched_movies %}data-bg="/api/img/{{ most_watched_movies[0].item_id }}"{% endif %}>
         <div class="stat-card-poster">
             {% if most_watched_movies %}
             <img src="/api/img/{{ most_watched_movies[0].item_id }}" alt="" loading="lazy">
@@ -25,7 +28,7 @@
     </div>
 
     <!-- Most Popular Movies -->
-    <div class="stat-card">
+    <div class="stat-card" {% if most_popular_movies %}data-bg="/api/img/{{ most_popular_movies[0].item_id }}"{% endif %}>
         <div class="stat-card-poster">
             {% if most_popular_movies %}
             <img src="/api/img/{{ most_popular_movies[0].item_id }}" alt="" loading="lazy">
@@ -49,10 +52,10 @@
     </div>
 
     <!-- Most Watched TV Shows -->
-    <div class="stat-card">
+    <div class="stat-card" {% if most_watched_shows %}data-bg="/api/img/{{ most_watched_shows[0].poster_id }}"{% endif %}>
         <div class="stat-card-poster">
             {% if most_watched_shows %}
-            <img src="/api/img/{{ most_watched_shows[0].item_id }}" alt="" loading="lazy">
+            <img src="/api/img/{{ most_watched_shows[0].poster_id }}" alt="" loading="lazy">
             {% endif %}
         </div>
         <div class="stat-card-content">
@@ -73,10 +76,10 @@
     </div>
 
     <!-- Most Popular TV Shows -->
-    <div class="stat-card">
+    <div class="stat-card" {% if most_popular_shows %}data-bg="/api/img/{{ most_popular_shows[0].poster_id }}"{% endif %}>
         <div class="stat-card-poster">
             {% if most_popular_shows %}
-            <img src="/api/img/{{ most_popular_shows[0].item_id }}" alt="" loading="lazy">
+            <img src="/api/img/{{ most_popular_shows[0].poster_id }}" alt="" loading="lazy">
             {% endif %}
         </div>
         <div class="stat-card-content">
@@ -97,10 +100,10 @@
     </div>
 
     <!-- Recently Watched -->
-    <div class="stat-card">
+    <div class="stat-card" {% if recently_watched %}data-bg="/api/img/{{ rw_poster(recently_watched[0]) | trim }}"{% endif %}>
         <div class="stat-card-poster">
             {% if recently_watched %}
-            <img src="/api/img/{{ recently_watched[0].item_id }}" alt="" loading="lazy">
+            <img src="/api/img/{{ rw_poster(recently_watched[0]) | trim }}" alt="" loading="lazy">
             {% endif %}
         </div>
         <div class="stat-card-content">

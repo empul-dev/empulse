@@ -6,6 +6,7 @@ class EmbyNowPlayingItem(BaseModel):
     name: str = Field(alias="Name", default="")
     type: str = Field(alias="Type", default="")
     series_name: str | None = Field(alias="SeriesName", default=None)
+    series_id: str | None = Field(alias="SeriesId", default=None)
     parent_index_number: int | None = Field(alias="ParentIndexNumber", default=None)
     index_number: int | None = Field(alias="IndexNumber", default=None)
     production_year: int | None = Field(alias="ProductionYear", default=None)

@@ -1,10 +1,10 @@
 {% if sessions %}
 <div class="now-playing-grid">
     {% for s in sessions %}
-    <div class="now-playing-card">
+    <div class="now-playing-card" {% if s.poster_id %}data-bg="/api/img/{{ s.poster_id }}"{% endif %}>
         <div class="now-playing-poster">
-            {% if s.item_id %}
-            <img src="/api/img/{{ s.item_id }}" alt="" loading="lazy">
+            {% if s.poster_id %}
+            <img src="/api/img/{{ s.poster_id }}" alt="" loading="lazy">
             {% endif %}
         </div>
         <div class="now-playing-info">
