@@ -1,19 +1,28 @@
-{% extends "base.html" %}
-{% block title %}Login — Emtulli{% endblock %}
-
-{% block content %}
-<div class="login-wrap">
-    <div class="login-card">
-        <h2>Emtulli</h2>
-        {% if error %}
-        <div class="error-msg">{{ error }}</div>
-        {% endif %}
-        <form method="post" action="/login">
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password"
-                   placeholder="Enter password" required autofocus>
-            <button type="submit">Sign In</button>
-        </form>
-    </div>
-</div>
-{% endblock %}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login — Emtulli</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <main class="container">
+        <div class="login-wrap">
+            <div class="login-card">
+                <h2>Emtulli</h2>
+                {% if error %}
+                <div class="error-msg">{{ error }}</div>
+                {% endif %}
+                <form method="post" action="/login">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password"
+                           placeholder="Enter password" required autofocus>
+                    <button type="submit">Sign In</button>
+                </form>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

@@ -68,6 +68,73 @@ class TestMiddleware:
             await db.close()
 
     @pytest.mark.asyncio
+    async def test_login_success(self):
+        """Correct password sets cookie and redirects to /."""
+        with patch("emtulli.app.init_db", new_callable=AsyncMock), \
+             patch("emtulli.app.settings") as mock_settings:
+            mock_settings.emby_api_key = ""
+            mock_settings.emby_url = "http://localhost:8096"
+            mock_settings.poll_interval = 10
+            mock_settings.db_path = ":memory:"
+            mock_settings.auth_password = "testpass"
+            mock_settings.secret_key = "testsecret"
+
+            from emtulli.app import create_app
+            app = create_app()
+
+            import aiosqlite
+            from emtulli.database import SCHEMA
+            db = await aiosqlite.connect(":memory:")
+            db.row_factory = aiosqlite.Row
+            await db.executescript(SCHEMA)
+            await db.commit()
+
+            with patch("emtulli.web.router.get_db", return_value=db), \
+                 patch("emtulli.web.api.get_db", return_value=db), \
+                 patch("emtulli.web.router.settings", mock_settings):
+                transport = ASGITransport(app=app)
+                async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
+                    r = await ac.post("/login", data={"password": "testpass"})
+                    assert r.status_code == 302
+                    assert r.headers.get("location") == "/"
+                    assert "emtulli_session" in r.headers.get("set-cookie", "")
+
+            await db.close()
+
+    @pytest.mark.asyncio
+    async def test_login_failure(self):
+        """Wrong password shows error."""
+        with patch("emtulli.app.init_db", new_callable=AsyncMock), \
+             patch("emtulli.app.settings") as mock_settings:
+            mock_settings.emby_api_key = ""
+            mock_settings.emby_url = "http://localhost:8096"
+            mock_settings.poll_interval = 10
+            mock_settings.db_path = ":memory:"
+            mock_settings.auth_password = "testpass"
+            mock_settings.secret_key = "testsecret"
+
+            from emtulli.app import create_app
+            app = create_app()
+
+            import aiosqlite
+            from emtulli.database import SCHEMA
+            db = await aiosqlite.connect(":memory:")
+            db.row_factory = aiosqlite.Row
+            await db.executescript(SCHEMA)
+            await db.commit()
+
+            with patch("emtulli.web.router.get_db", return_value=db), \
+                 patch("emtulli.web.api.get_db", return_value=db), \
+                 patch("emtulli.web.router.settings", mock_settings):
+                transport = ASGITransport(app=app)
+                async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                    r = await ac.post("/login", data={"password": "wrong"})
+                    assert r.status_code == 200
+                    assert "Invalid password" in r.text
+
+            await db.close()
+
+    @pytest.mark.asyncio
     async def test_password_redirects_to_login(self):
         """When password is set, unauthenticated requests redirect to login."""
         with patch("emtulli.app.init_db", new_callable=AsyncMock), \

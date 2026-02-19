@@ -20,7 +20,6 @@ SORTABLE_COLUMNS = {
     "duration": "duration_seconds",
     "play_method": "play_method",
     "player": "device_name",
-    "platform": "client",
     "product": "client",
     "ip": "ip_address",
 }

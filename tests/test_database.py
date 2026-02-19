@@ -447,6 +447,49 @@ class TestStats:
         assert top[0]["title"] == "Top Movie"
 
     @pytest.mark.asyncio
+    async def test_user_plays_by_type(self, db):
+        from datetime import date
+        today = date.today().isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "s1", "user_id": "u1", "item_type": "Movie",
+            "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
+        })
+        await history_db.insert_history(db, {
+            "session_key": "s2", "user_id": "u1", "item_type": "Episode",
+            "started_at": f"{today}T15:00:00", "stopped_at": f"{today}T16:00:00",
+        })
+        rows = await stats_db.get_user_plays_by_type(db, "u1", days=99999)
+        types = {r["item_type"]: r["plays"] for r in rows}
+        assert types["Movie"] == 1
+        assert types["Episode"] == 1
+
+    @pytest.mark.asyncio
+    async def test_library_stats(self, db):
+        from datetime import date
+        today = date.today().isoformat()
+        for i in range(3):
+            await history_db.insert_history(db, {
+                "session_key": f"ls{i}", "user_id": f"u{i}", "item_type": "Movie",
+                "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
+                "duration_seconds": 3600,
+            })
+        stats = await stats_db.get_library_stats(db, "Movie")
+        assert stats["all_time"]["plays"] == 3
+        assert stats["all_time"]["users"] == 3
+        assert stats["all_time"]["duration"] == 10800
+
+    @pytest.mark.asyncio
+    async def test_library_plays_per_day(self, db):
+        from datetime import date
+        today = date.today().isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "lpd1", "item_type": "Movie",
+            "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
+        })
+        rows = await stats_db.get_library_plays_per_day(db, "Movie", days=7)
+        assert any(r["plays"] == 1 for r in rows)
+
+    @pytest.mark.asyncio
     async def test_library_top_users(self, db):
         from datetime import date
         today = date.today().isoformat()

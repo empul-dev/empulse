@@ -206,14 +206,7 @@ document.body.addEventListener("htmx:responseError", function(evt) {
         loadCharts();
     }
 
-    // Reload when days input changes
-    document.body.addEventListener("change", function(e) {
-        if (e.target && e.target.id === "days-input") {
-            loadCharts();
-        }
-    });
-
-    // Reload on HTMX swap (for push updates)
+    // Reload on HTMX swap (stats-cards swap triggers after days-input change or push update)
     document.body.addEventListener("htmx:afterSwap", function(e) {
         if (e.detail.target && e.detail.target.id === "stats-cards") {
             loadCharts();

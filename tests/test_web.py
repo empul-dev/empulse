@@ -70,6 +70,25 @@ class TestPageRoutes:
         assert "Libraries" in r.text
 
     @pytest.mark.asyncio
+    async def test_user_detail_page(self, client):
+        from emtulli.db import users as users_db
+        db = client._test_db
+        await users_db.upsert_user(db, {
+            "emby_user_id": "u1", "username": "Alice",
+            "is_admin": 0, "thumb_url": None, "last_seen": None,
+        })
+        await history_db.insert_history(db, {
+            "session_key": "ud1", "user_id": "u1", "user_name": "Alice",
+            "item_id": "m1", "item_name": "Test Movie", "item_type": "Movie",
+            "started_at": "2024-01-15T20:00:00", "stopped_at": "2024-01-15T22:00:00",
+            "duration_seconds": 7200,
+        })
+        r = await client.get("/users/u1")
+        assert r.status_code == 200
+        assert "Alice" in r.text
+        assert "Plays" in r.text
+
+    @pytest.mark.asyncio
     async def test_settings_page(self, client):
         r = await client.get("/settings")
         assert r.status_code == 200
