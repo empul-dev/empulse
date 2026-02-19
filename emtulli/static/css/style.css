@@ -171,8 +171,25 @@ nav a.active {
     z-index: 0;
 }
 
-.stat-card[data-bg]:hover::before {
+.stat-card[data-bg]:hover::before,
+.stat-card[data-bg].is-hovered::before {
     opacity: 1;
+}
+
+/* Highlight hovered list item */
+.stat-list li[data-img] {
+    cursor: pointer;
+    padding: 0.2rem 0.3rem;
+    border-radius: 3px;
+    transition: background 0.15s;
+}
+
+.stat-list li[data-img]:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.stat-list li[data-img]:hover .stat-list-name {
+    color: var(--accent);
 }
 
 .stat-card > * {

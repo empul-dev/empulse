@@ -17,7 +17,7 @@
             </div>
             <ol class="stat-list">
                 {% for m in most_watched_movies %}
-                <li>
+                <li data-img="/api/img/{{ m.item_id }}">
                     <span class="stat-list-name">{{ m.item_name }}{% if m.year %} ({{ m.year }}){% endif %}</span>
                     <span class="stat-list-value">{{ m.plays if metric == 'plays' else (m.total_duration // 3600) ~ 'h' }}</span>
                 </li>
@@ -41,7 +41,7 @@
             </div>
             <ol class="stat-list">
                 {% for m in most_popular_movies %}
-                <li>
+                <li data-img="/api/img/{{ m.item_id }}">
                     <span class="stat-list-name">{{ m.item_name }}</span>
                     <span class="stat-list-value">{{ m.users }}</span>
                 </li>
@@ -65,7 +65,7 @@
             </div>
             <ol class="stat-list">
                 {% for s in most_watched_shows %}
-                <li>
+                <li data-img="/api/img/{{ s.poster_id }}">
                     <span class="stat-list-name">{{ s.series_name }}</span>
                     <span class="stat-list-value">{{ s.plays if metric == 'plays' else (s.total_duration // 3600) ~ 'h' }}</span>
                 </li>
@@ -89,7 +89,7 @@
             </div>
             <ol class="stat-list">
                 {% for s in most_popular_shows %}
-                <li>
+                <li data-img="/api/img/{{ s.poster_id }}">
                     <span class="stat-list-name">{{ s.series_name }}</span>
                     <span class="stat-list-value">{{ s.users }}</span>
                 </li>
@@ -113,7 +113,7 @@
             </div>
             <ol class="stat-list">
                 {% for r in recently_watched %}
-                <li>
+                <li data-img="/api/img/{{ rw_poster(r) | trim }}">
                     <span class="stat-list-name">{{ r.display_title }}</span>
                     <span class="stat-list-value-small">{{ r.user_name }}</span>
                 </li>
