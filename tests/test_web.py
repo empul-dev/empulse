@@ -17,6 +17,8 @@ async def client():
         mock_settings.emby_url = "http://localhost:8096"
         mock_settings.poll_interval = 10
         mock_settings.db_path = ":memory:"
+        mock_settings.auth_password = ""
+        mock_settings.secret_key = ""
 
         app = create_app()
 
@@ -202,6 +204,66 @@ class TestAPIRoutes:
         assert "Transcode" in r.text
         assert "Bob" in r.text
         assert "Apple TV" in r.text
+
+    @pytest.mark.asyncio
+    async def test_chart_daily_plays_empty(self, client):
+        r = await client.get("/api/charts/daily-plays?days=7")
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data) == 7
+        assert all(d["plays"] == 0 for d in data)
+
+    @pytest.mark.asyncio
+    async def test_chart_daily_plays_with_data(self, client):
+        from datetime import date
+        db = client._test_db
+        today = date.today().isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "chart1", "user_id": "u1", "item_type": "Movie",
+            "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
+            "duration_seconds": 7200,
+        })
+        r = await client.get("/api/charts/daily-plays?days=7")
+        assert r.status_code == 200
+        data = r.json()
+        plays = [d["plays"] for d in data]
+        assert 1 in plays
+
+    @pytest.mark.asyncio
+    async def test_chart_plays_by_type(self, client):
+        r = await client.get("/api/charts/plays-by-type?days=30")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_chart_plays_by_platform(self, client):
+        r = await client.get("/api/charts/plays-by-platform?days=30")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_chart_user_daily_plays(self, client):
+        r = await client.get("/api/charts/user/u1/daily-plays?days=7")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_chart_user_by_type(self, client):
+        r = await client.get("/api/charts/user/u1/by-type?days=30")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_chart_library_daily_plays(self, client):
+        r = await client.get("/api/charts/library/Movie/daily-plays?days=7")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_library_detail_route(self, client):
+        r = await client.get("/libraries/Movie")
+        assert r.status_code == 200
+        assert "Movies" in r.text
 
     @pytest.mark.asyncio
     async def test_static_css(self, client):

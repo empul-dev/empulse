@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}{{ label }} — Emtulli{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h2>{{ label }}</h2>
+</div>
+
+<div class="library-stats-grid">
+    {% for period, lbl in [("last_7d", "7 Days"), ("last_30d", "30 Days"), ("all_time", "All Time")] %}
+    {% set s = lib_stats.get(period, {}) %}
+    <div class="library-stat-box">
+        <div class="period-label">{{ lbl }}</div>
+        <div class="big-num">{{ s.get("plays", 0) }}</div>
+        <div class="stat-detail">plays</div>
+        <div class="stat-detail">{{ (s.get("duration", 0) / 3600)|round(1) }}h · {{ s.get("users", 0) }} users</div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="charts-section">
+    <div class="chart-card wide" style="margin-bottom:1rem">
+        <div class="chart-header">Daily Plays</div>
+        <div class="chart-body"><canvas id="lib-chart-daily"></canvas></div>
+    </div>
+</div>
+
+{% if top_items %}
+<div class="section-header"><h2>Most Watched</h2></div>
+<div class="user-most-watched">
+    {% for item in top_items %}
+    <div class="user-watched-item">
+        <img src="/api/img/{{ item.poster_id }}" alt="" loading="lazy">
+        <div class="watched-title" title="{{ item.title }}">{{ item.title }}</div>
+        <div class="watched-plays">{{ item.plays }} plays · {{ item.users }} users</div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if top_users %}
+<div class="section-header"><h2>Most Active Users</h2></div>
+<div class="item-user-stats">
+    {% for u in top_users %}
+    <div class="item-user-card">
+        <div class="item-user-avatar">
+            <img src="/api/img/user/{{ u.user_id }}" alt=""
+                 onerror="this.style.display='none'">
+        </div>
+        <div>
+            <a href="/users/{{ u.user_id }}" class="item-user-name">{{ u.user_name or "Unknown" }}</a>
+            <div style="font-size:0.78em;color:var(--text-muted)">{{ u.plays }} plays</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var C = window.emtulliCharts;
+    if (!C) return;
+    C.setupDefaults();
+    var accent = C.getCSS("--accent") || "#c8a438";
+
+    fetch("/api/charts/library/{{ item_type }}/daily-plays?days=30")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            new Chart(document.getElementById("lib-chart-daily"), {
+                type: "line",
+                data: {
+                    labels: data.map(function(d) { return d.date.slice(5); }),
+                    datasets: [{
+                        label: "Plays",
+                        data: data.map(function(d) { return d.plays; }),
+                        borderColor: accent,
+                        backgroundColor: accent + "33",
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                }
+            });
+        });
+})();
+</script>
+{% endblock %}

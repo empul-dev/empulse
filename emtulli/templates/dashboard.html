@@ -37,6 +37,23 @@
     </div>
 </div>
 
+<div class="charts-section">
+    <div class="charts-grid">
+        <div class="chart-card wide">
+            <div class="chart-header">Daily Plays</div>
+            <div class="chart-body"><canvas id="chart-daily"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">Plays by Type</div>
+            <div class="chart-body"><canvas id="chart-type"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">Plays by Platform</div>
+            <div class="chart-body"><canvas id="chart-platform"></canvas></div>
+        </div>
+    </div>
+</div>
+
 <div id="stats-cards"
      hx-get="/api/stats-cards"
      hx-trigger="load, refresh-stats from:body"

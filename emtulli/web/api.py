@@ -1,7 +1,8 @@
 import json
 import logging
+from datetime import date, timedelta
 from fastapi import APIRouter, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from emtulli.app import templates
 from emtulli.config import settings
 from emtulli.database import get_db
@@ -252,6 +253,66 @@ async def user_image_proxy(user_id: str):
         media_type="image/png",
         headers={"Cache-Control": "public, max-age=3600"},
     )
+
+
+def _fill_date_gaps(rows: list[dict], days: int) -> list[dict]:
+    """Fill missing dates with zeroed entries."""
+    today = date.today()
+    start = today - timedelta(days=days - 1)
+    existing = {r["date"]: r for r in rows}
+    result = []
+    for i in range(days):
+        d = (start + timedelta(days=i)).isoformat()
+        if d in existing:
+            result.append(existing[d])
+        else:
+            result.append({"date": d, "plays": 0, "total_duration": 0})
+    return result
+
+
+@router.get("/charts/daily-plays")
+async def chart_daily_plays(days: int = 30):
+    db = get_db()
+    rows = await stats_db.get_plays_per_day(db, days=days)
+    filled = _fill_date_gaps(rows, days)
+    return JSONResponse(filled)
+
+
+@router.get("/charts/plays-by-type")
+async def chart_plays_by_type(days: int = 30):
+    db = get_db()
+    rows = await stats_db.get_plays_by_type(db, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/plays-by-platform")
+async def chart_plays_by_platform(days: int = 30):
+    db = get_db()
+    rows = await stats_db.get_most_active_platforms(db, limit=10, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/user/{user_id}/daily-plays")
+async def chart_user_daily_plays(user_id: str, days: int = 30):
+    db = get_db()
+    rows = await stats_db.get_user_plays_per_day(db, user_id, days=days)
+    filled = _fill_date_gaps(rows, days)
+    return JSONResponse(filled)
+
+
+@router.get("/charts/user/{user_id}/by-type")
+async def chart_user_by_type(user_id: str, days: int = 30):
+    db = get_db()
+    rows = await stats_db.get_user_plays_by_type(db, user_id, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/library/{item_type}/daily-plays")
+async def chart_library_daily_plays(item_type: str, days: int = 30):
+    db = get_db()
+    rows = await stats_db.get_library_plays_per_day(db, item_type, days=days)
+    filled = _fill_date_gaps(rows, days)
+    return JSONResponse(filled)
 
 
 @router.post("/test-connection")

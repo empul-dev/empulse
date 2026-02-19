@@ -86,4 +86,12 @@ def create_app() -> FastAPI:
     app.include_router(api_router, prefix="/api")
     app.include_router(ws_router)
 
+    if settings.auth_password:
+        from emtulli.web.auth import AuthMiddleware
+        app.add_middleware(
+            AuthMiddleware,
+            password=settings.auth_password,
+            secret=settings.secret_key or settings.auth_password,
+        )
+
     return app

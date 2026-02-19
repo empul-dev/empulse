@@ -7,12 +7,17 @@
 {% if libraries %}
 <div class="grid">
     {% for lib in libraries %}
+    {% set type_map = {"movies": "Movie", "tvshows": "Episode", "music": "Audio"} %}
+    {% set item_type = type_map.get(lib.library_type, "") %}
     <article>
         <header>{{ lib.name }}</header>
         <p>
             <strong>{{ lib.item_count }}</strong> items<br>
             <small>{{ lib.library_type }}</small>
         </p>
+        {% if item_type %}
+        <footer><a href="/libraries/{{ item_type }}">View Stats</a></footer>
+        {% endif %}
     </article>
     {% endfor %}
 </div>

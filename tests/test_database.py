@@ -399,7 +399,64 @@ class TestStats:
             "started_at": "2024-01-01T12:00:00", "stopped_at": "2024-01-01T14:00:00",
         })
 
-        by_type = await stats_db.get_plays_by_type(db)
+        by_type = await stats_db.get_plays_by_type(db, days=99999)
         types = {r["item_type"]: r["plays"] for r in by_type}
         assert types["Episode"] == 2
         assert types["Movie"] == 1
+
+    @pytest.mark.asyncio
+    async def test_user_plays_per_day(self, db):
+        from datetime import date
+        today = date.today().isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "s1", "user_id": "u1", "user_name": "Alice",
+            "item_type": "Movie",
+            "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
+            "duration_seconds": 7200,
+        })
+        rows = await stats_db.get_user_plays_per_day(db, "u1", days=7)
+        assert any(r["plays"] == 1 for r in rows)
+
+    @pytest.mark.asyncio
+    async def test_user_most_watched(self, db):
+        from datetime import date
+        today = date.today().isoformat()
+        for i in range(3):
+            await history_db.insert_history(db, {
+                "session_key": f"s{i}", "user_id": "u1", "user_name": "Alice",
+                "item_id": "m1", "item_name": "Popular Movie", "item_type": "Movie",
+                "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
+            })
+        top = await stats_db.get_user_most_watched(db, "u1", limit=5, days=99999)
+        assert len(top) >= 1
+        assert top[0]["title"] == "Popular Movie"
+        assert top[0]["plays"] == 3
+
+    @pytest.mark.asyncio
+    async def test_library_top_items(self, db):
+        from datetime import date
+        today = date.today().isoformat()
+        for i in range(3):
+            await history_db.insert_history(db, {
+                "session_key": f"s{i}", "user_id": "u1",
+                "item_id": "m1", "item_name": "Top Movie", "item_type": "Movie",
+                "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
+            })
+        top = await stats_db.get_library_top_items(db, "Movie", limit=5, days=99999)
+        assert len(top) >= 1
+        assert top[0]["title"] == "Top Movie"
+
+    @pytest.mark.asyncio
+    async def test_library_top_users(self, db):
+        from datetime import date
+        today = date.today().isoformat()
+        for i in range(5):
+            await history_db.insert_history(db, {
+                "session_key": f"s{i}", "user_id": "u1", "user_name": "Alice",
+                "item_type": "Movie",
+                "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
+            })
+        top = await stats_db.get_library_top_users(db, "Movie", limit=5, days=99999)
+        assert len(top) >= 1
+        assert top[0]["user_name"] == "Alice"
+        assert top[0]["plays"] == 5

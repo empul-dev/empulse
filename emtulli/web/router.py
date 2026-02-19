@@ -1,11 +1,13 @@
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Form
+from fastapi.responses import RedirectResponse
 from emtulli.app import templates
 from emtulli.config import settings
 from emtulli.database import get_db
 from emtulli.db import users as users_db, libraries as libraries_db, history as history_db, stats as stats_db
 from emtulli.models import UserInfo, HistoryRecord
+from emtulli.web.auth import create_session_token, COOKIE_NAME
 
 logger = logging.getLogger("emtulli.router")
 
@@ -45,11 +47,13 @@ async def user_detail(request: Request, user_id: str):
         user_data = {"emby_user_id": user_id, "username": "Unknown", "total_plays": 0, "total_duration": 0}
     user = UserInfo(**user_data)
     user_stats = await stats_db.get_user_stats(db, user_id)
+    most_watched = await stats_db.get_user_most_watched(db, user_id, limit=10, days=30)
     history_rows = await history_db.get_history_for_user(db, user_id, limit=50)
     history_list = [HistoryRecord(**r) for r in history_rows]
     return templates.TemplateResponse("user.html", {
         "request": request, "active": "users",
-        "user": user, "user_stats": user_stats, "history": history_list,
+        "user": user, "user_stats": user_stats,
+        "most_watched": most_watched, "history": history_list,
     })
 
 
@@ -125,6 +129,44 @@ async def libraries_page(request: Request):
     return templates.TemplateResponse("libraries.html", {
         "request": request, "active": "libraries",
         "libraries": all_libs,
+    })
+
+
+@router.get("/libraries/{item_type}")
+async def library_detail(request: Request, item_type: str):
+    db = get_db()
+    type_labels = {"Movie": "Movies", "Episode": "TV Shows", "Audio": "Music"}
+    label = type_labels.get(item_type, item_type)
+    lib_stats = await stats_db.get_library_stats(db, item_type)
+    top_items = await stats_db.get_library_top_items(db, item_type, limit=10, days=30)
+    top_users = await stats_db.get_library_top_users(db, item_type, limit=10, days=30)
+    return templates.TemplateResponse("library.html", {
+        "request": request, "active": "libraries",
+        "item_type": item_type, "label": label,
+        "lib_stats": lib_stats, "top_items": top_items, "top_users": top_users,
+    })
+
+
+@router.get("/login")
+async def login_page(request: Request, error: str = ""):
+    return templates.TemplateResponse("login.html", {
+        "request": request, "active": "", "error": error,
+    })
+
+
+@router.post("/login")
+async def login_submit(request: Request, password: str = Form(...)):
+    if settings.auth_password and password == settings.auth_password:
+        secret = settings.secret_key or settings.auth_password
+        token = create_session_token(secret)
+        response = RedirectResponse("/", status_code=302)
+        response.set_cookie(
+            COOKIE_NAME, token,
+            httponly=True, samesite="lax", max_age=30 * 24 * 3600,
+        )
+        return response
+    return templates.TemplateResponse("login.html", {
+        "request": request, "active": "", "error": "Invalid password",
     })
 
 

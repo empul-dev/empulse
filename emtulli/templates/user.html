@@ -2,12 +2,57 @@
 {% block title %}{{ user.username }} — Emtulli{% endblock %}
 
 {% block content %}
-<hgroup>
-    <h2>{{ user.username or "Unknown User" }}</h2>
-    <p>{{ user_stats.total_plays }} plays · {{ user.total_duration_display }} watched</p>
-</hgroup>
+<div class="user-hero">
+    <div class="user-avatar-large">
+        <img src="/api/img/user/{{ user.emby_user_id }}" alt=""
+             onerror="this.parentElement.innerHTML='<div class=\'avatar-fallback\'>{{ (user.username or '?')[0]|upper }}</div>'">
+    </div>
+    <div>
+        <h2 style="margin:0">{{ user.username or "Unknown User" }}</h2>
+        <div class="user-stat-row">
+            <div class="stat-item">
+                <span class="stat-label">Plays</span>
+                <span class="stat-value">{{ user_stats.total_plays }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Watch Time</span>
+                <span class="stat-value">{{ user.total_duration_display }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Last Seen</span>
+                <span class="stat-value" style="font-size:0.85em; color:var(--text-secondary)">{{ (user_stats.last_play or "Never")[:10] }}</span>
+            </div>
+        </div>
+    </div>
+</div>
 
-<h3>Recent Activity</h3>
+<div class="charts-section">
+    <div class="charts-grid">
+        <div class="chart-card wide">
+            <div class="chart-header">Daily Plays</div>
+            <div class="chart-body"><canvas id="user-chart-daily"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">Plays by Type</div>
+            <div class="chart-body"><canvas id="user-chart-type"></canvas></div>
+        </div>
+    </div>
+</div>
+
+{% if most_watched %}
+<div class="section-header"><h2>Most Watched</h2></div>
+<div class="user-most-watched">
+    {% for item in most_watched %}
+    <div class="user-watched-item">
+        <img src="/api/img/{{ item.poster_id }}" alt="" loading="lazy">
+        <div class="watched-title" title="{{ item.title }}">{{ item.title }}</div>
+        <div class="watched-plays">{{ item.plays }} plays</div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="section-header"><h2>Recent Activity</h2></div>
 {% if history %}
 <figure>
 <table>
@@ -22,7 +67,7 @@
     <tbody>
         {% for h in history %}
         <tr>
-            <td>{{ h.display_title }}</td>
+            <td><a href="{{ h.item_link }}">{{ h.display_title }}</a></td>
             <td>{{ h.item_type or "" }}</td>
             <td>{{ h.duration_display }}</td>
             <td>{{ h.started_at[:16] }}</td>
@@ -32,6 +77,63 @@
 </table>
 </figure>
 {% else %}
-<p>No watch history yet.</p>
+<p class="empty-state">No watch history yet.</p>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var C = window.emtulliCharts;
+    if (!C) return;
+    C.setupDefaults();
+    var accent = C.getCSS("--accent") || "#c8a438";
+    var userId = "{{ user.emby_user_id }}";
+
+    fetch("/api/charts/user/" + userId + "/daily-plays?days=30")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            new Chart(document.getElementById("user-chart-daily"), {
+                type: "line",
+                data: {
+                    labels: data.map(function(d) { return d.date.slice(5); }),
+                    datasets: [{
+                        label: "Plays",
+                        data: data.map(function(d) { return d.plays; }),
+                        borderColor: accent,
+                        backgroundColor: accent + "33",
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                }
+            });
+        });
+
+    fetch("/api/charts/user/" + userId + "/by-type?days=30")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            new Chart(document.getElementById("user-chart-type"), {
+                type: "doughnut",
+                data: {
+                    labels: data.map(function(d) { return d.item_type; }),
+                    datasets: [{
+                        data: data.map(function(d) { return d.plays; }),
+                        backgroundColor: C.COLORS.slice(0, data.length)
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, position: "right", labels: { boxWidth: 12 } } }
+                }
+            });
+        });
+})();
+</script>
 {% endblock %}

@@ -3,6 +3,9 @@ __pycache__/
 *.pyo
 .venv/
 *.db
+*.db-shm
+*.db-wal
+uv.lock
 .env
 *.egg-info/
 dist/

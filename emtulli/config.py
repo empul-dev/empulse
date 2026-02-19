@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     emtulli_port: int = 8189
     poll_interval: int = 10
     db_path: str = str(_PROJECT_DIR / "emtulli.db")
+    auth_password: str = ""
+    secret_key: str = ""
 
     model_config = {"env_file_encoding": "utf-8"}
 
