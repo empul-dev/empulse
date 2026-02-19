@@ -476,6 +476,100 @@ nav a.active {
     font-size: 0.9em;
 }
 
+/* === History Toolbar === */
+.history-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.history-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+.filter-select {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-primary) !important;
+    font-size: 0.82em !important;
+    padding: 0.35rem 0.6rem !important;
+    border-radius: 4px !important;
+    margin: 0 !important;
+    min-width: 120px;
+}
+
+.filter-buttons {
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.filter-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.35rem 0.7rem;
+    font-size: 0.78em;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: 500;
+    border-right: 1px solid var(--border);
+}
+
+.filter-btn:last-child {
+    border-right: none;
+}
+
+.filter-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.05);
+}
+
+.filter-btn.active {
+    background: var(--accent);
+    color: #000;
+    font-weight: 700;
+}
+
+.filter-btn.direct-play.active {
+    background: var(--success);
+}
+
+.filter-btn.direct-stream.active {
+    background: var(--warning);
+}
+
+.filter-btn.transcode.active {
+    background: var(--danger);
+}
+
+.history-search {
+    margin-left: auto;
+}
+
+.search-input {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-primary) !important;
+    font-size: 0.82em !important;
+    padding: 0.35rem 0.6rem !important;
+    border-radius: 4px !important;
+    margin: 0 !important;
+    width: 180px;
+}
+
+.search-input::placeholder {
+    color: var(--text-muted);
+}
+
 /* === Tables === */
 table {
     font-size: 0.88em;
@@ -491,6 +585,126 @@ table th {
 
 table a {
     color: var(--accent);
+}
+
+/* === History Table === */
+.history-table-wrap {
+    overflow-x: auto;
+}
+
+.history-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84em;
+}
+
+.history-tbl th {
+    padding: 0.5rem 0.6rem;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 2px solid var(--border);
+}
+
+.history-tbl td {
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.history-tbl tbody tr:hover {
+    background: rgba(255,255,255,0.03);
+}
+
+.col-icon {
+    width: 24px;
+    text-align: center;
+}
+
+.type-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--text-muted);
+    vertical-align: middle;
+}
+
+.col-date {
+    white-space: nowrap;
+    color: var(--text-secondary);
+}
+
+.col-user a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.col-user a:hover {
+    text-decoration: underline;
+}
+
+.col-ip {
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.col-platform .platform-name {
+    display: block;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.col-platform .device-name {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+
+.col-title .title-text {
+    display: block;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
+}
+
+.col-title .episode-name {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.85em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
+}
+
+.col-time {
+    white-space: nowrap;
+    color: var(--text-secondary);
+}
+
+.col-duration {
+    white-space: nowrap;
+}
+
+.col-duration .dur-text {
+    color: var(--text-secondary);
+    margin-left: 0.4rem;
+}
+
+.history-pagination ul {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    align-items: center;
+    list-style: none;
+    padding: 0.5rem 0;
+}
+
+.history-pagination a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.85em;
 }
 
 /* === Connection test === */
@@ -550,5 +764,19 @@ input[readonly] {
     .section-header {
         flex-direction: column;
         align-items: flex-start;
+    }
+    .history-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .history-search {
+        margin-left: 0;
+    }
+    .search-input {
+        width: 100% !important;
+    }
+    .col-title .title-text,
+    .col-title .episode-name {
+        max-width: 160px;
     }
 }

@@ -63,6 +63,7 @@ class HistoryRecord(BaseModel):
     user_name: str | None = None
     client: str | None = None
     device_name: str | None = None
+    ip_address: str | None = None
     item_name: str | None = None
     item_type: str | None = None
     series_name: str | None = None
@@ -85,6 +86,44 @@ class HistoryRecord(BaseModel):
         if self.item_name and self.year:
             return f"{self.item_name} ({self.year})"
         return self.item_name or "Unknown"
+
+    @property
+    def title_short(self) -> str:
+        """Shorter title for table display."""
+        if self.series_name and self.season_number is not None and self.episode_number is not None:
+            return f"{self.series_name} (S{self.season_number:02d} · E{self.episode_number:02d})"
+        if self.item_name and self.year:
+            return f"{self.item_name} ({self.year})"
+        return self.item_name or "Unknown"
+
+    @property
+    def type_icon(self) -> str:
+        icons = {"Movie": "film", "Episode": "tv", "Audio": "music"}
+        return icons.get(self.item_type or "", "")
+
+    @property
+    def started_time(self) -> str:
+        return self.started_at[11:16] if len(self.started_at) > 16 else ""
+
+    @property
+    def stopped_time(self) -> str:
+        return self.stopped_at[11:16] if len(self.stopped_at) > 16 else ""
+
+    @property
+    def started_date(self) -> str:
+        return self.started_at[:10] if len(self.started_at) >= 10 else ""
+
+    @property
+    def paused_display(self) -> str:
+        if not self.paused_seconds:
+            return "0 mins"
+        m = self.paused_seconds // 60
+        return f"{m} mins"
+
+    @property
+    def duration_mins(self) -> str:
+        m = self.duration_seconds // 60
+        return f"{m} mins"
 
     @property
     def duration_display(self) -> str:

@@ -17,6 +17,7 @@ async def get_history(
     offset: int = 0,
     user_id: str | None = None,
     item_type: str | None = None,
+    play_method: str | None = None,
     search: str | None = None,
 ) -> list[dict]:
     query = "SELECT * FROM history WHERE 1=1"
@@ -28,6 +29,9 @@ async def get_history(
     if item_type:
         query += " AND item_type = ?"
         params.append(item_type)
+    if play_method:
+        query += " AND play_method = ?"
+        params.append(play_method)
     if search:
         query += " AND (item_name LIKE ? OR series_name LIKE ? OR user_name LIKE ?)"
         term = f"%{search}%"
@@ -45,6 +49,7 @@ async def get_history_count(
     db: aiosqlite.Connection,
     user_id: str | None = None,
     item_type: str | None = None,
+    play_method: str | None = None,
     search: str | None = None,
 ) -> int:
     query = "SELECT COUNT(*) FROM history WHERE 1=1"
@@ -56,6 +61,9 @@ async def get_history_count(
     if item_type:
         query += " AND item_type = ?"
         params.append(item_type)
+    if play_method:
+        query += " AND play_method = ?"
+        params.append(play_method)
     if search:
         query += " AND (item_name LIKE ? OR series_name LIKE ? OR user_name LIKE ?)"
         term = f"%{search}%"

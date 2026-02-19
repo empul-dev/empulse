@@ -1,44 +1,71 @@
 {% if records %}
-<figure>
-<table>
+<div class="history-table-wrap">
+<table class="history-tbl">
     <thead>
         <tr>
-            <th>User</th>
-            <th>Title</th>
-            <th>Type</th>
-            <th>Play Method</th>
-            <th>Duration</th>
+            <th></th>
             <th>Date</th>
+            <th>User</th>
+            <th>IP Address</th>
+            <th>Platform</th>
+            <th>Title</th>
+            <th>Started</th>
+            <th>Paused</th>
+            <th>Stopped</th>
+            <th>Duration</th>
         </tr>
     </thead>
     <tbody>
         {% for r in records %}
         <tr>
-            <td><a href="/users/{{ r.user_id }}">{{ r.user_name or "Unknown" }}</a></td>
-            <td>{{ r.display_title }}</td>
-            <td>{{ r.item_type or "" }}</td>
-            <td>
-                <span class="play-method {% if r.play_method == 'Transcode' %}transcode{% elif r.play_method == 'DirectPlay' %}direct-play{% else %}direct-stream{% endif %}">
+            <td class="col-icon">
+                {% if r.type_icon == 'film' %}
+                <svg class="type-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+                {% elif r.type_icon == 'tv' %}
+                <svg class="type-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>
+                {% elif r.type_icon == 'music' %}
+                <svg class="type-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                {% endif %}
+            </td>
+            <td class="col-date">{{ r.started_date }}</td>
+            <td class="col-user"><a href="/users/{{ r.user_id }}">{{ r.user_name or "Unknown" }}</a></td>
+            <td class="col-ip">{{ r.ip_address or "" }}</td>
+            <td class="col-platform">
+                <span class="platform-name">{{ r.client or "" }}</span>
+                {% if r.device_name %}<span class="device-name">{{ r.device_name }}</span>{% endif %}
+            </td>
+            <td class="col-title">
+                <span class="title-text">{{ r.title_short }}</span>
+                {% if r.item_name and r.series_name %}
+                <span class="episode-name">{{ r.item_name }}</span>
+                {% endif %}
+            </td>
+            <td class="col-time">{{ r.started_time }}</td>
+            <td class="col-time">{{ r.paused_display }}</td>
+            <td class="col-time">{{ r.stopped_time }}</td>
+            <td class="col-duration">
+                <span class="play-method {% if r.play_method == 'Transcode' %}transcode{% elif r.play_method == 'DirectPlay' %}direct-play{% elif r.play_method == 'DirectStream' %}direct-stream{% endif %}">
                     {{ r.play_method or "" }}
                 </span>
+                <span class="dur-text">{{ r.duration_display }}</span>
             </td>
-            <td>{{ r.duration_display }}</td>
-            <td>{{ r.started_at[:16] }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
-</figure>
+</div>
 
 {% if total_pages > 1 %}
-<nav>
+<nav class="history-pagination">
     <ul>
         {% if page > 1 %}
-        <li><a href="#" hx-get="/api/history-table?page={{ page - 1 }}" hx-target="#history-table">&laquo; Prev</a></li>
+        <li><a href="#" hx-get="/api/history-table?page={{ page - 1 }}{{ filter_params }}"
+               hx-target="#history-table">&laquo; Prev</a></li>
         {% endif %}
         <li><small>Page {{ page }} of {{ total_pages }}</small></li>
         {% if page < total_pages %}
-        <li><a href="#" hx-get="/api/history-table?page={{ page + 1 }}" hx-target="#history-table">Next &raquo;</a></li>
+        <li><a href="#" hx-get="/api/history-table?page={{ page + 1 }}{{ filter_params }}"
+               hx-target="#history-table">Next &raquo;</a></li>
         {% endif %}
     </ul>
 </nav>

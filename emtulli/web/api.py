@@ -94,6 +94,7 @@ async def history_table(
     search: str = "",
     user_id: str = "",
     item_type: str = "",
+    play_method: str = "",
 ):
     db = get_db()
     per_page = 50
@@ -103,19 +104,33 @@ async def history_table(
         db, limit=per_page, offset=offset,
         user_id=user_id or None,
         item_type=item_type or None,
+        play_method=play_method or None,
         search=search or None,
     )
     total = await history_db.get_history_count(
         db, user_id=user_id or None,
         item_type=item_type or None,
+        play_method=play_method or None,
         search=search or None,
     )
     records = [HistoryRecord(**r) for r in rows]
     total_pages = max(1, (total + per_page - 1) // per_page)
 
+    # Build filter params for pagination links
+    filter_params = ""
+    if user_id:
+        filter_params += f"&user_id={user_id}"
+    if item_type:
+        filter_params += f"&item_type={item_type}"
+    if play_method:
+        filter_params += f"&play_method={play_method}"
+    if search:
+        filter_params += f"&search={search}"
+
     return templates.TemplateResponse("partials/history_table.html", {
         "request": request, "records": records,
         "page": page, "total_pages": total_pages,
+        "filter_params": filter_params,
     })
 
 

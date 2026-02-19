@@ -2,40 +2,57 @@
 {% block title %}History — Emtulli{% endblock %}
 
 {% block content %}
-<h2>History</h2>
+<div class="section-header">
+    <h2>History</h2>
+</div>
 
-<div class="grid">
-    <div>
-        <input type="search" name="search" placeholder="Search..."
-               hx-get="/api/history-table"
-               hx-trigger="input changed delay:300ms, search"
-               hx-target="#history-table"
-               hx-include="[name='user_id'], [name='item_type']">
-    </div>
-    <div>
-        <select name="item_type"
+<div class="history-toolbar" id="history-filters">
+    <div class="history-toolbar-group">
+        <select name="user_id" class="filter-select"
                 hx-get="/api/history-table"
                 hx-trigger="change"
                 hx-target="#history-table"
-                hx-include="[name='search'], [name='user_id']">
-            <option value="">All Types</option>
-            <option value="Movie">Movies</option>
-            <option value="Episode">Episodes</option>
-            <option value="Audio">Music</option>
-        </select>
-    </div>
-    <div>
-        <select name="user_id"
-                hx-get="/api/history-table"
-                hx-trigger="change"
-                hx-target="#history-table"
-                hx-include="[name='search'], [name='item_type']">
-            <option value="">All Users</option>
+                hx-include="#history-filters">
+            <option value="">All users</option>
             {% for user in users %}
             <option value="{{ user.emby_user_id }}">{{ user.username }}</option>
             {% endfor %}
         </select>
     </div>
+
+    <div class="history-toolbar-group filter-buttons">
+        <button class="filter-btn active" data-filter="item_type" data-value=""
+                onclick="toggleFilter(this)">All</button>
+        <button class="filter-btn" data-filter="item_type" data-value="Movie"
+                onclick="toggleFilter(this)">Movies</button>
+        <button class="filter-btn" data-filter="item_type" data-value="Episode"
+                onclick="toggleFilter(this)">TV Shows</button>
+        <button class="filter-btn" data-filter="item_type" data-value="Audio"
+                onclick="toggleFilter(this)">Music</button>
+    </div>
+
+    <div class="history-toolbar-group filter-buttons">
+        <button class="filter-btn active" data-filter="play_method" data-value=""
+                onclick="toggleFilter(this)">All</button>
+        <button class="filter-btn direct-play" data-filter="play_method" data-value="DirectPlay"
+                onclick="toggleFilter(this)">Direct Play</button>
+        <button class="filter-btn direct-stream" data-filter="play_method" data-value="DirectStream"
+                onclick="toggleFilter(this)">Direct Stream</button>
+        <button class="filter-btn transcode" data-filter="play_method" data-value="Transcode"
+                onclick="toggleFilter(this)">Transcode</button>
+    </div>
+
+    <div class="history-toolbar-group history-search">
+        <input type="search" name="search" placeholder="Search..."
+               class="search-input"
+               hx-get="/api/history-table"
+               hx-trigger="input changed delay:300ms, search"
+               hx-target="#history-table"
+               hx-include="#history-filters">
+    </div>
+
+    <input type="hidden" name="item_type" value="">
+    <input type="hidden" name="play_method" value="">
 </div>
 
 <div id="history-table"
@@ -43,4 +60,20 @@
      hx-trigger="load"
      hx-swap="innerHTML">
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleFilter(btn) {
+    var group = btn.closest('.filter-buttons');
+    group.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+
+    var name = btn.dataset.filter;
+    var hidden = document.querySelector('#history-filters input[name="' + name + '"]');
+    hidden.value = btn.dataset.value;
+
+    htmx.trigger(document.querySelector('#history-filters .search-input'), 'search');
+}
+</script>
 {% endblock %}
