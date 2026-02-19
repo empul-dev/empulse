@@ -64,20 +64,42 @@ class HistoryRecord(BaseModel):
     client: str | None = None
     device_name: str | None = None
     ip_address: str | None = None
+    item_id: str | None = None
     item_name: str | None = None
     item_type: str | None = None
     series_name: str | None = None
+    series_id: str | None = None
     season_number: int | None = None
     episode_number: int | None = None
     year: int | None = None
     runtime_ticks: int = 0
     play_method: str | None = None
+    video_decision: str | None = None
+    audio_decision: str | None = None
+    transcode_video_codec: str | None = None
+    transcode_audio_codec: str | None = None
+    stream_info: str = "{}"
     started_at: str = ""
     stopped_at: str = ""
     duration_seconds: int = 0
     paused_seconds: int = 0
     percent_complete: float = 0
     watched: bool = False
+
+    @property
+    def poster_id(self) -> str | None:
+        if self.item_type == "Episode" and self.series_id:
+            return self.series_id
+        return self.item_id
+
+    @property
+    def item_link(self) -> str:
+        """Link to item detail page."""
+        if self.item_type == "Episode" and self.series_name:
+            return f"/item/{self.series_id or self.item_id}?type=series&name={self.series_name}"
+        if self.item_id:
+            return f"/item/{self.item_id}"
+        return "#"
 
     @property
     def display_title(self) -> str:
@@ -100,6 +122,37 @@ class HistoryRecord(BaseModel):
     def type_icon(self) -> str:
         icons = {"Movie": "film", "Episode": "tv", "Audio": "music"}
         return icons.get(self.item_type or "", "")
+
+    @property
+    def platform_name(self) -> str:
+        """Derive platform/OS from client and device_name."""
+        c = (self.client or "").lower()
+        d = (self.device_name or "").lower()
+        if "ios" in c or "iphone" in d or "ipad" in d:
+            return "iOS"
+        if "android" in c or "android" in d:
+            return "Android"
+        if "apple tv" in d or "tvos" in c:
+            return "tvOS"
+        if "fire" in d or "amazon" in d:
+            return "Fire TV"
+        if "roku" in d or "roku" in c:
+            return "Roku"
+        if "samsung" in d or "tizen" in c:
+            return "Tizen"
+        if "lg" in d or "webos" in c:
+            return "webOS"
+        if "chrome" in d or "firefox" in d or "safari" in d or "edge" in d:
+            return d.split()[0].title() if d else "Browser"
+        if "web" in c:
+            return "Web"
+        if "theater" in c or "windows" in c or "desktop" in c:
+            return "Windows"
+        if "mac" in d:
+            return "macOS"
+        if "linux" in d:
+            return "Linux"
+        return self.client or ""
 
     @property
     def started_time(self) -> str:

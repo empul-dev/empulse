@@ -1,6 +1,28 @@
 from pydantic import BaseModel, Field
 
 
+class EmbyMediaStream(BaseModel):
+    type: str = Field(alias="Type", default="")
+    codec: str | None = Field(alias="Codec", default=None)
+    profile: str | None = Field(alias="Profile", default=None)
+    level: int | None = Field(alias="Level", default=None)
+    bit_rate: int | None = Field(alias="BitRate", default=None)
+    bit_depth: int | None = Field(alias="BitDepth", default=None)
+    width: int | None = Field(alias="Width", default=None)
+    height: int | None = Field(alias="Height", default=None)
+    channels: int | None = Field(alias="Channels", default=None)
+    sample_rate: int | None = Field(alias="SampleRate", default=None)
+    language: str | None = Field(alias="Language", default=None)
+    display_title: str | None = Field(alias="DisplayTitle", default=None)
+    average_frame_rate: float | None = Field(alias="AverageFrameRate", default=None)
+    real_frame_rate: float | None = Field(alias="RealFrameRate", default=None)
+    aspect_ratio: str | None = Field(alias="AspectRatio", default=None)
+    video_range: str | None = Field(alias="VideoRange", default=None)
+    is_default: bool = Field(alias="IsDefault", default=False)
+
+    model_config = {"populate_by_name": True}
+
+
 class EmbyNowPlayingItem(BaseModel):
     id: str = Field(alias="Id", default="")
     name: str = Field(alias="Name", default="")
@@ -11,6 +33,8 @@ class EmbyNowPlayingItem(BaseModel):
     index_number: int | None = Field(alias="IndexNumber", default=None)
     production_year: int | None = Field(alias="ProductionYear", default=None)
     run_time_ticks: int | None = Field(alias="RunTimeTicks", default=None)
+    container: str | None = Field(alias="Container", default=None)
+    media_streams: list[EmbyMediaStream] = Field(alias="MediaStreams", default_factory=list)
 
     model_config = {"populate_by_name": True}
 
@@ -26,6 +50,16 @@ class EmbyPlayState(BaseModel):
 class EmbyTranscodingInfo(BaseModel):
     video_codec: str | None = Field(alias="VideoCodec", default=None)
     audio_codec: str | None = Field(alias="AudioCodec", default=None)
+    container: str | None = Field(alias="Container", default=None)
+    bitrate: int | None = Field(alias="Bitrate", default=None)
+    video_bitrate: int | None = Field(alias="VideoBitrate", default=None)
+    audio_bitrate: int | None = Field(alias="AudioBitrate", default=None)
+    width: int | None = Field(alias="Width", default=None)
+    height: int | None = Field(alias="Height", default=None)
+    framerate: float | None = Field(alias="Framerate", default=None)
+    audio_channels: int | None = Field(alias="AudioChannels", default=None)
+    is_video_direct: bool | None = Field(alias="IsVideoDirect", default=None)
+    is_audio_direct: bool | None = Field(alias="IsAudioDirect", default=None)
     transcode_reasons: list[str] = Field(alias="TranscodeReasons", default_factory=list)
 
     model_config = {"populate_by_name": True}

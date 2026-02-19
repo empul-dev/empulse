@@ -49,6 +49,14 @@ class EmbyClient:
         r.raise_for_status()
         return r.json().get("TotalRecordCount", 0)
 
+    async def get_item(self, item_id: str) -> dict:
+        r = await self._client.get(
+            f"{self.base_url}/Items/{item_id}",
+            params=self._params,
+        )
+        r.raise_for_status()
+        return r.json()
+
     def get_user_image_url(self, user_id: str) -> str:
         return f"{self.base_url}/Users/{user_id}/Images/Primary?api_key={self.api_key}"
 

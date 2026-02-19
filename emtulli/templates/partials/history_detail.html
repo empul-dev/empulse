@@ -1,0 +1,130 @@
+{% set video = info.get('video', {}) %}
+{% set audio = info.get('audio', {}) %}
+{% set media = info.get('media', {}) %}
+{% set tc = info.get('transcode', {}) %}
+{% set has_detail = video or audio %}
+
+<div class="detail-inner">
+    <div class="detail-poster">
+        <img src="/api/img/{{ record.poster_id }}" alt="" loading="lazy">
+    </div>
+    <div class="detail-content">
+        <div class="detail-title">
+            <a href="{{ record.item_link }}">{{ record.display_title }}</a>
+            <span class="detail-user">{{ record.user_name }}</span>
+        </div>
+
+        {% if has_detail %}
+        <div class="detail-streams">
+            <div class="detail-stream-section">
+                <div class="detail-stream-header">
+                    <span class="play-method-badge {% if record.play_method == 'Transcode' %}transcode{% elif record.play_method == 'DirectPlay' %}direct-play{% elif record.play_method == 'DirectStream' %}direct-stream{% endif %}">{{ record.play_method or 'Unknown' }}</span>
+                </div>
+                <table class="detail-stream-tbl">
+                    {% if media.get('container') %}
+                    <tr>
+                        <td class="ds-label">Container</td>
+                        <td class="ds-src">{{ media.get('container', '') }}</td>
+                        <td class="ds-arrow">&rarr;</td>
+                        <td class="ds-dst">{{ tc.get('container') or media.get('container', '') }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if video %}
+                    <tr class="ds-section-row"><td colspan="4">Video <span class="ds-decision">{{ record.video_decision or 'direct play' }}</span></td></tr>
+                    <tr>
+                        <td class="ds-label">Codec</td>
+                        <td class="ds-src">{{ video.get('codec', '') }}</td>
+                        <td class="ds-arrow">&rarr;</td>
+                        <td class="ds-dst">{{ tc.get('video_codec') or video.get('codec', '') }}</td>
+                    </tr>
+                    {% if video.get('width') %}
+                    <tr>
+                        <td class="ds-label">Resolution</td>
+                        <td class="ds-src">{{ video.get('width', '') }}x{{ video.get('height', '') }}</td>
+                        <td class="ds-arrow">&rarr;</td>
+                        <td class="ds-dst">{% if tc.get('width') %}{{ tc.get('width') }}x{{ tc.get('height') }}{% else %}{{ video.get('width', '') }}x{{ video.get('height', '') }}{% endif %}</td>
+                    </tr>
+                    {% endif %}
+                    {% if video.get('bitrate') %}
+                    <tr>
+                        <td class="ds-label">Bitrate</td>
+                        <td class="ds-src">{{ '%d' % ((video.get('bitrate', 0) or 0) / 1000) }} kbps</td>
+                        <td class="ds-arrow">&rarr;</td>
+                        <td class="ds-dst">{{ '%d' % ((tc.get('video_bitrate', 0) or video.get('bitrate', 0) or 0) / 1000) }} kbps</td>
+                    </tr>
+                    {% endif %}
+                    {% if video.get('video_range') %}
+                    <tr>
+                        <td class="ds-label">Dynamic Range</td>
+                        <td class="ds-src">{{ video.get('video_range', '') }}</td>
+                        <td class="ds-arrow">&rarr;</td>
+                        <td class="ds-dst">{{ video.get('video_range', '') }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endif %}
+                    {% if audio %}
+                    <tr class="ds-section-row"><td colspan="4">Audio <span class="ds-decision">{{ record.audio_decision or 'direct play' }}</span></td></tr>
+                    <tr>
+                        <td class="ds-label">Codec</td>
+                        <td class="ds-src">{{ audio.get('codec', '') }}</td>
+                        <td class="ds-arrow">&rarr;</td>
+                        <td class="ds-dst">{{ tc.get('audio_codec') or audio.get('codec', '') }}</td>
+                    </tr>
+                    {% if audio.get('channels') %}
+                    <tr>
+                        <td class="ds-label">Channels</td>
+                        <td class="ds-src">{{ audio.get('channels', '') }}</td>
+                        <td class="ds-arrow">&rarr;</td>
+                        <td class="ds-dst">{{ tc.get('audio_channels') or audio.get('channels', '') }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if audio.get('language') %}
+                    <tr>
+                        <td class="ds-label">Language</td>
+                        <td class="ds-src">{{ audio.get('language', '') | title }}</td>
+                        <td class="ds-arrow">&rarr;</td>
+                        <td class="ds-dst">-</td>
+                    </tr>
+                    {% endif %}
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+
+        {% else %}
+        {# Fallback for old records without stream_info JSON #}
+        <div class="detail-streams">
+            <div class="detail-stream-header">
+                <span class="play-method-badge {% if record.play_method == 'Transcode' %}transcode{% elif record.play_method == 'DirectPlay' %}direct-play{% elif record.play_method == 'DirectStream' %}direct-stream{% endif %}">{{ record.play_method or 'Unknown' }}</span>
+            </div>
+            <table class="detail-stream-tbl">
+                {% if record.video_decision %}
+                <tr class="ds-section-row"><td colspan="4">Video <span class="ds-decision">{{ record.video_decision }}</span></td></tr>
+                {% if record.transcode_video_codec %}
+                <tr>
+                    <td class="ds-label">Transcode Codec</td>
+                    <td class="ds-src" colspan="3">{{ record.transcode_video_codec | upper }}</td>
+                </tr>
+                {% endif %}
+                {% endif %}
+                {% if record.audio_decision %}
+                <tr class="ds-section-row"><td colspan="4">Audio <span class="ds-decision">{{ record.audio_decision }}</span></td></tr>
+                {% if record.transcode_audio_codec %}
+                <tr>
+                    <td class="ds-label">Transcode Codec</td>
+                    <td class="ds-src" colspan="3">{{ record.transcode_audio_codec | upper }}</td>
+                </tr>
+                {% endif %}
+                {% endif %}
+            </table>
+        </div>
+        {% endif %}
+
+        <div class="detail-meta">
+            <span><strong>Player:</strong> {{ record.device_name or '' }}</span>
+            <span><strong>Product:</strong> {{ record.client or '' }}</span>
+            <span><strong>Platform:</strong> {{ record.platform_name }}</span>
+            {% if record.ip_address %}<span><strong>IP:</strong> {{ record.ip_address }}</span>{% endif %}
+        </div>
+    </div>
+</div>

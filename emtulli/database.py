@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS history (
     transcode_audio_codec TEXT,
     video_decision TEXT,
     audio_decision TEXT,
+    stream_info TEXT DEFAULT '{}',
     started_at TEXT NOT NULL,
     stopped_at TEXT NOT NULL,
     duration_seconds INTEGER DEFAULT 0,
@@ -112,10 +113,22 @@ async def init_db():
     await _db.execute("PRAGMA journal_mode=WAL")
     await _db.execute("PRAGMA busy_timeout=5000")
     await _db.executescript(SCHEMA)
+    # Migrations — add columns that may not exist yet
+    await _migrate(_db)
     # Clear ephemeral sessions on startup
     await _db.execute("DELETE FROM sessions")
     await _db.commit()
     logger.info(f"Database ready at {db_path}")
+
+
+async def _migrate(db: aiosqlite.Connection):
+    """Add columns that may be missing from older databases."""
+    cursor = await db.execute("PRAGMA table_info(history)")
+    cols = {row[1] for row in await cursor.fetchall()}
+    if "stream_info" not in cols:
+        await db.execute("ALTER TABLE history ADD COLUMN stream_info TEXT DEFAULT '{}'")
+        logger.info("Migration: added stream_info column to history")
+    await db.commit()
 
 
 def get_db() -> aiosqlite.Connection:

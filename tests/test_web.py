@@ -1,9 +1,11 @@
+import json
 import pytest
 import pytest_asyncio
 from unittest.mock import patch, AsyncMock
 from httpx import AsyncClient, ASGITransport
 
 from emtulli.app import create_app
+from emtulli.db import history as history_db
 
 
 @pytest_asyncio.fixture
@@ -33,6 +35,7 @@ async def client():
 
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                ac._test_db = db  # expose for seeding data
                 yield ac
 
         await db.close()
@@ -94,6 +97,111 @@ class TestAPIRoutes:
     async def test_history_table_empty(self, client):
         r = await client.get("/api/history-table")
         assert r.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_history_table_with_records(self, client):
+        """History table renders rows with expand chevrons."""
+        db = client._test_db
+        await history_db.insert_history(db, {
+            "session_key": "s1",
+            "user_id": "u1",
+            "user_name": "Alice",
+            "item_id": "m1",
+            "item_name": "Test Movie",
+            "item_type": "Movie",
+            "year": 2024,
+            "client": "Emby Web",
+            "device_name": "Chrome",
+            "play_method": "DirectPlay",
+            "started_at": "2024-01-15T20:00:00",
+            "stopped_at": "2024-01-15T22:00:00",
+            "duration_seconds": 7200,
+            "percent_complete": 95.0,
+            "watched": 1,
+        })
+        r = await client.get("/api/history-table")
+        assert r.status_code == 200
+        assert "expand-chevron" in r.text
+        assert "detail-row" in r.text
+        assert "Test Movie" in r.text
+        assert "Alice" in r.text
+        assert "toggleDetail" in r.text
+
+    @pytest.mark.asyncio
+    async def test_history_detail_not_found(self, client):
+        """History detail returns error for missing record."""
+        r = await client.get("/api/history-detail/99999")
+        assert r.status_code == 200
+        assert "not found" in r.text.lower()
+
+    @pytest.mark.asyncio
+    async def test_history_detail_basic(self, client):
+        """History detail renders basic info for record without stream_info."""
+        db = client._test_db
+        await history_db.insert_history(db, {
+            "session_key": "s2",
+            "user_id": "u1",
+            "user_name": "Alice",
+            "item_id": "m2",
+            "item_name": "Another Movie",
+            "item_type": "Movie",
+            "year": 2023,
+            "client": "Emby Web",
+            "device_name": "Firefox",
+            "play_method": "DirectPlay",
+            "video_decision": "Direct Play",
+            "audio_decision": "Direct Play",
+            "started_at": "2024-01-16T20:00:00",
+            "stopped_at": "2024-01-16T22:00:00",
+            "duration_seconds": 7200,
+        })
+        # Get the inserted record's id
+        cursor = await db.execute("SELECT id FROM history WHERE item_name = 'Another Movie'")
+        row = await cursor.fetchone()
+        r = await client.get(f"/api/history-detail/{row[0]}")
+        assert r.status_code == 200
+        assert "Another Movie" in r.text
+        assert "Alice" in r.text
+        assert "Firefox" in r.text
+        assert "detail-inner" in r.text
+
+    @pytest.mark.asyncio
+    async def test_history_detail_with_stream_info(self, client):
+        """History detail renders full stream info from JSON."""
+        db = client._test_db
+        stream_info = json.dumps({
+            "video": {"codec": "HEVC", "width": 1920, "height": 1080, "bitrate": 5000000},
+            "audio": {"codec": "AAC", "channels": 6, "language": "english"},
+            "media": {"container": "MKV", "bitrate": 5500000, "resolution": "1080p"},
+            "transcode": {"video_codec": "H264", "width": 1280, "height": 720},
+        })
+        await history_db.insert_history(db, {
+            "session_key": "s3",
+            "user_id": "u2",
+            "user_name": "Bob",
+            "item_id": "m3",
+            "item_name": "Streamed Movie",
+            "item_type": "Movie",
+            "client": "Infuse",
+            "device_name": "Apple TV",
+            "play_method": "Transcode",
+            "video_decision": "Transcode",
+            "audio_decision": "Direct Play",
+            "stream_info": stream_info,
+            "started_at": "2024-01-17T19:00:00",
+            "stopped_at": "2024-01-17T21:00:00",
+            "duration_seconds": 7200,
+        })
+        cursor = await db.execute("SELECT id FROM history WHERE item_name = 'Streamed Movie'")
+        row = await cursor.fetchone()
+        r = await client.get(f"/api/history-detail/{row[0]}")
+        assert r.status_code == 200
+        assert "HEVC" in r.text
+        assert "H264" in r.text
+        assert "AAC" in r.text
+        assert "Transcode" in r.text
+        assert "Bob" in r.text
+        assert "Apple TV" in r.text
 
     @pytest.mark.asyncio
     async def test_static_css(self, client):

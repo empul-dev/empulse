@@ -167,6 +167,70 @@ async def get_user_stats(db: aiosqlite.Connection, user_id: str) -> dict:
     return dict(row)
 
 
+async def get_item_stats(db: aiosqlite.Connection, item_id: str) -> dict:
+    """Get play stats for a specific item across time periods."""
+    result = {}
+    for label, days_expr in [
+        ("last_24h", "-1 days"),
+        ("last_7d", "-7 days"),
+        ("last_30d", "-30 days"),
+        ("all_time", "-99999 days"),
+    ]:
+        cursor = await db.execute(
+            """SELECT COUNT(*) as plays, COALESCE(SUM(duration_seconds), 0) as duration
+               FROM history WHERE item_id = ? AND started_at >= datetime('now', ?)""",
+            [item_id, days_expr],
+        )
+        row = await cursor.fetchone()
+        result[label] = dict(row)
+    return result
+
+
+async def get_item_user_stats(db: aiosqlite.Connection, item_id: str) -> list[dict]:
+    """Get per-user play stats for an item."""
+    cursor = await db.execute(
+        """SELECT user_id, user_name, COUNT(*) as plays,
+                  COALESCE(SUM(duration_seconds), 0) as total_duration
+           FROM history WHERE item_id = ?
+           GROUP BY user_id ORDER BY plays DESC""",
+        [item_id],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_series_stats(db: aiosqlite.Connection, series_name: str) -> dict:
+    """Get play stats for a series across time periods."""
+    result = {}
+    for label, days_expr in [
+        ("last_24h", "-1 days"),
+        ("last_7d", "-7 days"),
+        ("last_30d", "-30 days"),
+        ("all_time", "-99999 days"),
+    ]:
+        cursor = await db.execute(
+            """SELECT COUNT(*) as plays, COALESCE(SUM(duration_seconds), 0) as duration
+               FROM history WHERE series_name = ? AND started_at >= datetime('now', ?)""",
+            [series_name, days_expr],
+        )
+        row = await cursor.fetchone()
+        result[label] = dict(row)
+    return result
+
+
+async def get_series_user_stats(db: aiosqlite.Connection, series_name: str) -> list[dict]:
+    """Get per-user play stats for a series."""
+    cursor = await db.execute(
+        """SELECT user_id, user_name, COUNT(*) as plays,
+                  COALESCE(SUM(duration_seconds), 0) as total_duration
+           FROM history WHERE series_name = ?
+           GROUP BY user_id ORDER BY plays DESC""",
+        [series_name],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
 async def get_most_played(db: aiosqlite.Connection, limit: int = 10) -> list[dict]:
     cursor = await db.execute(
         """SELECT item_name, series_name, item_type, year, COUNT(*) as plays,

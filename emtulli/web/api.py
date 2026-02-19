@@ -84,6 +84,7 @@ async def recent_history(request: Request):
     records = [HistoryRecord(**r) for r in rows]
     return templates.TemplateResponse("partials/history_table.html", {
         "request": request, "records": records, "page": 1, "total_pages": 1,
+        "filter_params": "", "sort_by": "date", "sort_order": "desc",
     })
 
 
@@ -95,6 +96,8 @@ async def history_table(
     user_id: str = "",
     item_type: str = "",
     play_method: str = "",
+    sort_by: str = "date",
+    sort_order: str = "desc",
 ):
     db = get_db()
     per_page = 50
@@ -106,6 +109,8 @@ async def history_table(
         item_type=item_type or None,
         play_method=play_method or None,
         search=search or None,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )
     total = await history_db.get_history_count(
         db, user_id=user_id or None,
@@ -126,11 +131,56 @@ async def history_table(
         filter_params += f"&play_method={play_method}"
     if search:
         filter_params += f"&search={search}"
+    if sort_by != "date":
+        filter_params += f"&sort_by={sort_by}"
+    if sort_order != "desc":
+        filter_params += f"&sort_order={sort_order}"
 
     return templates.TemplateResponse("partials/history_table.html", {
         "request": request, "records": records,
         "page": page, "total_pages": total_pages,
         "filter_params": filter_params,
+        "sort_by": sort_by, "sort_order": sort_order,
+    })
+
+
+@router.get("/stream-info/{history_id}")
+async def stream_info(request: Request, history_id: int):
+    db = get_db()
+    row = await history_db.get_history_by_id(db, history_id)
+    if not row:
+        return '<p class="empty-state">Record not found</p>'
+
+    record = HistoryRecord(**row)
+    try:
+        info = json.loads(record.stream_info) if record.stream_info else {}
+    except (json.JSONDecodeError, TypeError):
+        info = {}
+
+    return templates.TemplateResponse("partials/stream_info.html", {
+        "request": request,
+        "record": record,
+        "info": info,
+    })
+
+
+@router.get("/history-detail/{history_id}")
+async def history_detail(request: Request, history_id: int):
+    db = get_db()
+    row = await history_db.get_history_by_id(db, history_id)
+    if not row:
+        return '<p class="empty-state">Record not found</p>'
+
+    record = HistoryRecord(**row)
+    try:
+        info = json.loads(record.stream_info) if record.stream_info else {}
+    except (json.JSONDecodeError, TypeError):
+        info = {}
+
+    return templates.TemplateResponse("partials/history_detail.html", {
+        "request": request,
+        "record": record,
+        "info": info,
     })
 
 
@@ -151,6 +201,29 @@ async def image_proxy(item_id: str):
     except Exception:
         pass
     # 1x1 transparent pixel fallback
+    return Response(
+        content=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n\xb4\x00\x00\x00\x00IEND\xaeB`\x82",
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@router.get("/img/backdrop/{item_id}")
+async def backdrop_proxy(item_id: str):
+    """Proxy Emby item backdrop images."""
+    import httpx
+    url = f"{settings.emby_url.rstrip('/')}/Items/{item_id}/Images/Backdrop"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(url, params={"api_key": settings.emby_api_key, "maxWidth": "1280"})
+            if r.status_code == 200:
+                return Response(
+                    content=r.content,
+                    media_type=r.headers.get("content-type", "image/jpeg"),
+                    headers={"Cache-Control": "public, max-age=86400"},
+                )
+    except Exception:
+        pass
     return Response(
         content=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n\xb4\x00\x00\x00\x00IEND\xaeB`\x82",
         media_type="image/png",

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}{{ item.get('Name', 'Item') }} — Emtulli{% endblock %}
+
+{% block content %}
+<!-- Backdrop hero -->
+<div class="item-hero" {% if item.get('BackdropImageTags') %}style="background-image: linear-gradient(to bottom, rgba(26,26,46,0.4), rgba(26,26,46,0.95)), url('/api/img/backdrop/{{ item_id }}')"{% endif %}>
+    <div class="item-hero-inner">
+        <div class="item-poster">
+            <img src="/api/img/{{ item_id }}" alt="" loading="lazy">
+            {% if video_stream %}
+            <div class="item-badges">
+                {% if video_stream.get('Codec') %}
+                <span class="badge">{{ video_stream.get('Codec', '') | upper }}</span>
+                {% endif %}
+                {% if video_stream.get('Height') %}
+                <span class="badge">{{ video_stream.get('Height') }}p</span>
+                {% endif %}
+                {% if audio_stream.get('Channels') %}
+                <span class="badge">{{ audio_stream.get('Channels') }}.1</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        <div class="item-meta">
+            {% if is_series %}
+            <h1 class="item-title accent">{{ series_name }}</h1>
+            {% if item.get('Name') and item.get('Name') != series_name %}
+            <h2 class="item-subtitle">{{ item.get('Name', '') }}</h2>
+            {% endif %}
+            {% else %}
+            <h1 class="item-title accent">{{ item.get('Name', 'Unknown') }}</h1>
+            {% endif %}
+
+            {% if item.get('ParentIndexNumber') is not none and item.get('IndexNumber') is not none %}
+            <span class="item-episode-badge">S{{ item.get('ParentIndexNumber') }} · E{{ item.get('IndexNumber') }}</span>
+            {% endif %}
+
+            <div class="item-meta-row">
+                {% if directors %}
+                <span>Directed by <strong>{{ directors | join(', ') }}</strong></span>
+                {% endif %}
+                {% if studios %}
+                <span>Studio <strong>{{ studios | join(', ') }}</strong></span>
+                {% endif %}
+                {% if aired %}
+                <span>Aired <strong>{{ aired }}</strong></span>
+                {% endif %}
+                {% if runtime_mins %}
+                <span>Runtime <strong>{{ runtime_mins }} mins</strong></span>
+                {% endif %}
+                {% if item.get('OfficialRating') %}
+                <span>Rated <strong>{{ item.get('OfficialRating') }}</strong></span>
+                {% endif %}
+            </div>
+
+            {% if item.get('Overview') %}
+            <p class="item-overview">{{ item.get('Overview', '') }}</p>
+            {% endif %}
+
+            <div class="item-details-grid">
+                {% if writers %}
+                <div>
+                    <span class="detail-label">Written by</span>
+                    {% for w in writers %}<span class="detail-value">{{ w }}</span>{% endfor %}
+                </div>
+                {% endif %}
+                {% if actors %}
+                <div>
+                    <span class="detail-label">Starring</span>
+                    {% for a in actors %}<span class="detail-value">{{ a }}</span>{% endfor %}
+                </div>
+                {% endif %}
+                {% if genres %}
+                <div>
+                    <span class="detail-label">Genres</span>
+                    {% for g in genres %}<span class="detail-value">{{ g }}</span>{% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Global Stats -->
+<div class="section-header">
+    <h2>Global Stats</h2>
+</div>
+
+<div class="item-stats-grid">
+    {% for label, key in [('Last 24 hours', 'last_24h'), ('Last 7 days', 'last_7d'), ('Last 30 days', 'last_30d'), ('All Time', 'all_time')] %}
+    <div class="item-stat-box">
+        <div class="item-stat-label">{{ label }}</div>
+        <div class="item-stat-values">
+            <span class="stat-big accent">{{ global_stats.get(key, {}).get('plays', 0) }}</span>
+            <span class="stat-unit">plays</span>
+            <span class="stat-sep">/</span>
+            <span class="stat-big accent">{{ (global_stats.get(key, {}).get('duration', 0) // 60) }}</span>
+            <span class="stat-unit">mins</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- User Stats -->
+{% if user_stats %}
+<div class="section-header">
+    <h2>User Stats</h2>
+</div>
+
+<div class="item-user-stats">
+    {% for u in user_stats %}
+    <div class="item-user-card">
+        <div class="item-user-avatar">
+            <img src="/api/img/user/{{ u.user_id }}" alt=""
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+            <div class="avatar-fallback" style="display:none">{{ (u.user_name or '?')[0] | upper }}</div>
+        </div>
+        <div class="item-user-info">
+            <a href="/users/{{ u.user_id }}" class="item-user-name">{{ u.user_name or 'Unknown' }}</a>
+            <div><span class="stat-big accent">{{ u.plays }}</span> <span class="stat-unit">plays</span></div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

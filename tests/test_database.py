@@ -98,6 +98,125 @@ class TestHistoryCRUD:
         assert page1[0]["session_key"] != page2[0]["session_key"]
 
 
+    @pytest.mark.asyncio
+    async def test_get_history_by_id(self, db):
+        await history_db.insert_history(db, {
+            "session_key": "s1",
+            "user_id": "u1",
+            "user_name": "Alice",
+            "item_id": "m1",
+            "item_name": "Test Movie",
+            "item_type": "Movie",
+            "started_at": "2024-01-01T12:00:00",
+            "stopped_at": "2024-01-01T14:00:00",
+            "duration_seconds": 7200,
+        })
+
+        # Fetch all to get the id
+        rows = await history_db.get_history(db)
+        record_id = rows[0]["id"]
+
+        result = await history_db.get_history_by_id(db, record_id)
+        assert result is not None
+        assert result["item_name"] == "Test Movie"
+        assert result["user_name"] == "Alice"
+
+    @pytest.mark.asyncio
+    async def test_get_history_by_id_not_found(self, db):
+        result = await history_db.get_history_by_id(db, 99999)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_find_recent_history(self, db):
+        from datetime import datetime, timezone, timedelta
+        recent_stop = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "s1",
+            "user_id": "u1",
+            "item_id": "m1",
+            "item_name": "Recent Movie",
+            "started_at": "2024-01-01T12:00:00",
+            "stopped_at": recent_stop,
+            "duration_seconds": 1800,
+        })
+
+        result = await history_db.find_recent_history(db, "u1", "m1")
+        assert result is not None
+        assert result["item_name"] == "Recent Movie"
+
+    @pytest.mark.asyncio
+    async def test_find_recent_history_too_old(self, db):
+        from datetime import datetime, timezone, timedelta
+        old_stop = (datetime.now(timezone.utc) - timedelta(minutes=60)).isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "s1",
+            "user_id": "u1",
+            "item_id": "m1",
+            "item_name": "Old Movie",
+            "started_at": "2024-01-01T12:00:00",
+            "stopped_at": old_stop,
+            "duration_seconds": 1800,
+        })
+
+        result = await history_db.find_recent_history(db, "u1", "m1")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_find_recent_history_wrong_user(self, db):
+        from datetime import datetime, timezone, timedelta
+        recent_stop = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "s1",
+            "user_id": "u1",
+            "item_id": "m1",
+            "item_name": "Movie",
+            "started_at": "2024-01-01T12:00:00",
+            "stopped_at": recent_stop,
+            "duration_seconds": 1800,
+        })
+
+        result = await history_db.find_recent_history(db, "u2", "m1")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_merge_history(self, db):
+        from datetime import datetime, timezone
+        await history_db.insert_history(db, {
+            "session_key": "s1",
+            "user_id": "u1",
+            "item_id": "m1",
+            "item_name": "Movie",
+            "started_at": "2024-01-01T12:00:00",
+            "stopped_at": "2024-01-01T13:00:00",
+            "duration_seconds": 3600,
+            "paused_seconds": 60,
+            "percent_complete": 50.0,
+            "watched": 0,
+            "progress_ticks": 36000000000,
+        })
+
+        rows = await history_db.get_history(db)
+        record_id = rows[0]["id"]
+
+        await history_db.merge_history(db, record_id, {
+            "stopped_at": "2024-01-01T14:00:00",
+            "duration_seconds": 7200,
+            "paused_seconds": 120,
+            "percent_complete": 95.0,
+            "watched": 1,
+            "progress_ticks": 72000000000,
+            "stream_info": '{"video": {"codec": "H264"}}',
+        })
+
+        updated = await history_db.get_history_by_id(db, record_id)
+        assert updated["stopped_at"] == "2024-01-01T14:00:00"
+        assert updated["duration_seconds"] == 7200
+        assert updated["paused_seconds"] == 120
+        assert updated["percent_complete"] == 95.0
+        assert updated["watched"] == 1
+        assert updated["progress_ticks"] == 72000000000
+
+
 class TestUsersCRUD:
     @pytest.mark.asyncio
     async def test_upsert_and_get(self, db):

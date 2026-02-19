@@ -1,0 +1,180 @@
+<div class="modal-header">
+    <h3>Stream Info: {{ record.display_title }} ({{ record.user_name }})</h3>
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+</div>
+
+{% set video = info.get('video', {}) %}
+{% set audio = info.get('audio', {}) %}
+{% set media = info.get('media', {}) %}
+{% set tc = info.get('transcode', {}) %}
+{% set has_detail = video or audio %}
+
+<div class="stream-info-content">
+    <div class="stream-info-columns">
+        <div class="stream-col-header source">Source Details</div>
+        <div class="stream-col-header arrow"></div>
+        <div class="stream-col-header stream">Stream Details</div>
+    </div>
+
+    {% if has_detail %}
+    {# Full stream info from JSON #}
+
+    {% if media.get('bitrate') or media.get('resolution') %}
+    <div class="stream-section-label">Media</div>
+    {% if media.get('bitrate') %}
+    <div class="stream-row">
+        <span class="stream-label">Bitrate</span>
+        <span class="stream-val">{{ '%d' % ((media.get('bitrate', 0) or 0) / 1000) }} kbps</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">{{ '%d' % ((tc.get('bitrate', 0) or media.get('bitrate', 0) or 0) / 1000) }} kbps</span>
+    </div>
+    {% endif %}
+    {% if media.get('resolution') %}
+    <div class="stream-row">
+        <span class="stream-label">Resolution</span>
+        <span class="stream-val">{{ media.get('resolution') }}</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">{{ (tc.get('height', '') ~ 'p') if tc.get('height') else media.get('resolution') }}</span>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if media.get('container') %}
+    <div class="stream-section-label">Container
+        <span class="stream-decision">{{ record.play_method or 'direct play' }}</span>
+    </div>
+    <div class="stream-row">
+        <span class="stream-label">Container</span>
+        <span class="stream-val">{{ media.get('container', '') }}</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">{{ tc.get('container') or media.get('container', '') }}</span>
+    </div>
+    {% endif %}
+
+    {% if video %}
+    <div class="stream-section-label">Video
+        <span class="stream-decision">{{ record.video_decision or 'direct play' }}</span>
+    </div>
+    <div class="stream-row">
+        <span class="stream-label">Codec</span>
+        <span class="stream-val">{{ video.get('codec', '') }}</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">{{ tc.get('video_codec') or video.get('codec', '') }}</span>
+    </div>
+    {% if video.get('bitrate') %}
+    <div class="stream-row">
+        <span class="stream-label">Bitrate</span>
+        <span class="stream-val">{{ '%d' % ((video.get('bitrate', 0) or 0) / 1000) }} kbps</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">{{ '%d' % ((tc.get('video_bitrate', 0) or video.get('bitrate', 0) or 0) / 1000) }} kbps</span>
+    </div>
+    {% endif %}
+    {% if video.get('width') %}
+    <div class="stream-row">
+        <span class="stream-label">Width</span>
+        <span class="stream-val">{{ video.get('width', '') }}</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">{{ tc.get('width') or video.get('width', '') }}</span>
+    </div>
+    <div class="stream-row">
+        <span class="stream-label">Height</span>
+        <span class="stream-val">{{ video.get('height', '') }}</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">{{ tc.get('height') or video.get('height', '') }}</span>
+    </div>
+    {% endif %}
+    {% if video.get('framerate') %}
+    <div class="stream-row">
+        <span class="stream-label">Framerate</span>
+        <span class="stream-val">{{ video.get('framerate') }}p</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">{{ (tc.get('framerate') or video.get('framerate')) }}p</span>
+    </div>
+    {% endif %}
+    {% if video.get('video_range') %}
+    <div class="stream-row">
+        <span class="stream-label">Dynamic Range</span>
+        <span class="stream-val">{{ video.get('video_range', '') }}</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">{{ video.get('video_range', '') }}</span>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if audio %}
+    <div class="stream-section-label">Audio
+        <span class="stream-decision">{{ record.audio_decision or 'direct play' }}</span>
+    </div>
+    <div class="stream-row">
+        <span class="stream-label">Codec</span>
+        <span class="stream-val">{{ audio.get('codec', '') }}</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">{{ tc.get('audio_codec') or audio.get('codec', '') }}</span>
+    </div>
+    {% if audio.get('bitrate') %}
+    <div class="stream-row">
+        <span class="stream-label">Bitrate</span>
+        <span class="stream-val">{{ '%d' % ((audio.get('bitrate', 0) or 0) / 1000) }} kbps</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">{{ '%d' % ((tc.get('audio_bitrate', 0) or audio.get('bitrate', 0) or 0) / 1000) }} kbps</span>
+    </div>
+    {% endif %}
+    {% if audio.get('channels') %}
+    <div class="stream-row">
+        <span class="stream-label">Channels</span>
+        <span class="stream-val">{{ audio.get('channels', '') }}</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">{{ tc.get('audio_channels') or audio.get('channels', '') }}</span>
+    </div>
+    {% endif %}
+    {% if audio.get('language') %}
+    <div class="stream-row">
+        <span class="stream-label">Language</span>
+        <span class="stream-val">{{ audio.get('language', '') | title }}</span>
+        <span class="stream-arrow">&rarr;</span>
+        <span class="stream-val">-</span>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% else %}
+    {# Fallback: use basic fields from history record #}
+
+    <div class="stream-section-label">Playback</div>
+    <div class="stream-row">
+        <span class="stream-label">Play Method</span>
+        <span class="stream-val" style="grid-column: 2 / -1">
+            <span class="play-method-badge {% if record.play_method == 'Transcode' %}transcode{% elif record.play_method == 'DirectPlay' %}direct-play{% elif record.play_method == 'DirectStream' %}direct-stream{% endif %}">
+                {{ record.play_method or 'Unknown' }}
+            </span>
+        </span>
+    </div>
+
+    {% if record.video_decision %}
+    <div class="stream-section-label">Video
+        <span class="stream-decision">{{ record.video_decision }}</span>
+    </div>
+    {% if record.transcode_video_codec %}
+    <div class="stream-row">
+        <span class="stream-label">Transcode Codec</span>
+        <span class="stream-val" style="grid-column: 2 / -1">{{ record.transcode_video_codec | upper }}</span>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if record.audio_decision %}
+    <div class="stream-section-label">Audio
+        <span class="stream-decision">{{ record.audio_decision }}</span>
+    </div>
+    {% if record.transcode_audio_codec %}
+    <div class="stream-row">
+        <span class="stream-label">Transcode Codec</span>
+        <span class="stream-val" style="grid-column: 2 / -1">{{ record.transcode_audio_codec | upper }}</span>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <p class="stream-note">Detailed stream info will be captured for new playback sessions.</p>
+
+    {% endif %}
+</div>

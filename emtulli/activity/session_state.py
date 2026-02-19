@@ -30,6 +30,7 @@ class SessionStateTracker:
         # Track pause duration
         if is_paused and not was_paused:
             data["pause_start"] = now
+            data["paused_seconds"] = existing.get("paused_seconds", 0)
             transition = "paused"
         elif not is_paused and was_paused and existing.get("pause_start"):
             pause_start = datetime.fromisoformat(existing["pause_start"])
