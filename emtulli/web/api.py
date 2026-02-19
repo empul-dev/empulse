@@ -25,6 +25,14 @@ async def now_playing(request: Request):
 
 @router.get("/stats-cards")
 async def stats_cards(request: Request, days: int = 30, metric: str = "plays"):
+    try:
+        return await _stats_cards(request, days, metric)
+    except Exception as e:
+        logger.exception("stats-cards error")
+        return f'<p class="empty-state">Error: {e}</p>'
+
+
+async def _stats_cards(request: Request, days: int, metric: str):
     db = get_db()
 
     state_tracker = getattr(request.app.state, "state_tracker", None)
