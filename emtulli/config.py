@@ -1,7 +1,17 @@
+import os
 from pathlib import Path
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
-_PROJECT_DIR = Path(__file__).resolve().parent.parent
+# Find .env by walking up from this file
+_THIS_DIR = Path(__file__).resolve().parent
+for _candidate in [_THIS_DIR.parent, _THIS_DIR, Path.cwd()]:
+    _env_file = _candidate / ".env"
+    if _env_file.exists():
+        load_dotenv(_env_file)
+        break
+
+_PROJECT_DIR = _THIS_DIR.parent
 
 
 class Settings(BaseSettings):
@@ -12,10 +22,7 @@ class Settings(BaseSettings):
     poll_interval: int = 10
     db_path: str = str(_PROJECT_DIR / "emtulli.db")
 
-    model_config = {
-        "env_file": str(_PROJECT_DIR / ".env"),
-        "env_file_encoding": "utf-8",
-    }
+    model_config = {"env_file_encoding": "utf-8"}
 
 
 settings = Settings()
