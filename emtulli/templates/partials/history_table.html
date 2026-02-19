@@ -1,0 +1,49 @@
+{% if records %}
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>User</th>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Play Method</th>
+            <th>Duration</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in records %}
+        <tr>
+            <td><a href="/users/{{ r.user_id }}">{{ r.user_name or "Unknown" }}</a></td>
+            <td>{{ r.display_title }}</td>
+            <td>{{ r.item_type or "" }}</td>
+            <td>
+                <span class="play-method {% if r.play_method == 'Transcode' %}transcode{% elif r.play_method == 'DirectPlay' %}direct-play{% else %}direct-stream{% endif %}">
+                    {{ r.play_method or "" }}
+                </span>
+            </td>
+            <td>{{ r.duration_display }}</td>
+            <td>{{ r.started_at[:16] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+
+{% if total_pages > 1 %}
+<nav>
+    <ul>
+        {% if page > 1 %}
+        <li><a href="#" hx-get="/api/history-table?page={{ page - 1 }}" hx-target="#history-table">&laquo; Prev</a></li>
+        {% endif %}
+        <li><small>Page {{ page }} of {{ total_pages }}</small></li>
+        {% if page < total_pages %}
+        <li><a href="#" hx-get="/api/history-table?page={{ page + 1 }}" hx-target="#history-table">Next &raquo;</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<p class="empty-state">No history records found.</p>
+{% endif %}

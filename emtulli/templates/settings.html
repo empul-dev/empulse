@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Settings — Emtulli{% endblock %}
+
+{% block content %}
+<h2>Settings</h2>
+
+<article>
+    <header>Emby Server Connection</header>
+    <form hx-post="/api/test-connection" hx-target="#connection-result" hx-swap="innerHTML">
+        <label>Emby URL
+            <input type="text" name="emby_url" value="{{ settings.emby_url }}" readonly>
+        </label>
+        <label>API Key
+            <input type="text" name="emby_api_key" value="{{ '••••••••' if settings.emby_api_key else '' }}" readonly>
+        </label>
+        <button type="submit">Test Connection</button>
+    </form>
+    <div id="connection-result"></div>
+</article>
+
+{% if server_info %}
+<article>
+    <header>Server Info</header>
+    <dl>
+        <dt>Server Name</dt><dd>{{ server_info.server_name or "N/A" }}</dd>
+        <dt>Version</dt><dd>{{ server_info.version or "N/A" }}</dd>
+        <dt>OS</dt><dd>{{ server_info.os or "N/A" }}</dd>
+        <dt>Local Address</dt><dd>{{ server_info.local_address or "N/A" }}</dd>
+        <dt>WAN Address</dt><dd>{{ server_info.wan_address or "N/A" }}</dd>
+    </dl>
+</article>
+{% endif %}
+
+<article>
+    <header>About</header>
+    <p>Emtulli v0.1.0 — Tautulli-like monitoring for Emby Server</p>
+    <p><small>Poll interval: {{ settings.poll_interval }}s</small></p>
+</article>
+{% endblock %}

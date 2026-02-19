@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Libraries — Emtulli{% endblock %}
+
+{% block content %}
+<h2>Libraries</h2>
+
+{% if libraries %}
+<div class="grid">
+    {% for lib in libraries %}
+    <article>
+        <header>{{ lib.name }}</header>
+        <p>
+            <strong>{{ lib.item_count }}</strong> items<br>
+            <small>{{ lib.library_type }}</small>
+        </p>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<p>No libraries found. Connect to Emby to sync libraries.</p>
+{% endif %}
+{% endblock %}

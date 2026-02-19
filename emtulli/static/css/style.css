@@ -1,0 +1,120 @@
+:root {
+    --pico-font-size: 16px;
+}
+
+.nav-brand {
+    text-decoration: none;
+    color: var(--pico-primary);
+}
+
+nav a.active {
+    font-weight: bold;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    margin: 0;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--pico-muted-color);
+}
+
+/* Now Playing Cards */
+.now-playing-card header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.now-playing-card .user-name {
+    font-weight: bold;
+}
+
+.now-playing-card .device-info {
+    font-size: 0.85em;
+    color: var(--pico-muted-color);
+}
+
+.now-playing-card .title {
+    font-size: 1.1em;
+    margin: 0.5rem 0;
+}
+
+.now-playing-card .progress-info {
+    margin: 0.5rem 0;
+}
+
+.now-playing-card .progress-info small {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--pico-muted-color);
+}
+
+.now-playing-card footer {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* Play method badges */
+.play-method {
+    font-size: 0.8em;
+    padding: 0.15em 0.5em;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.play-method.direct-play {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+
+.play-method.direct-stream {
+    background: rgba(234, 179, 8, 0.2);
+    color: #eab308;
+}
+
+.play-method.transcode {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.paused-badge {
+    font-size: 0.8em;
+    padding: 0.15em 0.5em;
+    border-radius: 4px;
+    background: rgba(234, 179, 8, 0.2);
+    color: #eab308;
+    font-weight: 600;
+}
+
+/* Connection test result */
+#connection-result .success {
+    color: #22c55e;
+}
+
+#connection-result .error {
+    color: #ef4444;
+}
+
+footer {
+    text-align: center;
+    padding: 1rem 0;
+    color: var(--pico-muted-color);
+}
+
+/* Pagination nav */
+nav ul {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    align-items: center;
+    list-style: none;
+    padding: 0;
+}

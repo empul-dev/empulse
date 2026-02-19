@@ -1,0 +1,21 @@
+<div class="grid">
+    <article>
+        <header>Total Plays</header>
+        <p class="stat-number">{{ total_plays }}</p>
+    </article>
+    <article>
+        <header>Total Watch Time</header>
+        <p class="stat-number">{{ total_duration_display }}</p>
+    </article>
+    <article>
+        <header>Active Streams</header>
+        <p class="stat-number">{{ active_streams }}</p>
+    </article>
+</div>
+
+{% if plays_per_day %}
+<article>
+    <header>Plays per Day (Last 30 Days)</header>
+    <canvas id="plays-chart" data-chart-data='{{ plays_per_day_json }}'></canvas>
+</article>
+{% endif %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{{ user.username }} — Emtulli{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h2>{{ user.username or "Unknown User" }}</h2>
+    <p>{{ user_stats.total_plays }} plays · {{ user.total_duration_display }} watched</p>
+</hgroup>
+
+<h3>Recent Activity</h3>
+{% if history %}
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Duration</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for h in history %}
+        <tr>
+            <td>{{ h.display_title }}</td>
+            <td>{{ h.item_type or "" }}</td>
+            <td>{{ h.duration_display }}</td>
+            <td>{{ h.started_at[:16] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% else %}
+<p>No watch history yet.</p>
+{% endif %}
+{% endblock %}

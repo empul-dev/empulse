@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}History — Emtulli{% endblock %}
+
+{% block content %}
+<h2>History</h2>
+
+<div class="grid">
+    <div>
+        <input type="search" name="search" placeholder="Search..."
+               hx-get="/api/history-table"
+               hx-trigger="input changed delay:300ms, search"
+               hx-target="#history-table"
+               hx-include="[name='user_id'], [name='item_type']">
+    </div>
+    <div>
+        <select name="item_type"
+                hx-get="/api/history-table"
+                hx-trigger="change"
+                hx-target="#history-table"
+                hx-include="[name='search'], [name='user_id']">
+            <option value="">All Types</option>
+            <option value="Movie">Movies</option>
+            <option value="Episode">Episodes</option>
+            <option value="Audio">Music</option>
+        </select>
+    </div>
+    <div>
+        <select name="user_id"
+                hx-get="/api/history-table"
+                hx-trigger="change"
+                hx-target="#history-table"
+                hx-include="[name='search'], [name='item_type']">
+            <option value="">All Users</option>
+            {% for user in users %}
+            <option value="{{ user.emby_user_id }}">{{ user.username }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<div id="history-table"
+     hx-get="/api/history-table"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+</div>
+{% endblock %}

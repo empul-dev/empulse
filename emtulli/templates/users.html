@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Users — Emtulli{% endblock %}
+
+{% block content %}
+<h2>Users</h2>
+
+{% if users %}
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>User</th>
+            <th>Total Plays</th>
+            <th>Total Duration</th>
+            <th>Last Seen</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td><a href="/users/{{ user.emby_user_id }}">{{ user.username or "Unknown" }}</a></td>
+            <td>{{ user.total_plays }}</td>
+            <td>{{ user.total_duration_display }}</td>
+            <td>{{ user.last_seen or "Never" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% else %}
+<p>No users found. Connect to Emby to sync users.</p>
+{% endif %}
+{% endblock %}
