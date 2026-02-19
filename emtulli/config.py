@@ -1,4 +1,7 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings
+
+_PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
@@ -7,9 +10,12 @@ class Settings(BaseSettings):
     emtulli_host: str = "0.0.0.0"
     emtulli_port: int = 8189
     poll_interval: int = 10
-    db_path: str = "emtulli.db"
+    db_path: str = str(_PROJECT_DIR / "emtulli.db")
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {
+        "env_file": str(_PROJECT_DIR / ".env"),
+        "env_file_encoding": "utf-8",
+    }
 
 
 settings = Settings()
