@@ -264,7 +264,7 @@ async def get_user_most_watched(db: aiosqlite.Connection, user_id: str, limit: i
     cursor = await db.execute(
         """SELECT
                COALESCE(series_name, item_name) as title,
-               COALESCE(series_id, item_id) as poster_id,
+               MIN(COALESCE(series_id, item_id)) as poster_id,
                item_type,
                COUNT(*) as plays,
                SUM(duration_seconds) as total_duration

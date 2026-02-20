@@ -199,17 +199,20 @@ document.body.addEventListener("htmx:responseError", function(evt) {
         getCSS: getCSS
     };
 
-    // Load on page load
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", loadCharts);
-    } else {
-        loadCharts();
-    }
-
-    // Reload on HTMX swap (stats-cards swap triggers after days-input change or push update)
+    // Load charts when stats-cards swaps (initial load, days change, push update).
+    // Also load once on DOMContentLoaded for pages without stats-cards (dashboard
+    // always has stats-cards which triggers afterSwap on its hx-trigger="load").
+    var chartsLoaded = false;
     document.body.addEventListener("htmx:afterSwap", function(e) {
         if (e.detail.target && e.detail.target.id === "stats-cards") {
+            chartsLoaded = true;
             loadCharts();
         }
     });
+
+    // Fallback: if no afterSwap fires within 2s (e.g. stats-cards not on page),
+    // load charts once. On dashboard this won't double-fire because chartsLoaded guards it.
+    setTimeout(function() {
+        if (!chartsLoaded) loadCharts();
+    }, 100);
 })();
