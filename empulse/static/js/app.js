@@ -102,6 +102,21 @@ document.body.addEventListener("htmx:responseError", function(evt) {
         return input ? (parseInt(input.value) || 30) : 30;
     }
 
+    function getMetric() {
+        var active = document.querySelector("#metric-toggle .toggle-btn.active");
+        return active ? (active.dataset.value || "plays") : "plays";
+    }
+
+    function isDuration() { return getMetric() === "duration"; }
+
+    function toHours(seconds) { return Math.round((seconds || 0) / 360) / 10; }
+
+    function pickValue(d) {
+        return isDuration() ? toHours(d.total_duration) : d.plays;
+    }
+
+    function metricLabel() { return isDuration() ? "Hours" : "Plays"; }
+
     function destroyChart(chart) {
         if (chart) chart.destroy();
         return null;
@@ -116,6 +131,7 @@ document.body.addEventListener("htmx:responseError", function(evt) {
         setupDefaults();
         var days = getDays();
         var accent = getCSS("--accent") || "#52b54b";
+        var label = metricLabel();
 
         // Daily plays
         fetch("/api/charts/daily-plays?days=" + days)
@@ -127,8 +143,8 @@ document.body.addEventListener("htmx:responseError", function(evt) {
                     data: {
                         labels: data.map(function(d) { return d.date.slice(5); }),
                         datasets: [{
-                            label: "Plays",
-                            data: data.map(function(d) { return d.plays; }),
+                            label: label,
+                            data: data.map(pickValue),
                             borderColor: accent,
                             backgroundColor: accent + "33",
                             fill: true,
@@ -140,7 +156,7 @@ document.body.addEventListener("htmx:responseError", function(evt) {
                         responsive: true,
                         maintainAspectRatio: false,
                         scales: {
-                            y: { beginAtZero: true, ticks: { precision: 0 } }
+                            y: { beginAtZero: true, ticks: { precision: isDuration() ? 1 : 0 } }
                         }
                     }
                 });
@@ -156,7 +172,7 @@ document.body.addEventListener("htmx:responseError", function(evt) {
                     data: {
                         labels: data.map(function(d) { return d.item_type; }),
                         datasets: [{
-                            data: data.map(function(d) { return d.plays; }),
+                            data: data.map(pickValue),
                             backgroundColor: COLORS.slice(0, data.length)
                         }]
                     },
@@ -178,8 +194,8 @@ document.body.addEventListener("htmx:responseError", function(evt) {
                     data: {
                         labels: data.map(function(d) { return d.client; }),
                         datasets: [{
-                            label: "Plays",
-                            data: data.map(function(d) { return d.plays; }),
+                            label: label,
+                            data: data.map(pickValue),
                             backgroundColor: COLORS.slice(0, data.length)
                         }]
                     },
@@ -188,7 +204,7 @@ document.body.addEventListener("htmx:responseError", function(evt) {
                         maintainAspectRatio: false,
                         indexAxis: "y",
                         scales: {
-                            x: { beginAtZero: true, ticks: { precision: 0 } }
+                            x: { beginAtZero: true, ticks: { precision: isDuration() ? 1 : 0 } }
                         }
                     }
                 });

@@ -148,7 +148,8 @@ async def get_plays_per_day(db: aiosqlite.Connection, days: int = 30) -> list[di
 
 async def get_plays_by_type(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
     cursor = await db.execute(
-        """SELECT item_type, COUNT(*) as plays
+        """SELECT item_type, COUNT(*) as plays,
+                  SUM(duration_seconds) as total_duration
            FROM history
            WHERE started_at >= datetime('now', ?)
            GROUP BY item_type ORDER BY plays DESC""",
