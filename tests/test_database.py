@@ -217,6 +217,30 @@ class TestHistoryCRUD:
         assert updated["progress_ticks"] == 72000000000
 
 
+    @pytest.mark.asyncio
+    async def test_delete_history(self, db):
+        await history_db.insert_history(db, {
+            "session_key": "s1",
+            "user_id": "u1",
+            "item_name": "To Delete",
+            "started_at": "2024-01-01T12:00:00",
+            "stopped_at": "2024-01-01T14:00:00",
+        })
+        rows = await history_db.get_history(db)
+        record_id = rows[0]["id"]
+
+        deleted = await history_db.delete_history(db, record_id)
+        assert deleted is True
+
+        result = await history_db.get_history_by_id(db, record_id)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_delete_history_not_found(self, db):
+        deleted = await history_db.delete_history(db, 99999)
+        assert deleted is False
+
+
 class TestUsersCRUD:
     @pytest.mark.asyncio
     async def test_upsert_and_get(self, db):

@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block title %}Notifications — Empulse{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h2>Notification Channels</h2>
+    <a href="/settings" class="toolbar-btn">Back to Settings</a>
+</div>
+
+<article>
+    <header>Channels</header>
+    <div id="channels-list">
+        {% if channels %}
+        <table class="history-tbl">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Triggers</th>
+                    <th>Enabled</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ch in channels %}
+                <tr id="channel-row-{{ ch.id }}">
+                    <td>{{ ch.name }}</td>
+                    <td><span class="play-method-badge">{{ ch.channel_type }}</span></td>
+                    <td>{{ ch.triggers }}</td>
+                    <td>{{ "Yes" if ch.enabled else "No" }}</td>
+                    <td class="channel-actions">
+                        <button class="toolbar-btn" onclick="editChannel({{ ch.id }})">Edit</button>
+                        <button class="toolbar-btn" onclick="testChannel({{ ch.id }})">Test</button>
+                        <button class="btn-delete" onclick="deleteChannel({{ ch.id }})">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-state">No notification channels configured.</p>
+        {% endif %}
+    </div>
+    <div id="channel-test-result"></div>
+</article>
+
+<article>
+    <header>Add / Edit Channel</header>
+    <form id="channel-form" onsubmit="saveChannel(event)">
+        <input type="hidden" id="ch-id" value="">
+        <div class="grid">
+            <label>Name
+                <input type="text" id="ch-name" required placeholder="My Discord">
+            </label>
+            <label>Type
+                <select id="ch-type" onchange="toggleTypeFields()">
+                    <option value="discord">Discord</option>
+                    <option value="webhook">Generic Webhook</option>
+                </select>
+            </label>
+        </div>
+
+        <label>Webhook URL
+            <input type="url" id="ch-url" required placeholder="https://discord.com/api/webhooks/...">
+        </label>
+
+        <div id="webhook-extra" style="display:none">
+            <div class="grid">
+                <label>HTTP Method
+                    <select id="ch-method">
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                    </select>
+                </label>
+                <label>Custom Headers (JSON)
+                    <input type="text" id="ch-headers" placeholder='{"Authorization": "Bearer ..."}'>
+                </label>
+            </div>
+            <label>Body Template (optional — use {user}, {title}, {event}, etc.)
+                <textarea id="ch-body" rows="3" placeholder="Leave empty for default JSON payload"></textarea>
+            </label>
+        </div>
+
+        <fieldset>
+            <legend>Triggers</legend>
+            <div class="grid">
+                <label><input type="checkbox" class="ch-trigger" value="playback_start"> Playback Start</label>
+                <label><input type="checkbox" class="ch-trigger" value="playback_stop"> Playback Stop</label>
+                <label><input type="checkbox" class="ch-trigger" value="playback_pause"> Playback Pause</label>
+                <label><input type="checkbox" class="ch-trigger" value="playback_resume"> Playback Resume</label>
+                <label><input type="checkbox" class="ch-trigger" value="watched"> Watched (>=80%)</label>
+                <label><input type="checkbox" class="ch-trigger" value="transcode"> Transcode Detected</label>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Conditions (optional)</legend>
+            <div class="grid">
+                <label>User IDs (comma-separated, empty = all)
+                    <input type="text" id="ch-cond-users" placeholder="user1, user2">
+                </label>
+                <label>Item Types (comma-separated, empty = all)
+                    <input type="text" id="ch-cond-types" placeholder="Movie, Episode, Audio">
+                </label>
+                <label>Min Duration (seconds)
+                    <input type="number" id="ch-cond-min-dur" value="0" min="0">
+                </label>
+            </div>
+        </fieldset>
+
+        <button type="submit">Save Channel</button>
+        <button type="button" class="secondary" onclick="resetForm()">Cancel</button>
+    </form>
+</article>
+
+<article>
+    <header>Recent Notification Log</header>
+    {% if logs %}
+    <table class="history-tbl">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Event</th>
+                <th>Summary</th>
+                <th>Status</th>
+                <th>Error</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.sent_at[:19] }}</td>
+                <td>{{ log.event_type }}</td>
+                <td>{{ log.event_summary or "" }}</td>
+                <td><span class="play-method-badge {% if log.status == 'sent' %}direct-play{% else %}transcode{% endif %}">{{ log.status }}</span></td>
+                <td>{{ log.error or "" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No notifications sent yet.</p>
+    {% endif %}
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleTypeFields() {
+    var type = document.getElementById('ch-type').value;
+    document.getElementById('webhook-extra').style.display = type === 'webhook' ? '' : 'none';
+}
+
+function resetForm() {
+    document.getElementById('ch-id').value = '';
+    document.getElementById('channel-form').reset();
+    toggleTypeFields();
+}
+
+function saveChannel(e) {
+    e.preventDefault();
+    var id = document.getElementById('ch-id').value;
+    var triggers = [];
+    document.querySelectorAll('.ch-trigger:checked').forEach(function(cb) { triggers.push(cb.value); });
+
+    var usersRaw = document.getElementById('ch-cond-users').value.trim();
+    var typesRaw = document.getElementById('ch-cond-types').value.trim();
+    var conditions = {};
+    if (usersRaw) conditions.users = usersRaw.split(',').map(function(s) { return s.trim(); });
+    if (typesRaw) conditions.types = typesRaw.split(',').map(function(s) { return s.trim(); });
+    var minDur = parseInt(document.getElementById('ch-cond-min-dur').value) || 0;
+    if (minDur > 0) conditions.min_duration = minDur;
+
+    var config = { url: document.getElementById('ch-url').value };
+    var type = document.getElementById('ch-type').value;
+    if (type === 'webhook') {
+        config.method = document.getElementById('ch-method').value;
+        var hdr = document.getElementById('ch-headers').value.trim();
+        if (hdr) { try { config.headers = JSON.parse(hdr); } catch(e) {} }
+        var body = document.getElementById('ch-body').value.trim();
+        if (body) config.body = body;
+    }
+
+    var payload = {
+        name: document.getElementById('ch-name').value,
+        channel_type: type,
+        config: config,
+        triggers: triggers,
+        conditions: conditions,
+        enabled: true,
+    };
+
+    var url = id ? '/api/notification-channels/' + id : '/api/notification-channels';
+    var method = id ? 'PUT' : 'POST';
+
+    fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
+        .then(function(r) { if (r.ok) location.reload(); else alert('Error saving channel'); });
+}
+
+function editChannel(id) {
+    fetch('/api/notification-channels')
+        .then(function(r) { return r.json(); })
+        .then(function(channels) {
+            var ch = channels.find(function(c) { return c.id === id; });
+            if (!ch) return;
+            document.getElementById('ch-id').value = ch.id;
+            document.getElementById('ch-name').value = ch.name;
+            document.getElementById('ch-type').value = ch.channel_type;
+            toggleTypeFields();
+
+            var config = typeof ch.config === 'string' ? JSON.parse(ch.config) : ch.config;
+            document.getElementById('ch-url').value = config.url || '';
+            if (ch.channel_type === 'webhook') {
+                document.getElementById('ch-method').value = config.method || 'POST';
+                document.getElementById('ch-headers').value = config.headers ? JSON.stringify(config.headers) : '';
+                document.getElementById('ch-body').value = config.body || '';
+            }
+
+            var triggers = typeof ch.triggers === 'string' ? JSON.parse(ch.triggers) : ch.triggers;
+            document.querySelectorAll('.ch-trigger').forEach(function(cb) {
+                cb.checked = triggers.indexOf(cb.value) !== -1;
+            });
+
+            var cond = typeof ch.conditions === 'string' ? JSON.parse(ch.conditions) : ch.conditions;
+            document.getElementById('ch-cond-users').value = (cond.users || []).join(', ');
+            document.getElementById('ch-cond-types').value = (cond.types || []).join(', ');
+            document.getElementById('ch-cond-min-dur').value = cond.min_duration || 0;
+        });
+}
+
+function deleteChannel(id) {
+    if (!confirm('Delete this notification channel?')) return;
+    fetch('/api/notification-channels/' + id, { method: 'DELETE' })
+        .then(function(r) { if (r.ok) location.reload(); });
+}
+
+function testChannel(id) {
+    var el = document.getElementById('channel-test-result');
+    el.innerHTML = '<p>Sending test...</p>';
+    fetch('/api/notification-channels/' + id + '/test', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                el.innerHTML = '<p class="success">Test notification sent!</p>';
+            } else {
+                el.innerHTML = '<p class="error">Failed: ' + (data.message || 'Unknown error') + '</p>';
+            }
+        })
+        .catch(function() { el.innerHTML = '<p class="error">Request failed</p>'; });
+}
+</script>
+{% endblock %}

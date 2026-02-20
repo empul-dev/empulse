@@ -14,6 +14,7 @@ class ActivityProcessor:
     def __init__(self, state_tracker: SessionStateTracker, db_factory: Callable):
         self.state = state_tracker
         self.get_db = db_factory
+        self.notification_engine = None
 
     def _build_stream_info(self, s: EmbySessionInfo) -> str:
         """Build a JSON string with source and transcode stream details."""
@@ -145,11 +146,27 @@ class ActivityProcessor:
             session = self.state.remove_session(key)
             if session:
                 await self._write_history(session)
+                await self._emit("playback_stop", session)
 
         # New or updated sessions
         for key, emby_session in active.items():
             data = self._build_session_data(emby_session)
-            self.state.update_session(key, data)
+            transition = self.state.update_session(key, data)
+            if transition == "new":
+                await self._emit("playback_start", data)
+                if data.get("play_method") == "Transcode":
+                    await self._emit("transcode", data)
+            elif transition == "paused":
+                await self._emit("playback_pause", data)
+            elif transition == "resumed":
+                await self._emit("playback_resume", data)
+
+    async def _emit(self, event_type: str, data: dict):
+        if self.notification_engine:
+            try:
+                await self.notification_engine.emit(event_type, data)
+            except Exception as e:
+                logger.error(f"Notification emit error: {e}")
 
     async def _write_history(self, session: dict):
         now = datetime.now(timezone.utc).isoformat()
@@ -202,6 +219,9 @@ class ActivityProcessor:
             if user_id:
                 await users_db.update_user_stats(db, user_id, actual_duration)
 
+            if merged_watched and not existing.get("watched"):
+                await self._emit("watched", session)
+
             logger.info(
                 f"History merged (id={existing['id']}): {session.get('user_name')} - "
                 f"{session.get('item_name')} (+{actual_duration}s, {merged_percent}%)"
@@ -242,6 +262,9 @@ class ActivityProcessor:
 
             if user_id:
                 await users_db.update_user_stats(db, user_id, actual_duration)
+
+            if watched:
+                await self._emit("watched", session)
 
             logger.info(
                 f"History written: {session.get('user_name')} - {session.get('item_name')} "

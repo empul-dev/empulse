@@ -201,3 +201,16 @@ async def settings_page(request: Request):
         "request": request, "active": "settings",
         "settings": settings, "server_info": server_info,
     })
+
+
+@router.get("/settings/notifications")
+async def settings_notifications(request: Request):
+    db = get_db()
+    cursor = await db.execute("SELECT * FROM notification_channels ORDER BY created_at DESC")
+    channels = [dict(r) for r in await cursor.fetchall()]
+    cursor = await db.execute("SELECT * FROM notification_log ORDER BY sent_at DESC LIMIT 20")
+    logs = [dict(r) for r in await cursor.fetchall()]
+    return templates.TemplateResponse("settings_notifications.html", {
+        "request": request, "active": "settings",
+        "channels": channels, "logs": logs,
+    })

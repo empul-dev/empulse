@@ -31,6 +31,10 @@ async def lifespan(app: FastAPI):
     poller_task = None
     ws_task = None
 
+    from empulse.notifications.engine import NotificationEngine
+    notification_engine = NotificationEngine(get_db)
+    app.state.notification_engine = notification_engine
+
     if settings.emby_api_key:
         from empulse.activity.poller import SessionPoller
         from empulse.emby.client import EmbyClient
@@ -41,6 +45,7 @@ async def lifespan(app: FastAPI):
         emby_client = EmbyClient()
         state_tracker = SessionStateTracker()
         processor = ActivityProcessor(state_tracker, get_db)
+        processor.notification_engine = notification_engine
         poller = SessionPoller(emby_client, processor, ws_manager)
 
         app.state.emby_client = emby_client

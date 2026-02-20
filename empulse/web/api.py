@@ -1,10 +1,12 @@
+import csv
+import io
 import json
 import logging
 import re
 from datetime import date, timedelta
 from urllib.parse import quote
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from empulse.app import templates
 from empulse.config import settings
 from empulse.database import get_db
@@ -198,6 +200,64 @@ async def history_detail(request: Request, history_id: int):
     })
 
 
+@router.delete("/history/{history_id}")
+async def delete_history(history_id: int):
+    db = get_db()
+    deleted = await history_db.delete_history(db, history_id)
+    if not deleted:
+        return Response(status_code=404)
+    return Response(status_code=204)
+
+
+EXPORT_FIELDS = [
+    "started_at", "stopped_at", "user_name", "item_name", "series_name",
+    "item_type", "duration_seconds", "percent_complete", "play_method",
+    "client", "device_name", "ip_address",
+]
+EXPORT_MAX_ROWS = 10_000
+
+
+@router.get("/export/history")
+async def export_history(
+    format: str = "csv",
+    user_id: str = "",
+    item_type: str = "",
+    play_method: str = "",
+    search: str = "",
+):
+    db = get_db()
+    rows = await history_db.get_history(
+        db, limit=EXPORT_MAX_ROWS, offset=0,
+        user_id=user_id or None,
+        item_type=item_type or None,
+        play_method=play_method or None,
+        search=search or None,
+        sort_by="date", sort_order="desc",
+    )
+
+    if format == "json":
+        data = [{k: r.get(k) for k in EXPORT_FIELDS} for r in rows]
+        content = json.dumps(data, indent=2)
+        return Response(
+            content=content,
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=empulse_history.json"},
+        )
+
+    # CSV (default)
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=EXPORT_FIELDS, extrasaction="ignore")
+    writer.writeheader()
+    for r in rows:
+        writer.writerow({k: r.get(k, "") for k in EXPORT_FIELDS})
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=empulse_history.csv"},
+    )
+
+
 @router.get("/img/{item_id}")
 async def image_proxy(item_id: str):
     """Proxy Emby item images so the API key stays server-side."""
@@ -338,6 +398,103 @@ async def chart_library_daily_plays(item_type: str, days: int = 30):
     rows = await stats_db.get_library_plays_per_day(db, item_type, days=days)
     filled = _fill_date_gaps(rows, days)
     return JSONResponse(filled)
+
+
+@router.get("/notification-channels")
+async def list_notification_channels():
+    db = get_db()
+    cursor = await db.execute("SELECT * FROM notification_channels ORDER BY created_at DESC")
+    rows = await cursor.fetchall()
+    return JSONResponse([dict(r) for r in rows])
+
+
+@router.post("/notification-channels")
+async def create_notification_channel(request: Request):
+    data = await request.json()
+    db = get_db()
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    await db.execute(
+        "INSERT INTO notification_channels (name, channel_type, config, triggers, conditions, enabled, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+            data.get("name", ""),
+            data.get("channel_type", ""),
+            json.dumps(data.get("config", {})),
+            json.dumps(data.get("triggers", [])),
+            json.dumps(data.get("conditions", {})),
+            1 if data.get("enabled", True) else 0,
+            now,
+        ],
+    )
+    await db.commit()
+    engine = getattr(request.app.state, "notification_engine", None)
+    if engine:
+        engine.invalidate_cache()
+    return JSONResponse({"status": "created"}, status_code=201)
+
+
+@router.put("/notification-channels/{channel_id}")
+async def update_notification_channel(request: Request, channel_id: int):
+    data = await request.json()
+    db = get_db()
+    cursor = await db.execute("SELECT id FROM notification_channels WHERE id = ?", [channel_id])
+    if not await cursor.fetchone():
+        return Response(status_code=404)
+    await db.execute(
+        "UPDATE notification_channels SET name=?, channel_type=?, config=?, triggers=?, conditions=?, enabled=? WHERE id=?",
+        [
+            data.get("name", ""),
+            data.get("channel_type", ""),
+            json.dumps(data.get("config", {})),
+            json.dumps(data.get("triggers", [])),
+            json.dumps(data.get("conditions", {})),
+            1 if data.get("enabled", True) else 0,
+            channel_id,
+        ],
+    )
+    await db.commit()
+    engine = getattr(request.app.state, "notification_engine", None)
+    if engine:
+        engine.invalidate_cache()
+    return JSONResponse({"status": "updated"})
+
+
+@router.delete("/notification-channels/{channel_id}")
+async def delete_notification_channel(request: Request, channel_id: int):
+    db = get_db()
+    cursor = await db.execute("DELETE FROM notification_channels WHERE id = ?", [channel_id])
+    await db.commit()
+    if cursor.rowcount == 0:
+        return Response(status_code=404)
+    engine = getattr(request.app.state, "notification_engine", None)
+    if engine:
+        engine.invalidate_cache()
+    return Response(status_code=204)
+
+
+@router.post("/notification-channels/{channel_id}/test")
+async def test_notification_channel(request: Request, channel_id: int):
+    db = get_db()
+    cursor = await db.execute("SELECT * FROM notification_channels WHERE id = ?", [channel_id])
+    row = await cursor.fetchone()
+    if not row:
+        return Response(status_code=404)
+    engine = getattr(request.app.state, "notification_engine", None)
+    if not engine:
+        return JSONResponse({"success": False, "message": "Notification engine not initialized"})
+    success, message = await engine.send_test(dict(row))
+    return JSONResponse({"success": success, "message": message})
+
+
+@router.get("/notification-log")
+async def notification_log():
+    db = get_db()
+    cursor = await db.execute(
+        "SELECT * FROM notification_log ORDER BY sent_at DESC LIMIT 50"
+    )
+    rows = await cursor.fetchall()
+    return JSONResponse([dict(r) for r in rows])
 
 
 @router.post("/test-connection")

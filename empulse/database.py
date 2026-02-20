@@ -102,6 +102,27 @@ CREATE TABLE IF NOT EXISTS server_info (
     wan_address TEXT,
     os TEXT
 );
+
+CREATE TABLE IF NOT EXISTS notification_channels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    channel_type TEXT NOT NULL,
+    config TEXT NOT NULL DEFAULT '{}',
+    triggers TEXT NOT NULL DEFAULT '[]',
+    conditions TEXT NOT NULL DEFAULT '{}',
+    enabled INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notification_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    channel_id INTEGER,
+    event_type TEXT NOT NULL,
+    event_summary TEXT,
+    status TEXT DEFAULT 'sent',
+    error TEXT,
+    sent_at TEXT NOT NULL
+);
 """
 
 

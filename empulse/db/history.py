@@ -154,6 +154,13 @@ async def get_history_by_id(db: aiosqlite.Connection, history_id: int) -> dict |
     return dict(row) if row else None
 
 
+async def delete_history(db: aiosqlite.Connection, history_id: int) -> bool:
+    """Delete a history record by ID. Returns True if a row was deleted."""
+    cursor = await db.execute("DELETE FROM history WHERE id = ?", [history_id])
+    await db.commit()
+    return cursor.rowcount > 0
+
+
 async def get_history_for_user(db: aiosqlite.Connection, user_id: str, limit: int = 50) -> list[dict]:
     cursor = await db.execute(
         "SELECT * FROM history WHERE user_id = ? ORDER BY started_at DESC LIMIT ?",

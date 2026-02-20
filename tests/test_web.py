@@ -225,6 +225,84 @@ class TestAPIRoutes:
         assert "Apple TV" in r.text
 
     @pytest.mark.asyncio
+    async def test_export_history_csv(self, client):
+        db = client._test_db
+        await history_db.insert_history(db, {
+            "session_key": "exp1",
+            "user_id": "u1",
+            "user_name": "Alice",
+            "item_name": "Export Movie",
+            "item_type": "Movie",
+            "started_at": "2024-01-01T12:00:00",
+            "stopped_at": "2024-01-01T14:00:00",
+            "duration_seconds": 7200,
+        })
+        r = await client.get("/api/export/history?format=csv")
+        assert r.status_code == 200
+        assert "text/csv" in r.headers["content-type"]
+        assert "Export Movie" in r.text
+        assert "Alice" in r.text
+        assert "started_at" in r.text  # header row
+
+    @pytest.mark.asyncio
+    async def test_export_history_json(self, client):
+        db = client._test_db
+        await history_db.insert_history(db, {
+            "session_key": "exp2",
+            "user_id": "u2",
+            "user_name": "Bob",
+            "item_name": "JSON Movie",
+            "item_type": "Movie",
+            "started_at": "2024-02-01T12:00:00",
+            "stopped_at": "2024-02-01T14:00:00",
+            "duration_seconds": 7200,
+        })
+        r = await client.get("/api/export/history?format=json")
+        assert r.status_code == 200
+        assert "application/json" in r.headers["content-type"]
+        data = r.json()
+        assert isinstance(data, list)
+        assert any(row["item_name"] == "JSON Movie" for row in data)
+
+    @pytest.mark.asyncio
+    async def test_export_history_filtered(self, client):
+        db = client._test_db
+        await history_db.insert_history(db, {
+            "session_key": "expf1", "user_id": "u1", "user_name": "Alice",
+            "item_name": "Movie A", "item_type": "Movie",
+            "started_at": "2024-03-01T12:00:00", "stopped_at": "2024-03-01T14:00:00",
+        })
+        await history_db.insert_history(db, {
+            "session_key": "expf2", "user_id": "u2", "user_name": "Bob",
+            "item_name": "Episode B", "item_type": "Episode",
+            "started_at": "2024-03-02T12:00:00", "stopped_at": "2024-03-02T14:00:00",
+        })
+        r = await client.get("/api/export/history?format=csv&item_type=Movie")
+        assert r.status_code == 200
+        assert "Movie A" in r.text
+        assert "Episode B" not in r.text
+
+    @pytest.mark.asyncio
+    async def test_delete_history(self, client):
+        db = client._test_db
+        await history_db.insert_history(db, {
+            "session_key": "del1",
+            "user_id": "u1",
+            "item_name": "To Delete",
+            "started_at": "2024-01-01T12:00:00",
+            "stopped_at": "2024-01-01T14:00:00",
+        })
+        cursor = await db.execute("SELECT id FROM history WHERE item_name = 'To Delete'")
+        row = await cursor.fetchone()
+        r = await client.delete(f"/api/history/{row[0]}")
+        assert r.status_code == 204
+
+    @pytest.mark.asyncio
+    async def test_delete_history_not_found(self, client):
+        r = await client.delete("/api/history/99999")
+        assert r.status_code == 404
+
+    @pytest.mark.asyncio
     async def test_chart_daily_plays_empty(self, client):
         r = await client.get("/api/charts/daily-plays?days=7")
         assert r.status_code == 200
@@ -283,6 +361,63 @@ class TestAPIRoutes:
         r = await client.get("/libraries/Movie")
         assert r.status_code == 200
         assert "Movies" in r.text
+
+    @pytest.mark.asyncio
+    async def test_notification_channels_crud(self, client):
+        # Create
+        r = await client.post("/api/notification-channels", json={
+            "name": "Test Discord",
+            "channel_type": "discord",
+            "config": {"url": "https://discord.com/api/webhooks/test"},
+            "triggers": ["playback_start", "playback_stop"],
+            "conditions": {},
+            "enabled": True,
+        })
+        assert r.status_code == 201
+
+        # List
+        r = await client.get("/api/notification-channels")
+        assert r.status_code == 200
+        channels = r.json()
+        assert len(channels) >= 1
+        ch_id = channels[0]["id"]
+        assert channels[0]["name"] == "Test Discord"
+
+        # Update
+        r = await client.put(f"/api/notification-channels/{ch_id}", json={
+            "name": "Updated Discord",
+            "channel_type": "discord",
+            "config": {"url": "https://discord.com/api/webhooks/test"},
+            "triggers": ["playback_start"],
+            "conditions": {},
+            "enabled": True,
+        })
+        assert r.status_code == 200
+
+        # Delete
+        r = await client.delete(f"/api/notification-channels/{ch_id}")
+        assert r.status_code == 204
+
+    @pytest.mark.asyncio
+    async def test_notification_channels_not_found(self, client):
+        r = await client.put("/api/notification-channels/99999", json={
+            "name": "X", "channel_type": "discord", "config": {}, "triggers": [], "conditions": {},
+        })
+        assert r.status_code == 404
+        r = await client.delete("/api/notification-channels/99999")
+        assert r.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_notification_log(self, client):
+        r = await client.get("/api/notification-log")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_settings_notifications_page(self, client):
+        r = await client.get("/settings/notifications")
+        assert r.status_code == 200
+        assert "Notification" in r.text
 
     @pytest.mark.asyncio
     async def test_static_css(self, client):

@@ -126,5 +126,15 @@
             <span><strong>Platform:</strong> {{ record.platform_name }}</span>
             {% if record.ip_address %}<span><strong>IP:</strong> {{ record.ip_address }}</span>{% endif %}
         </div>
+        <div class="detail-actions">
+            <button class="btn-delete"
+                    hx-delete="/api/history/{{ record.id }}"
+                    hx-confirm="Delete this history record?"
+                    hx-target="closest tr.detail-row"
+                    hx-swap="delete"
+                    hx-on::after-request="if(event.detail.successful) { var prev = this.closest('tr').previousElementSibling; if(prev) prev.remove(); }">
+                Delete
+            </button>
+        </div>
     </div>
 </div>
