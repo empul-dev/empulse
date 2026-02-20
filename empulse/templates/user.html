@@ -88,7 +88,7 @@
     var C = window.empulseCharts;
     if (!C) return;
     C.setupDefaults();
-    var accent = C.getCSS("--accent") || "#c8a438";
+    var accent = C.getCSS("--accent") || "#52b54b";
     var userId = {{ user.emby_user_id | tojson }};
 
     fetch("/api/charts/user/" + userId + "/daily-plays?days=30")
