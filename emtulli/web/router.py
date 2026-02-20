@@ -156,15 +156,35 @@ async def login_page(request: Request, error: str = ""):
 
 @router.post("/login")
 async def login_submit(request: Request, password: str = Form(...)):
+    from emtulli.web.auth import login_limiter, SESSION_MAX_AGE, check_origin
+
+    client_ip = request.client.host if request.client else "unknown"
+
+    # CSRF origin check
+    if not check_origin(request):
+        return templates.TemplateResponse("login.html", {
+            "request": request, "active": "", "error": "Request rejected.",
+        }, status_code=403)
+
+    # Rate limit check
+    if login_limiter.is_limited(client_ip):
+        return templates.TemplateResponse("login.html", {
+            "request": request, "active": "",
+            "error": "Too many attempts. Please try again later.",
+        }, status_code=429)
+
     if settings.auth_password and password == settings.auth_password:
-        secret = settings.secret_key or settings.auth_password
-        token = create_session_token(secret)
+        token = create_session_token(settings.secret_key)
         response = RedirectResponse("/", status_code=302)
         response.set_cookie(
             COOKIE_NAME, token,
-            httponly=True, samesite="lax", max_age=30 * 24 * 3600,
+            httponly=True, samesite="lax", max_age=SESSION_MAX_AGE,
+            secure=request.url.scheme == "https",
         )
+        login_limiter.reset(client_ip)
         return response
+
+    login_limiter.record(client_ip)
     return templates.TemplateResponse("login.html", {
         "request": request, "active": "", "error": "Invalid password",
     })

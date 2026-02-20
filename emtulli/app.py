@@ -20,6 +20,11 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
+    if not settings.auth_password:
+        logger.warning(
+            "No AUTH_PASSWORD set — the application is accessible without authentication! "
+            "Set AUTH_PASSWORD in your .env file to enable authentication."
+        )
 
     poller_task = None
     ws_task = None
@@ -91,7 +96,23 @@ def create_app() -> FastAPI:
         app.add_middleware(
             AuthMiddleware,
             password=settings.auth_password,
-            secret=settings.secret_key or settings.auth_password,
+            secret=settings.secret_key,
         )
+
+    @app.middleware("http")
+    async def security_headers(request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data:; "
+            "connect-src 'self' ws: wss:; "
+            "frame-ancestors 'none'"
+        )
+        return response
 
     return app

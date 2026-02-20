@@ -1,6 +1,8 @@
 import json
 import logging
+import re
 from datetime import date, timedelta
+from urllib.parse import quote
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 from emtulli.app import templates
@@ -11,6 +13,12 @@ from emtulli.models import SessionInfo, HistoryRecord
 
 logger = logging.getLogger("emtulli.api")
 router = APIRouter()
+
+VALID_ID = re.compile(r'^[a-zA-Z0-9_-]+$')
+
+
+def _validate_id(value: str) -> bool:
+    return bool(VALID_ID.match(value)) and len(value) <= 64
 
 
 @router.get("/now-playing")
@@ -30,7 +38,7 @@ async def stats_cards(request: Request, days: int = 30, metric: str = "plays"):
         return await _stats_cards(request, days, metric)
     except Exception as e:
         logger.exception("stats-cards error")
-        return f'<p class="empty-state">Error: {e}</p>'
+        return '<p class="empty-state">An internal error occurred.</p>'
 
 
 async def _stats_cards(request: Request, days: int, metric: str):
@@ -122,20 +130,20 @@ async def history_table(
     records = [HistoryRecord(**r) for r in rows]
     total_pages = max(1, (total + per_page - 1) // per_page)
 
-    # Build filter params for pagination links
+    # Build filter params for pagination links (URL-encoded)
     filter_params = ""
     if user_id:
-        filter_params += f"&user_id={user_id}"
+        filter_params += f"&user_id={quote(user_id)}"
     if item_type:
-        filter_params += f"&item_type={item_type}"
+        filter_params += f"&item_type={quote(item_type)}"
     if play_method:
-        filter_params += f"&play_method={play_method}"
+        filter_params += f"&play_method={quote(play_method)}"
     if search:
-        filter_params += f"&search={search}"
+        filter_params += f"&search={quote(search)}"
     if sort_by != "date":
-        filter_params += f"&sort_by={sort_by}"
+        filter_params += f"&sort_by={quote(sort_by)}"
     if sort_order != "desc":
-        filter_params += f"&sort_order={sort_order}"
+        filter_params += f"&sort_order={quote(sort_order)}"
 
     return templates.TemplateResponse("partials/history_table.html", {
         "request": request, "records": records,
@@ -188,6 +196,8 @@ async def history_detail(request: Request, history_id: int):
 @router.get("/img/{item_id}")
 async def image_proxy(item_id: str):
     """Proxy Emby item images so the API key stays server-side."""
+    if not _validate_id(item_id):
+        return Response(content=b"", status_code=400)
     import httpx
     url = f"{settings.emby_url.rstrip('/')}/Items/{item_id}/Images/Primary"
     try:
@@ -212,6 +222,8 @@ async def image_proxy(item_id: str):
 @router.get("/img/backdrop/{item_id}")
 async def backdrop_proxy(item_id: str):
     """Proxy Emby item backdrop images."""
+    if not _validate_id(item_id):
+        return Response(content=b"", status_code=400)
     import httpx
     url = f"{settings.emby_url.rstrip('/')}/Items/{item_id}/Images/Backdrop"
     try:
@@ -235,6 +247,8 @@ async def backdrop_proxy(item_id: str):
 @router.get("/img/user/{user_id}")
 async def user_image_proxy(user_id: str):
     """Proxy Emby user images."""
+    if not _validate_id(user_id):
+        return Response(content=b"", status_code=400)
     import httpx
     url = f"{settings.emby_url.rstrip('/')}/Users/{user_id}/Images/Primary"
     try:
@@ -336,4 +350,4 @@ async def test_connection(request: Request):
         return f'<p class="success">Connected to {info.get("ServerName", "Emby")} v{info.get("Version", "?")}</p>'
     except Exception as e:
         logger.error(f"Connection test failed: {e}")
-        return f'<p class="error">Connection failed: {e}</p>'
+        return '<p class="error">Connection failed. Check server logs for details.</p>'

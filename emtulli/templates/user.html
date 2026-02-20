@@ -5,7 +5,8 @@
 <div class="user-hero">
     <div class="user-avatar-large">
         <img src="/api/img/user/{{ user.emby_user_id }}" alt=""
-             onerror="this.parentElement.innerHTML='<div class=\'avatar-fallback\'>{{ (user.username or '?')[0]|upper }}</div>'">
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div class="avatar-fallback" style="display:none">{{ (user.username or '?')[0]|upper }}</div>
     </div>
     <div>
         <h2 style="margin:0">{{ user.username or "Unknown User" }}</h2>
@@ -88,7 +89,7 @@
     if (!C) return;
     C.setupDefaults();
     var accent = C.getCSS("--accent") || "#c8a438";
-    var userId = "{{ user.emby_user_id }}";
+    var userId = {{ user.emby_user_id | tojson }};
 
     fetch("/api/charts/user/" + userId + "/daily-plays?days=30")
         .then(function(r) { return r.json(); })

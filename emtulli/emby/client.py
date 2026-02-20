@@ -58,7 +58,7 @@ class EmbyClient:
         return r.json()
 
     def get_user_image_url(self, user_id: str) -> str:
-        return f"{self.base_url}/Users/{user_id}/Images/Primary?api_key={self.api_key}"
+        return f"/api/img/user/{user_id}"
 
     async def close(self):
         await self._client.aclose()
