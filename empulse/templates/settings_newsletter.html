@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Newsletter — Empulse{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h2>Newsletter</h2>
+    <a href="/settings" class="toolbar-btn">Back to Settings</a>
+</div>
+
+<article>
+    <header>Newsletter Settings</header>
+    <form id="newsletter-form" onsubmit="saveNewsletter(event)">
+        <label><input type="checkbox" id="nl-enabled" {% if config.get('enabled') %}checked{% endif %}> Enable Newsletter</label>
+
+        <div class="grid">
+            <label>Schedule
+                <select id="nl-schedule">
+                    <option value="daily" {% if config.get('schedule') == 'daily' %}selected{% endif %}>Daily</option>
+                    <option value="weekly" {% if config.get('schedule', 'weekly') == 'weekly' %}selected{% endif %}>Weekly</option>
+                    <option value="monthly" {% if config.get('schedule') == 'monthly' %}selected{% endif %}>Monthly</option>
+                </select>
+            </label>
+            <label>Day of Week (for weekly)
+                <select id="nl-dow">
+                    {% for d, name in [(0,'Monday'),(1,'Tuesday'),(2,'Wednesday'),(3,'Thursday'),(4,'Friday'),(5,'Saturday'),(6,'Sunday')] %}
+                    <option value="{{ d }}" {% if config.get('day_of_week', 0) == d %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Send Hour (UTC)
+                <input type="number" id="nl-hour" value="{{ config.get('hour', 9) }}" min="0" max="23">
+            </label>
+        </div>
+
+        <div class="grid">
+            <label>Recently Added — Days
+                <input type="number" id="nl-ra-days" value="{{ config.get('recently_added_days', 7) }}" min="1" max="30">
+            </label>
+            <label>Recently Added — Max Items
+                <input type="number" id="nl-ra-limit" value="{{ config.get('recently_added_limit', 20) }}" min="1" max="50">
+            </label>
+        </div>
+
+        <label><input type="checkbox" id="nl-stats" {% if config.get('include_stats', 1) %}checked{% endif %}> Include Watch Statistics</label>
+
+        <fieldset>
+            <legend>SMTP Settings</legend>
+            <div class="grid">
+                <label>SMTP Host
+                    <input type="text" id="nl-smtp-host" value="{{ config.get('smtp_host', '') }}" placeholder="smtp.gmail.com">
+                </label>
+                <label>SMTP Port
+                    <input type="number" id="nl-smtp-port" value="{{ config.get('smtp_port', 587) }}" min="1" max="65535">
+                </label>
+            </div>
+            <div class="grid">
+                <label>SMTP User
+                    <input type="text" id="nl-smtp-user" value="{{ config.get('smtp_user', '') }}" placeholder="user@example.com">
+                </label>
+                <label>SMTP Password
+                    <input type="password" id="nl-smtp-pass" value="{{ config.get('smtp_pass', '') }}">
+                </label>
+            </div>
+            <div class="grid">
+                <label>From Address
+                    <input type="email" id="nl-from" value="{{ config.get('from_addr', '') }}" placeholder="empulse@example.com">
+                </label>
+                <label>To Addresses (comma-separated)
+                    <input type="text" id="nl-to" value="{{ config.get('to_addrs', '') }}" placeholder="admin@example.com, user@example.com">
+                </label>
+            </div>
+            <label><input type="checkbox" id="nl-tls" {% if config.get('smtp_tls', 1) %}checked{% endif %}> Use TLS (STARTTLS)</label>
+        </fieldset>
+
+        <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+            <button type="submit">Save Settings</button>
+            <button type="button" class="secondary" onclick="previewNewsletter()">Preview</button>
+            <button type="button" class="contrast" onclick="sendNewsletter()">Send Now</button>
+        </div>
+    </form>
+    <div id="newsletter-result"></div>
+    {% if config.get('last_sent') %}
+    <p><small>Last sent: {{ config.get('last_sent', '')[:19] }}</small></p>
+    {% endif %}
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function saveNewsletter(e) {
+    e.preventDefault();
+    var payload = {
+        enabled: document.getElementById('nl-enabled').checked,
+        schedule: document.getElementById('nl-schedule').value,
+        day_of_week: parseInt(document.getElementById('nl-dow').value),
+        hour: parseInt(document.getElementById('nl-hour').value),
+        recently_added_days: parseInt(document.getElementById('nl-ra-days').value),
+        recently_added_limit: parseInt(document.getElementById('nl-ra-limit').value),
+        include_stats: document.getElementById('nl-stats').checked,
+        smtp_host: document.getElementById('nl-smtp-host').value,
+        smtp_port: parseInt(document.getElementById('nl-smtp-port').value),
+        smtp_user: document.getElementById('nl-smtp-user').value,
+        smtp_pass: document.getElementById('nl-smtp-pass').value,
+        smtp_tls: document.getElementById('nl-tls').checked,
+        from_addr: document.getElementById('nl-from').value,
+        to_addrs: document.getElementById('nl-to').value,
+    };
+    fetch('/api/newsletter/config', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+    }).then(function(r) {
+        if (r.ok) {
+            document.getElementById('newsletter-result').innerHTML = '<p class="success">Settings saved.</p>';
+        } else {
+            document.getElementById('newsletter-result').innerHTML = '<p class="error">Failed to save settings.</p>';
+        }
+    });
+}
+
+function previewNewsletter() {
+    window.open('/api/newsletter/preview', '_blank');
+}
+
+function sendNewsletter() {
+    if (!confirm('Send the newsletter now?')) return;
+    var el = document.getElementById('newsletter-result');
+    el.innerHTML = '<p>Sending...</p>';
+    fetch('/api/newsletter/send', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                el.innerHTML = '<p class="success">' + d.message + '</p>';
+            } else {
+                el.innerHTML = '<p class="error">' + (d.message || 'Failed') + '</p>';
+            }
+        })
+        .catch(function() { el.innerHTML = '<p class="error">Request failed</p>'; });
+}
+</script>
+{% endblock %}

@@ -56,12 +56,15 @@
                 <select id="ch-type" onchange="toggleTypeFields()">
                     <option value="discord">Discord</option>
                     <option value="webhook">Generic Webhook</option>
+                    <option value="email">Email (SMTP)</option>
+                    <option value="telegram">Telegram</option>
+                    <option value="ntfy">Ntfy</option>
                 </select>
             </label>
         </div>
 
         <label>Webhook URL
-            <input type="url" id="ch-url" required placeholder="https://discord.com/api/webhooks/...">
+            <input type="url" id="ch-url" placeholder="https://discord.com/api/webhooks/...">
         </label>
 
         <div id="webhook-extra" style="display:none">
@@ -78,6 +81,59 @@
             </div>
             <label>Body Template (optional — use {user}, {title}, {event}, etc.)
                 <textarea id="ch-body" rows="3" placeholder="Leave empty for default JSON payload"></textarea>
+            </label>
+        </div>
+
+        <div id="email-extra" style="display:none">
+            <div class="grid">
+                <label>SMTP Host
+                    <input type="text" id="ch-smtp-host" placeholder="smtp.gmail.com">
+                </label>
+                <label>SMTP Port
+                    <input type="number" id="ch-smtp-port" value="587" min="1" max="65535">
+                </label>
+            </div>
+            <div class="grid">
+                <label>SMTP User
+                    <input type="text" id="ch-smtp-user" placeholder="user@example.com">
+                </label>
+                <label>SMTP Password
+                    <input type="password" id="ch-smtp-pass" placeholder="app password">
+                </label>
+            </div>
+            <div class="grid">
+                <label>From Address
+                    <input type="email" id="ch-from-addr" placeholder="empulse@example.com">
+                </label>
+                <label>To Address
+                    <input type="email" id="ch-to-addr" placeholder="admin@example.com">
+                </label>
+            </div>
+            <label><input type="checkbox" id="ch-smtp-tls" checked> Use TLS (STARTTLS)</label>
+        </div>
+
+        <div id="telegram-extra" style="display:none">
+            <div class="grid">
+                <label>Bot Token
+                    <input type="text" id="ch-bot-token" placeholder="123456:ABC-DEF...">
+                </label>
+                <label>Chat ID
+                    <input type="text" id="ch-chat-id" placeholder="-1001234567890">
+                </label>
+            </div>
+        </div>
+
+        <div id="ntfy-extra" style="display:none">
+            <div class="grid">
+                <label>Server URL
+                    <input type="text" id="ch-ntfy-url" value="https://ntfy.sh" placeholder="https://ntfy.sh">
+                </label>
+                <label>Topic
+                    <input type="text" id="ch-ntfy-topic" placeholder="empulse-notifications">
+                </label>
+            </div>
+            <label>Auth Token (optional)
+                <input type="text" id="ch-ntfy-auth" placeholder="tk_...">
             </label>
         </div>
 
@@ -149,6 +205,12 @@
 function toggleTypeFields() {
     var type = document.getElementById('ch-type').value;
     document.getElementById('webhook-extra').style.display = type === 'webhook' ? '' : 'none';
+    document.getElementById('email-extra').style.display = type === 'email' ? '' : 'none';
+    document.getElementById('telegram-extra').style.display = type === 'telegram' ? '' : 'none';
+    document.getElementById('ntfy-extra').style.display = type === 'ntfy' ? '' : 'none';
+    // URL field: show for discord/webhook, hide for others
+    var urlLabel = document.getElementById('ch-url').closest('label');
+    urlLabel.style.display = (type === 'discord' || type === 'webhook') ? '' : 'none';
 }
 
 function resetForm() {
@@ -171,14 +233,32 @@ function saveChannel(e) {
     var minDur = parseInt(document.getElementById('ch-cond-min-dur').value) || 0;
     if (minDur > 0) conditions.min_duration = minDur;
 
-    var config = { url: document.getElementById('ch-url').value };
     var type = document.getElementById('ch-type').value;
+    var config = {};
+    if (type === 'discord' || type === 'webhook') {
+        config.url = document.getElementById('ch-url').value;
+    }
     if (type === 'webhook') {
         config.method = document.getElementById('ch-method').value;
         var hdr = document.getElementById('ch-headers').value.trim();
         if (hdr) { try { config.headers = JSON.parse(hdr); } catch(e) {} }
         var body = document.getElementById('ch-body').value.trim();
         if (body) config.body = body;
+    } else if (type === 'email') {
+        config.smtp_host = document.getElementById('ch-smtp-host').value;
+        config.smtp_port = parseInt(document.getElementById('ch-smtp-port').value) || 587;
+        config.smtp_user = document.getElementById('ch-smtp-user').value;
+        config.smtp_pass = document.getElementById('ch-smtp-pass').value;
+        config.tls = document.getElementById('ch-smtp-tls').checked;
+        config.from_addr = document.getElementById('ch-from-addr').value;
+        config.to_addr = document.getElementById('ch-to-addr').value;
+    } else if (type === 'telegram') {
+        config.bot_token = document.getElementById('ch-bot-token').value;
+        config.chat_id = document.getElementById('ch-chat-id').value;
+    } else if (type === 'ntfy') {
+        config.server_url = document.getElementById('ch-ntfy-url').value;
+        config.topic = document.getElementById('ch-ntfy-topic').value;
+        config.auth = document.getElementById('ch-ntfy-auth').value;
     }
 
     var payload = {
@@ -214,6 +294,21 @@ function editChannel(id) {
                 document.getElementById('ch-method').value = config.method || 'POST';
                 document.getElementById('ch-headers').value = config.headers ? JSON.stringify(config.headers) : '';
                 document.getElementById('ch-body').value = config.body || '';
+            } else if (ch.channel_type === 'email') {
+                document.getElementById('ch-smtp-host').value = config.smtp_host || '';
+                document.getElementById('ch-smtp-port').value = config.smtp_port || 587;
+                document.getElementById('ch-smtp-user').value = config.smtp_user || '';
+                document.getElementById('ch-smtp-pass').value = config.smtp_pass || '';
+                document.getElementById('ch-smtp-tls').checked = config.tls !== false;
+                document.getElementById('ch-from-addr').value = config.from_addr || '';
+                document.getElementById('ch-to-addr').value = config.to_addr || '';
+            } else if (ch.channel_type === 'telegram') {
+                document.getElementById('ch-bot-token').value = config.bot_token || '';
+                document.getElementById('ch-chat-id').value = config.chat_id || '';
+            } else if (ch.channel_type === 'ntfy') {
+                document.getElementById('ch-ntfy-url').value = config.server_url || 'https://ntfy.sh';
+                document.getElementById('ch-ntfy-topic').value = config.topic || '';
+                document.getElementById('ch-ntfy-auth').value = config.auth || '';
             }
 
             var triggers = typeof ch.triggers === 'string' ? JSON.parse(ch.triggers) : ch.triggers;

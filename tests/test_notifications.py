@@ -153,3 +153,155 @@ class TestWebhookTemplate:
         assert parsed["event"] == "playback_start"
         assert parsed["user"] == "Alice"
         assert parsed["title"] == "Movie"
+
+
+class TestEmailChannel:
+    def test_build_plain(self):
+        from empulse.notifications.channels.email import _build_plain
+        result = _build_plain("playback_start", {
+            "user_name": "Alice",
+            "item_name": "Test Movie",
+            "play_method": "DirectPlay",
+            "client": "Web",
+            "device_name": "Chrome",
+            "duration_seconds": 3700,
+            "percent_complete": 75.0,
+        })
+        assert "Alice" in result
+        assert "Test Movie" in result
+        assert "DirectPlay" in result
+        assert "75%" in result
+
+    def test_build_html(self):
+        from empulse.notifications.channels.email import _build_html
+        result = _build_html("watched", {
+            "user_name": "Bob",
+            "item_name": "Pilot",
+            "series_name": "Show",
+        })
+        assert "<html>" in result
+        assert "Bob" in result
+        assert "Show - Pilot" in result
+
+
+class TestTelegramChannel:
+    def test_build_message(self):
+        from empulse.notifications.channels.telegram import _build_message
+        result = _build_message("playback_start", {
+            "user_name": "Alice",
+            "item_name": "Test Movie",
+            "play_method": "DirectPlay",
+        })
+        assert "Alice" in result
+        assert "Test Movie" in result
+        assert "Playback Started" in result
+
+    def test_escape(self):
+        from empulse.notifications.channels.telegram import _escape
+        assert _escape("hello_world") == "hello\\_world"
+        assert _escape("a*b") == "a\\*b"
+
+
+class TestNtfyChannel:
+    @pytest.mark.asyncio
+    async def test_send_ntfy_no_topic(self):
+        from empulse.notifications.channels.ntfy import send_ntfy
+        with pytest.raises(ValueError, match="topic"):
+            await send_ntfy({}, "playback_start", {"user_name": "Test"})
+
+
+class TestGeoLocation:
+    @pytest.mark.asyncio
+    async def test_private_ip_returns_none(self, db):
+        from empulse.geo import lookup_ip
+        result = await lookup_ip(db, "192.168.1.1")
+        assert result is None
+        result = await lookup_ip(db, "127.0.0.1")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_empty_ip_returns_none(self, db):
+        from empulse.geo import lookup_ip
+        result = await lookup_ip(db, "")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_cached_result(self, db):
+        from empulse.geo import lookup_ip
+        # Insert a cached result
+        await db.execute(
+            "INSERT INTO ip_locations (ip, city, country, latitude, longitude) VALUES (?, ?, ?, ?, ?)",
+            ["8.8.8.8", "Mountain View", "United States", 37.386, -122.084],
+        )
+        await db.commit()
+        result = await lookup_ip(db, "8.8.8.8")
+        assert result is not None
+        assert result["city"] == "Mountain View"
+        assert result["country"] == "United States"
+
+    @pytest.mark.asyncio
+    async def test_get_all_locations_empty(self, db):
+        from empulse.geo import get_all_locations
+        result = await get_all_locations(db)
+        assert result == []
+
+
+class TestNewsletter:
+    @pytest.mark.asyncio
+    async def test_config_crud(self, db):
+        from empulse.newsletter import get_newsletter_config, save_newsletter_config
+        # Initially empty
+        config = await get_newsletter_config(db)
+        assert config is None
+
+        # Save
+        await save_newsletter_config(db, {
+            "enabled": True,
+            "schedule": "weekly",
+            "day_of_week": 1,
+            "hour": 10,
+            "recently_added_days": 7,
+            "recently_added_limit": 20,
+            "include_stats": True,
+            "smtp_host": "smtp.example.com",
+            "smtp_port": 587,
+            "smtp_user": "user",
+            "smtp_pass": "pass",
+            "smtp_tls": True,
+            "from_addr": "from@example.com",
+            "to_addrs": "to@example.com",
+        })
+
+        config = await get_newsletter_config(db)
+        assert config is not None
+        assert config["enabled"] == 1
+        assert config["schedule"] == "weekly"
+
+        # Update
+        await save_newsletter_config(db, {
+            "enabled": False,
+            "schedule": "daily",
+            "day_of_week": 0,
+            "hour": 8,
+            "recently_added_days": 3,
+            "recently_added_limit": 10,
+            "include_stats": False,
+            "smtp_host": "mail.example.com",
+            "smtp_port": 465,
+            "smtp_user": "",
+            "smtp_pass": "",
+            "smtp_tls": False,
+            "from_addr": "",
+            "to_addrs": "",
+        })
+        config = await get_newsletter_config(db)
+        assert config["schedule"] == "daily"
+        assert config["enabled"] == 0
+
+    @pytest.mark.asyncio
+    async def test_build_newsletter_html(self, db):
+        from empulse.newsletter import build_newsletter_html
+        config = {"recently_added_days": 7, "recently_added_limit": 10, "include_stats": 1}
+        html = await build_newsletter_html(db, config)
+        assert "Empulse Newsletter" in html
+        assert "Watch Statistics" in html

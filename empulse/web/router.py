@@ -131,6 +131,13 @@ async def graphs_page(request: Request):
     })
 
 
+@router.get("/map")
+async def map_page(request: Request):
+    return templates.TemplateResponse("map.html", {
+        "request": request, "active": "map",
+    })
+
+
 @router.get("/libraries")
 async def libraries_page(request: Request):
     db = get_db()
@@ -207,6 +214,17 @@ async def settings_page(request: Request):
     return templates.TemplateResponse("settings.html", {
         "request": request, "active": "settings",
         "settings": settings, "server_info": server_info,
+    })
+
+
+@router.get("/settings/newsletter")
+async def settings_newsletter(request: Request):
+    db = get_db()
+    from empulse.newsletter import get_newsletter_config
+    config = await get_newsletter_config(db)
+    return templates.TemplateResponse("settings_newsletter.html", {
+        "request": request, "active": "settings",
+        "config": config or {},
     })
 
 

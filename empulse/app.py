@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
 
     poller_task = None
     ws_task = None
+    newsletter_task = None
 
     from empulse.notifications.engine import NotificationEngine
     notification_engine = NotificationEngine(get_db)
@@ -56,6 +57,11 @@ async def lifespan(app: FastAPI):
         poller_task = asyncio.create_task(poller.run())
         logger.info("Session poller started")
 
+        from empulse.newsletter import NewsletterScheduler
+        newsletter_scheduler = NewsletterScheduler(get_db, emby_client)
+        newsletter_task = asyncio.create_task(newsletter_scheduler.run())
+        logger.info("Newsletter scheduler started")
+
         from empulse.emby.websocket import EmbyWebSocket
         emby_ws = EmbyWebSocket(poller)
         ws_task = asyncio.create_task(emby_ws.run())
@@ -76,6 +82,12 @@ async def lifespan(app: FastAPI):
         ws_task.cancel()
         try:
             await ws_task
+        except asyncio.CancelledError:
+            pass
+    if newsletter_task:
+        newsletter_task.cancel()
+        try:
+            await newsletter_task
         except asyncio.CancelledError:
             pass
     logger.info("Shutdown complete")
@@ -115,8 +127,8 @@ def create_app() -> FastAPI:
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "img-src 'self' data:; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+            "img-src 'self' data: https://*.tile.openstreetmap.org; "
             "connect-src 'self' ws: wss:; "
             "frame-ancestors 'none'"
         )

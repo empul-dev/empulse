@@ -102,6 +102,15 @@ class NotificationEngine:
             elif channel_type == "webhook":
                 from empulse.notifications.channels.webhook import send_webhook
                 await send_webhook(config, event_type, data)
+            elif channel_type == "email":
+                from empulse.notifications.channels.email import send_email
+                await send_email(config, event_type, data)
+            elif channel_type == "telegram":
+                from empulse.notifications.channels.telegram import send_telegram
+                await send_telegram(config, event_type, data)
+            elif channel_type == "ntfy":
+                from empulse.notifications.channels.ntfy import send_ntfy
+                await send_ntfy(config, event_type, data)
             else:
                 logger.warning(f"Unknown channel type: {channel_type}")
                 return
@@ -165,6 +174,15 @@ class NotificationEngine:
             elif channel_type == "webhook":
                 from empulse.notifications.channels.webhook import send_webhook
                 await send_webhook(config, "playback_start", test_data)
+            elif channel_type == "email":
+                from empulse.notifications.channels.email import send_email
+                await send_email(config, "playback_start", test_data)
+            elif channel_type == "telegram":
+                from empulse.notifications.channels.telegram import send_telegram
+                await send_telegram(config, "playback_start", test_data)
+            elif channel_type == "ntfy":
+                from empulse.notifications.channels.ntfy import send_ntfy
+                await send_ntfy(config, "playback_start", test_data)
             else:
                 return False, f"Unknown channel type: {channel_type}"
             return True, "Test notification sent"

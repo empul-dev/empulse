@@ -212,7 +212,7 @@ async def delete_history(history_id: int):
 EXPORT_FIELDS = [
     "started_at", "stopped_at", "user_name", "item_name", "series_name",
     "item_type", "duration_seconds", "percent_complete", "play_method",
-    "client", "device_name", "ip_address",
+    "client", "device_name", "ip_address", "city", "country",
 ]
 EXPORT_MAX_ROWS = 10_000
 
@@ -490,6 +490,14 @@ async def chart_top_users_stream_type(days: int = 30):
     return JSONResponse(rows)
 
 
+@router.get("/locations")
+async def get_locations():
+    db = get_db()
+    from empulse.geo import get_all_locations
+    locations = await get_all_locations(db)
+    return JSONResponse(locations)
+
+
 @router.get("/notification-channels")
 async def list_notification_channels():
     db = get_db()
@@ -585,6 +593,47 @@ async def notification_log():
     )
     rows = await cursor.fetchall()
     return JSONResponse([dict(r) for r in rows])
+
+
+@router.get("/newsletter/config")
+async def get_newsletter_config_api():
+    db = get_db()
+    from empulse.newsletter import get_newsletter_config
+    config = await get_newsletter_config(db)
+    return JSONResponse(config or {})
+
+
+@router.post("/newsletter/config")
+async def save_newsletter_config_api(request: Request):
+    data = await request.json()
+    db = get_db()
+    from empulse.newsletter import save_newsletter_config
+    await save_newsletter_config(db, data)
+    return JSONResponse({"status": "saved"})
+
+
+@router.get("/newsletter/preview")
+async def newsletter_preview(request: Request):
+    db = get_db()
+    from empulse.newsletter import get_newsletter_config, build_newsletter_html
+    config = await get_newsletter_config(db)
+    if not config:
+        config = {"recently_added_days": 7, "recently_added_limit": 20, "include_stats": 1}
+    emby_client = getattr(request.app.state, "emby_client", None)
+    html = await build_newsletter_html(db, config, emby_client)
+    return Response(content=html, media_type="text/html")
+
+
+@router.post("/newsletter/send")
+async def send_newsletter_now(request: Request):
+    db = get_db()
+    from empulse.newsletter import get_newsletter_config, send_newsletter
+    config = await get_newsletter_config(db)
+    if not config:
+        return JSONResponse({"success": False, "message": "Newsletter not configured"}, status_code=400)
+    emby_client = getattr(request.app.state, "emby_client", None)
+    success, message = await send_newsletter(db, config, emby_client)
+    return JSONResponse({"success": success, "message": message})
 
 
 @router.get("/backup")
