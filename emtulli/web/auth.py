@@ -42,6 +42,8 @@ def verify_session_token(token: str, secret: str) -> bool:
 class LoginRateLimiter:
     """Simple in-memory rate limiter for login attempts."""
 
+    MAX_TRACKED_IPS = 10_000
+
     def __init__(self, max_attempts: int = 5, window_seconds: int = 300):
         self.max_attempts = max_attempts
         self.window = window_seconds
@@ -50,6 +52,8 @@ class LoginRateLimiter:
     def is_limited(self, ip: str) -> bool:
         now = time.time()
         self._attempts[ip] = [t for t in self._attempts[ip] if now - t < self.window]
+        if len(self._attempts) > self.MAX_TRACKED_IPS:
+            self._cleanup(now)
         return len(self._attempts[ip]) >= self.max_attempts
 
     def record(self, ip: str):
@@ -57,6 +61,12 @@ class LoginRateLimiter:
 
     def reset(self, ip: str):
         self._attempts.pop(ip, None)
+
+    def _cleanup(self, now: float):
+        expired = [ip for ip, ts in self._attempts.items()
+                   if not ts or now - ts[-1] > self.window]
+        for ip in expired:
+            del self._attempts[ip]
 
 
 login_limiter = LoginRateLimiter()

@@ -23,8 +23,9 @@ class EmbyWebSocket:
     def __init__(self, poller):
         self.poller = poller
         base = settings.emby_url.rstrip("/")
-        self.ws_url = base.replace("http://", "ws://").replace("https://", "wss://")
-        self.ws_url += f"/embywebsocket?api_key={settings.emby_api_key}"
+        ws_base = base.replace("http://", "ws://").replace("https://", "wss://")
+        self.ws_url = f"{ws_base}/embywebsocket"
+        self._ws_params = {"api_key": settings.emby_api_key}
 
     async def run(self):
         """Connect to Emby WebSocket with auto-reconnect."""
@@ -33,12 +34,14 @@ class EmbyWebSocket:
                 await self._connect()
             except asyncio.CancelledError:
                 raise
-            except Exception as e:
-                logger.warning(f"Emby WS error: {e}, reconnecting in 5s")
+            except Exception:
+                logger.warning("Emby WS connection error, reconnecting in 5s")
                 await asyncio.sleep(5)
 
     async def _connect(self):
-        async with websockets.connect(self.ws_url) as ws:
+        from urllib.parse import urlencode
+        url = f"{self.ws_url}?{urlencode(self._ws_params)}"
+        async with websockets.connect(url) as ws:
             logger.info("Connected to Emby WebSocket")
             async for raw in ws:
                 try:

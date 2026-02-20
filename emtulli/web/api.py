@@ -32,8 +32,13 @@ async def now_playing(request: Request):
     })
 
 
+def _clamp_days(days: int) -> int:
+    return max(1, min(days, 365))
+
+
 @router.get("/stats-cards")
 async def stats_cards(request: Request, days: int = 30, metric: str = "plays"):
+    days = _clamp_days(days)
     try:
         return await _stats_cards(request, days, metric)
     except Exception as e:
@@ -286,6 +291,7 @@ def _fill_date_gaps(rows: list[dict], days: int) -> list[dict]:
 
 @router.get("/charts/daily-plays")
 async def chart_daily_plays(days: int = 30):
+    days = _clamp_days(days)
     db = get_db()
     rows = await stats_db.get_plays_per_day(db, days=days)
     filled = _fill_date_gaps(rows, days)
@@ -294,6 +300,7 @@ async def chart_daily_plays(days: int = 30):
 
 @router.get("/charts/plays-by-type")
 async def chart_plays_by_type(days: int = 30):
+    days = _clamp_days(days)
     db = get_db()
     rows = await stats_db.get_plays_by_type(db, days=days)
     return JSONResponse(rows)
@@ -301,6 +308,7 @@ async def chart_plays_by_type(days: int = 30):
 
 @router.get("/charts/plays-by-platform")
 async def chart_plays_by_platform(days: int = 30):
+    days = _clamp_days(days)
     db = get_db()
     rows = await stats_db.get_most_active_platforms(db, limit=10, days=days)
     return JSONResponse(rows)
@@ -308,6 +316,7 @@ async def chart_plays_by_platform(days: int = 30):
 
 @router.get("/charts/user/{user_id}/daily-plays")
 async def chart_user_daily_plays(user_id: str, days: int = 30):
+    days = _clamp_days(days)
     db = get_db()
     rows = await stats_db.get_user_plays_per_day(db, user_id, days=days)
     filled = _fill_date_gaps(rows, days)
@@ -316,6 +325,7 @@ async def chart_user_daily_plays(user_id: str, days: int = 30):
 
 @router.get("/charts/user/{user_id}/by-type")
 async def chart_user_by_type(user_id: str, days: int = 30):
+    days = _clamp_days(days)
     db = get_db()
     rows = await stats_db.get_user_plays_by_type(db, user_id, days=days)
     return JSONResponse(rows)
@@ -323,6 +333,7 @@ async def chart_user_by_type(user_id: str, days: int = 30):
 
 @router.get("/charts/library/{item_type}/daily-plays")
 async def chart_library_daily_plays(item_type: str, days: int = 30):
+    days = _clamp_days(days)
     db = get_db()
     rows = await stats_db.get_library_plays_per_day(db, item_type, days=days)
     filled = _fill_date_gaps(rows, days)
@@ -347,7 +358,8 @@ async def test_connection(request: Request):
             "wan_address": info.get("WanAddress", ""),
             "os": info.get("OperatingSystem", ""),
         })
-        return f'<p class="success">Connected to {info.get("ServerName", "Emby")} v{info.get("Version", "?")}</p>'
+        from markupsafe import escape
+        return f'<p class="success">Connected to {escape(info.get("ServerName", "Emby"))} v{escape(info.get("Version", "?"))}</p>'
     except Exception as e:
         logger.error(f"Connection test failed: {e}")
         return '<p class="error">Connection failed. Check server logs for details.</p>'

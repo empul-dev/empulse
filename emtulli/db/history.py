@@ -1,12 +1,25 @@
 import aiosqlite
 
 
+HISTORY_COLUMNS = frozenset({
+    "session_key", "user_id", "user_name", "client", "device_name",
+    "ip_address", "item_id", "item_name", "item_type", "series_name",
+    "series_id", "season_number", "episode_number", "year",
+    "runtime_ticks", "progress_ticks", "play_method",
+    "transcode_video_codec", "transcode_audio_codec",
+    "video_decision", "audio_decision", "stream_info",
+    "started_at", "stopped_at", "duration_seconds", "paused_seconds",
+    "percent_complete", "watched",
+})
+
+
 async def insert_history(db: aiosqlite.Connection, data: dict):
-    cols = ", ".join(data.keys())
-    placeholders = ", ".join(["?"] * len(data))
+    safe_data = {k: v for k, v in data.items() if k in HISTORY_COLUMNS}
+    cols = ", ".join(safe_data.keys())
+    placeholders = ", ".join(["?"] * len(safe_data))
     await db.execute(
         f"INSERT INTO history ({cols}) VALUES ({placeholders})",
-        list(data.values()),
+        list(safe_data.values()),
     )
     await db.commit()
 

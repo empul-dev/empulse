@@ -1,5 +1,7 @@
 import logging
 
+import hmac
+
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse
 from emtulli.app import templates
@@ -147,10 +149,18 @@ async def library_detail(request: Request, item_type: str):
     })
 
 
+_LOGIN_ERRORS = {
+    "invalid": "Invalid password",
+    "rate_limited": "Too many attempts. Please try again later.",
+    "rejected": "Request rejected.",
+}
+
+
 @router.get("/login")
 async def login_page(request: Request, error: str = ""):
+    error_msg = _LOGIN_ERRORS.get(error, "")
     return templates.TemplateResponse("login.html", {
-        "request": request, "active": "", "error": error,
+        "request": request, "active": "", "error": error_msg,
     })
 
 
@@ -162,18 +172,13 @@ async def login_submit(request: Request, password: str = Form(...)):
 
     # CSRF origin check
     if not check_origin(request):
-        return templates.TemplateResponse("login.html", {
-            "request": request, "active": "", "error": "Request rejected.",
-        }, status_code=403)
+        return RedirectResponse("/login?error=rejected", status_code=302)
 
     # Rate limit check
     if login_limiter.is_limited(client_ip):
-        return templates.TemplateResponse("login.html", {
-            "request": request, "active": "",
-            "error": "Too many attempts. Please try again later.",
-        }, status_code=429)
+        return RedirectResponse("/login?error=rate_limited", status_code=302)
 
-    if settings.auth_password and password == settings.auth_password:
+    if settings.auth_password and hmac.compare_digest(password, settings.auth_password):
         token = create_session_token(settings.secret_key)
         response = RedirectResponse("/", status_code=302)
         response.set_cookie(
@@ -185,9 +190,7 @@ async def login_submit(request: Request, password: str = Form(...)):
         return response
 
     login_limiter.record(client_ip)
-    return templates.TemplateResponse("login.html", {
-        "request": request, "active": "", "error": "Invalid password",
-    })
+    return RedirectResponse("/login?error=invalid", status_code=302)
 
 
 @router.get("/settings")

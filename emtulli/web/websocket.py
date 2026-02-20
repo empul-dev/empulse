@@ -7,10 +7,15 @@ router = APIRouter()
 
 
 class BrowserWSManager:
+    MAX_CONNECTIONS = 100
+
     def __init__(self):
         self.connections: list[WebSocket] = []
 
     async def connect(self, ws: WebSocket):
+        if len(self.connections) >= self.MAX_CONNECTIONS:
+            await ws.close(code=1013)  # Try Again Later
+            return
         await ws.accept()
         self.connections.append(ws)
         logger.debug(f"Browser WS connected ({len(self.connections)} total)")

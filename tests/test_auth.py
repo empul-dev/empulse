@@ -128,9 +128,9 @@ class TestMiddleware:
                  patch("emtulli.web.router.settings", mock_settings):
                 transport = ASGITransport(app=app)
                 async with AsyncClient(transport=transport, base_url="http://test") as ac:
-                    r = await ac.post("/login", data={"password": "wrong"})
-                    assert r.status_code == 200
-                    assert "Invalid password" in r.text
+                    r = await ac.post("/login", data={"password": "wrong"}, follow_redirects=False)
+                    assert r.status_code == 302
+                    assert "/login?error=invalid" in r.headers["location"]
 
             await db.close()
 

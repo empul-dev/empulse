@@ -95,8 +95,9 @@ class HistoryRecord(BaseModel):
     @property
     def item_link(self) -> str:
         """Link to item detail page."""
+        from urllib.parse import quote
         if self.item_type == "Episode" and self.series_name:
-            return f"/item/{self.series_id or self.item_id}?type=series&name={self.series_name}"
+            return f"/item/{self.series_id or self.item_id}?type=series&name={quote(self.series_name)}"
         if self.item_id:
             return f"/item/{self.item_id}"
         return "#"
