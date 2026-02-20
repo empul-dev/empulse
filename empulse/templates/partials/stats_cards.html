@@ -8,6 +8,7 @@
         <div class="stat-card-poster">
             {% if most_watched_movies %}
             <img src="/api/img/{{ most_watched_movies[0].item_id }}" alt="" loading="lazy">
+            <div class="poster-fallback">{{ (most_watched_movies[0].item_name or '?')[:2] }}</div>
             {% endif %}
         </div>
         <div class="stat-card-content">
@@ -17,7 +18,7 @@
             </div>
             <ol class="stat-list">
                 {% for m in most_watched_movies %}
-                <li data-img="/api/img/{{ m.item_id }}">
+                <li data-img="/api/img/{{ m.item_id }}" data-title="{{ (m.item_name or '?')[:2] }}">
                     <span class="stat-list-name">{{ m.item_name }}{% if m.year %} ({{ m.year }}){% endif %}</span>
                     <span class="stat-list-value">{{ m.plays if metric == 'plays' else (m.total_duration // 3600) ~ 'h' }}</span>
                 </li>
@@ -32,6 +33,7 @@
         <div class="stat-card-poster">
             {% if most_popular_movies %}
             <img src="/api/img/{{ most_popular_movies[0].item_id }}" alt="" loading="lazy">
+            <div class="poster-fallback">{{ (most_popular_movies[0].item_name or '?')[:2] }}</div>
             {% endif %}
         </div>
         <div class="stat-card-content">
@@ -41,7 +43,7 @@
             </div>
             <ol class="stat-list">
                 {% for m in most_popular_movies %}
-                <li data-img="/api/img/{{ m.item_id }}">
+                <li data-img="/api/img/{{ m.item_id }}" data-title="{{ (m.item_name or '?')[:2] }}">
                     <span class="stat-list-name">{{ m.item_name }}</span>
                     <span class="stat-list-value">{{ m.users }}</span>
                 </li>
@@ -56,6 +58,7 @@
         <div class="stat-card-poster">
             {% if most_watched_shows %}
             <img src="/api/img/{{ most_watched_shows[0].poster_id }}" alt="" loading="lazy">
+            <div class="poster-fallback">{{ (most_watched_shows[0].series_name or '?')[:2] }}</div>
             {% endif %}
         </div>
         <div class="stat-card-content">
@@ -65,7 +68,7 @@
             </div>
             <ol class="stat-list">
                 {% for s in most_watched_shows %}
-                <li data-img="/api/img/{{ s.poster_id }}">
+                <li data-img="/api/img/{{ s.poster_id }}" data-title="{{ (s.series_name or '?')[:2] }}">
                     <span class="stat-list-name">{{ s.series_name }}</span>
                     <span class="stat-list-value">{{ s.plays if metric == 'plays' else (s.total_duration // 3600) ~ 'h' }}</span>
                 </li>
@@ -80,6 +83,7 @@
         <div class="stat-card-poster">
             {% if most_popular_shows %}
             <img src="/api/img/{{ most_popular_shows[0].poster_id }}" alt="" loading="lazy">
+            <div class="poster-fallback">{{ (most_popular_shows[0].series_name or '?')[:2] }}</div>
             {% endif %}
         </div>
         <div class="stat-card-content">
@@ -89,7 +93,7 @@
             </div>
             <ol class="stat-list">
                 {% for s in most_popular_shows %}
-                <li data-img="/api/img/{{ s.poster_id }}">
+                <li data-img="/api/img/{{ s.poster_id }}" data-title="{{ (s.series_name or '?')[:2] }}">
                     <span class="stat-list-name">{{ s.series_name }}</span>
                     <span class="stat-list-value">{{ s.users }}</span>
                 </li>
@@ -104,6 +108,7 @@
         <div class="stat-card-poster">
             {% if recently_watched %}
             <img src="/api/img/{{ rw_poster(recently_watched[0]) | trim }}" alt="" loading="lazy">
+            <div class="poster-fallback">{{ (recently_watched[0].display_title or '?')[:2] }}</div>
             {% endif %}
         </div>
         <div class="stat-card-content">
@@ -113,7 +118,7 @@
             </div>
             <ol class="stat-list">
                 {% for r in recently_watched %}
-                <li data-img="/api/img/{{ rw_poster(r) | trim }}">
+                <li data-img="/api/img/{{ rw_poster(r) | trim }}" data-title="{{ (r.display_title or '?')[:2] }}">
                     <span class="stat-list-name">{{ r.display_title }}</span>
                     <span class="stat-list-value-small">{{ r.user_name }}</span>
                 </li>

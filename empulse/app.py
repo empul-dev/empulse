@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -14,6 +15,7 @@ logger = logging.getLogger("empulse")
 
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+templates.env.globals["cache_v"] = str(int(time.time()))
 
 
 @asynccontextmanager

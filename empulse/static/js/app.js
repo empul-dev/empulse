@@ -33,7 +33,9 @@
 function initStatCards() {
     document.querySelectorAll(".stat-card[data-bg]").forEach(function(card) {
         var poster = card.querySelector(".stat-card-poster img");
+        var fallback = card.querySelector(".poster-fallback");
         var defaultSrc = card.dataset.bg;
+        var defaultTitle = fallback ? fallback.textContent : "";
 
         // Set initial blur bg
         card.style.setProperty("--hover-bg", "url(" + defaultSrc + ")");
@@ -42,6 +44,7 @@ function initStatCards() {
             li.addEventListener("mouseenter", function() {
                 var src = li.dataset.img;
                 if (poster) poster.src = src;
+                if (fallback && li.dataset.title) fallback.textContent = li.dataset.title;
                 card.style.setProperty("--hover-bg", "url(" + src + ")");
                 card.classList.add("is-hovered");
             });
@@ -49,6 +52,7 @@ function initStatCards() {
 
         card.addEventListener("mouseleave", function() {
             if (poster) poster.src = defaultSrc;
+            if (fallback) fallback.textContent = defaultTitle;
             card.style.setProperty("--hover-bg", "url(" + defaultSrc + ")");
             card.classList.remove("is-hovered");
         });
