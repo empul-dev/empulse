@@ -32,6 +32,21 @@
 {% endif %}
 
 <article>
+    <header>Backup &amp; Restore</header>
+    <p>Download the current database or restore from a backup.</p>
+    <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+        <a href="/api/backup" role="button" class="secondary">Download Backup</a>
+        <form id="restore-form" onsubmit="restoreDb(event)" style="flex: 1; min-width: 200px;">
+            <label>Restore from file
+                <input type="file" name="file" accept=".db" required>
+            </label>
+            <button type="submit" class="contrast">Restore Database</button>
+        </form>
+    </div>
+    <div id="restore-result"></div>
+</article>
+
+<article>
     <header>Notifications</header>
     <p>Configure Discord and webhook notifications for playback events.</p>
     <a href="/settings/notifications" role="button">Manage Notifications</a>
@@ -42,4 +57,27 @@
     <p>Empulse v0.1.0 — Activity monitoring for Emby Server</p>
     <p><small>Poll interval: {{ settings.poll_interval }}s</small></p>
 </article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function restoreDb(e) {
+    e.preventDefault();
+    if (!confirm('This will replace the current database. A backup of the current database will be saved. Continue?')) return;
+    var form = document.getElementById('restore-form');
+    var data = new FormData(form);
+    var el = document.getElementById('restore-result');
+    el.innerHTML = '<p>Uploading...</p>';
+    fetch('/api/restore', { method: 'POST', body: data })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.error) {
+                el.innerHTML = '<p class="error">' + d.error + '</p>';
+            } else {
+                el.innerHTML = '<p class="success">' + d.message + '</p>';
+            }
+        })
+        .catch(function() { el.innerHTML = '<p class="error">Upload failed</p>'; });
+}
+</script>
 {% endblock %}

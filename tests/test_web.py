@@ -363,6 +363,73 @@ class TestAPIRoutes:
         assert "Movies" in r.text
 
     @pytest.mark.asyncio
+    async def test_graphs_page(self, client):
+        r = await client.get("/graphs")
+        assert r.status_code == 200
+        assert "Graphs" in r.text
+        assert "g-daily-stacked" in r.text
+
+    @pytest.mark.asyncio
+    async def test_chart_plays_by_dow(self, client):
+        r = await client.get("/api/charts/plays-by-dow?days=30")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_chart_plays_by_hour(self, client):
+        r = await client.get("/api/charts/plays-by-hour?days=30")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_chart_plays_per_month(self, client):
+        r = await client.get("/api/charts/plays-per-month?months=12")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_chart_plays_by_date_stacked(self, client):
+        r = await client.get("/api/charts/plays-by-date-stacked?days=30")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_chart_plays_by_stream_type(self, client):
+        r = await client.get("/api/charts/plays-by-stream-type?days=30")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_chart_source_resolution(self, client):
+        r = await client.get("/api/charts/source-resolution?days=30")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_chart_transcode_ratio(self, client):
+        r = await client.get("/api/charts/transcode-ratio?days=30")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_chart_top_platforms_stream_type(self, client):
+        r = await client.get("/api/charts/top-platforms-stream-type?days=30")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_chart_top_users_stream_type(self, client):
+        r = await client.get("/api/charts/top-users-stream-type?days=30")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    @pytest.mark.asyncio
+    async def test_recently_added_no_emby(self, client):
+        r = await client.get("/api/recently-added")
+        assert r.status_code == 200
+        assert "No recently added" in r.text
+
+    @pytest.mark.asyncio
     async def test_notification_channels_crud(self, client):
         # Create
         r = await client.post("/api/notification-channels", json={

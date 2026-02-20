@@ -400,6 +400,96 @@ async def chart_library_daily_plays(item_type: str, days: int = 30):
     return JSONResponse(filled)
 
 
+@router.get("/recently-added")
+async def recently_added(request: Request, limit: int = 10, item_type: str = ""):
+    emby_client = getattr(request.app.state, "emby_client", None)
+    if not emby_client:
+        return templates.TemplateResponse("partials/recently_added.html", {
+            "request": request, "items": [],
+        })
+    limit = max(1, min(limit, 20))
+    try:
+        items = await emby_client.get_recently_added(limit=limit, item_type=item_type)
+    except Exception as e:
+        logger.error(f"Recently added fetch failed: {e}")
+        items = []
+    return templates.TemplateResponse("partials/recently_added.html", {
+        "request": request, "items": items,
+    })
+
+
+@router.get("/charts/plays-by-date-stacked")
+async def chart_plays_by_date_stacked(days: int = 30):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_plays_by_date_stacked(db, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/plays-by-dow")
+async def chart_plays_by_dow(days: int = 30):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_plays_by_day_of_week(db, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/plays-by-hour")
+async def chart_plays_by_hour(days: int = 30):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_plays_by_hour(db, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/plays-per-month")
+async def chart_plays_per_month(months: int = 12):
+    months = max(1, min(months, 36))
+    db = get_db()
+    rows = await stats_db.get_plays_per_month(db, months=months)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/plays-by-stream-type")
+async def chart_plays_by_stream_type(days: int = 30):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_plays_by_stream_type(db, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/source-resolution")
+async def chart_source_resolution(days: int = 30):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_source_resolution_distribution(db, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/transcode-ratio")
+async def chart_transcode_ratio(days: int = 30):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_transcode_ratio(db, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/top-platforms-stream-type")
+async def chart_top_platforms_stream_type(days: int = 30):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_top_platforms_with_stream_type(db, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/top-users-stream-type")
+async def chart_top_users_stream_type(days: int = 30):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_top_users_with_stream_type(db, days=days)
+    return JSONResponse(rows)
+
+
 @router.get("/notification-channels")
 async def list_notification_channels():
     db = get_db()
@@ -495,6 +585,57 @@ async def notification_log():
     )
     rows = await cursor.fetchall()
     return JSONResponse([dict(r) for r in rows])
+
+
+@router.get("/backup")
+async def backup_database():
+    from pathlib import Path
+    db_path = Path(settings.db_path)
+    if not db_path.exists() or str(db_path) == ":memory:":
+        return Response(content="Database not available for backup", status_code=400)
+
+    return Response(
+        content=db_path.read_bytes(),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename=empulse_backup.db"},
+    )
+
+
+@router.post("/restore")
+async def restore_database(request: Request):
+    from pathlib import Path
+    import shutil
+
+    db_path = Path(settings.db_path)
+    if str(db_path) == ":memory:":
+        return JSONResponse({"error": "Cannot restore to in-memory database"}, status_code=400)
+
+    content_type = request.headers.get("content-type", "")
+    if "multipart/form-data" not in content_type:
+        return JSONResponse({"error": "Upload a .db file"}, status_code=400)
+
+    form = await request.form()
+    upload = form.get("file")
+    if not upload:
+        return JSONResponse({"error": "No file uploaded"}, status_code=400)
+
+    data = await upload.read()
+    # Basic SQLite validation: check magic header
+    if not data[:16].startswith(b"SQLite format 3"):
+        return JSONResponse({"error": "Invalid SQLite database file"}, status_code=400)
+
+    # Size limit: 500MB
+    if len(data) > 500 * 1024 * 1024:
+        return JSONResponse({"error": "File too large (max 500MB)"}, status_code=400)
+
+    # Create backup of current DB before replacing
+    backup_path = db_path.with_suffix(".db.bak")
+    if db_path.exists():
+        shutil.copy2(str(db_path), str(backup_path))
+
+    # Write new DB
+    db_path.write_bytes(data)
+    return JSONResponse({"status": "restored", "message": "Database restored. Restart the application to apply changes."})
 
 
 @router.post("/test-connection")

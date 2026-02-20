@@ -57,6 +57,22 @@ class EmbyClient:
         r.raise_for_status()
         return r.json()
 
+    async def get_recently_added(self, limit: int = 10, item_type: str = "") -> list[dict]:
+        params = {
+            **self._params,
+            "SortBy": "DateCreated",
+            "SortOrder": "Descending",
+            "Recursive": "true",
+            "Limit": str(limit),
+            "Fields": "DateCreated,ProductionYear,Overview",
+            "ExcludeItemTypes": "Season,Series,CollectionFolder",
+        }
+        if item_type:
+            params["IncludeItemTypes"] = item_type
+        r = await self._client.get(f"{self.base_url}/Items", params=params)
+        r.raise_for_status()
+        return r.json().get("Items", [])
+
     def get_user_image_url(self, user_id: str) -> str:
         return f"/api/img/user/{user_id}"
 

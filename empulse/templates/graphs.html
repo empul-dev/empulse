@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Graphs — Empulse{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h2>Graphs</h2>
+    <div class="stat-controls">
+        <span class="stat-controls-label">Last</span>
+        <input type="number" id="graph-days" value="30" min="1" max="365"
+               class="days-input" onchange="loadGraphs()">
+        <span class="stat-controls-label">days</span>
+    </div>
+</div>
+
+<div class="charts-section">
+    <div class="charts-grid">
+        <div class="chart-card wide">
+            <div class="chart-header">Plays by Date (Stacked)</div>
+            <div class="chart-body chart-body-tall"><canvas id="g-daily-stacked"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">Plays by Day of Week</div>
+            <div class="chart-body"><canvas id="g-dow"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">Plays by Hour of Day</div>
+            <div class="chart-body"><canvas id="g-hour"></canvas></div>
+        </div>
+        <div class="chart-card wide">
+            <div class="chart-header">Plays per Month</div>
+            <div class="chart-body"><canvas id="g-monthly"></canvas></div>
+        </div>
+        <div class="chart-card wide">
+            <div class="chart-header">Stream Type over Time</div>
+            <div class="chart-body chart-body-tall"><canvas id="g-stream-time"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">Source Resolution</div>
+            <div class="chart-body"><canvas id="g-resolution"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">Transcode vs Direct Play</div>
+            <div class="chart-body"><canvas id="g-transcode"></canvas></div>
+        </div>
+        <div class="chart-card wide">
+            <div class="chart-header">Top Platforms by Stream Type</div>
+            <div class="chart-body chart-body-tall"><canvas id="g-platform-stream"></canvas></div>
+        </div>
+        <div class="chart-card wide">
+            <div class="chart-header">Top Users by Stream Type</div>
+            <div class="chart-body chart-body-tall"><canvas id="g-user-stream"></canvas></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var gCharts = {};
+var C = window.empulseCharts;
+var DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+var TYPE_COLORS = { Movie: '#c8a438', Episode: '#22c55e', Audio: '#3498db' };
+var STREAM_COLORS = { DirectPlay: '#22c55e', DirectStream: '#eab308', Transcode: '#ef4444' };
+
+function getDays() { return parseInt(document.getElementById('graph-days').value) || 30; }
+function destroy(key) { if (gCharts[key]) { gCharts[key].destroy(); gCharts[key] = null; } }
+
+function loadGraphs() {
+    C.setupDefaults();
+    var d = getDays();
+
+    // 1. Daily stacked by type
+    fetch('/api/charts/plays-by-date-stacked?days=' + d).then(r => r.json()).then(data => {
+        destroy('dailyStacked');
+        var dates = [...new Set(data.map(r => r.date))].sort();
+        var types = [...new Set(data.map(r => r.item_type))];
+        var map = {};
+        data.forEach(r => { map[r.date + '|' + r.item_type] = r.plays; });
+        gCharts.dailyStacked = new Chart(document.getElementById('g-daily-stacked'), {
+            type: 'bar',
+            data: {
+                labels: dates.map(d => d.slice(5)),
+                datasets: types.map(t => ({
+                    label: t, data: dates.map(d => map[d + '|' + t] || 0),
+                    backgroundColor: TYPE_COLORS[t] || C.COLORS[0]
+                }))
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12 } } } }
+        });
+    });
+
+    // 2. Day of week
+    fetch('/api/charts/plays-by-dow?days=' + d).then(r => r.json()).then(data => {
+        destroy('dow');
+        var map = {}; data.forEach(r => { map[r.dow] = r.plays; });
+        gCharts.dow = new Chart(document.getElementById('g-dow'), {
+            type: 'bar',
+            data: { labels: DOW_LABELS, datasets: [{ label: 'Plays', data: DOW_LABELS.map((_, i) => map[i] || 0), backgroundColor: C.COLORS }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+        });
+    });
+
+    // 3. Hour of day
+    fetch('/api/charts/plays-by-hour?days=' + d).then(r => r.json()).then(data => {
+        destroy('hour');
+        var map = {}; data.forEach(r => { map[r.hour] = r.plays; });
+        var hours = Array.from({length: 24}, (_, i) => i);
+        gCharts.hour = new Chart(document.getElementById('g-hour'), {
+            type: 'bar',
+            data: { labels: hours.map(h => h + ':00'), datasets: [{ label: 'Plays', data: hours.map(h => map[h] || 0), backgroundColor: C.COLORS[0] }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+        });
+    });
+
+    // 4. Monthly
+    fetch('/api/charts/plays-per-month?months=12').then(r => r.json()).then(data => {
+        destroy('monthly');
+        gCharts.monthly = new Chart(document.getElementById('g-monthly'), {
+            type: 'bar',
+            data: { labels: data.map(r => r.month), datasets: [{ label: 'Plays', data: data.map(r => r.plays), backgroundColor: C.COLORS[0] }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+        });
+    });
+
+    // 5. Stream type over time
+    fetch('/api/charts/plays-by-stream-type?days=' + d).then(r => r.json()).then(data => {
+        destroy('streamTime');
+        var dates = [...new Set(data.map(r => r.date))].sort();
+        var methods = [...new Set(data.map(r => r.play_method))];
+        var map = {};
+        data.forEach(r => { map[r.date + '|' + r.play_method] = r.plays; });
+        gCharts.streamTime = new Chart(document.getElementById('g-stream-time'), {
+            type: 'bar',
+            data: {
+                labels: dates.map(d => d.slice(5)),
+                datasets: methods.map(m => ({
+                    label: m, data: dates.map(d => map[d + '|' + m] || 0),
+                    backgroundColor: STREAM_COLORS[m] || '#999'
+                }))
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12 } } } }
+        });
+    });
+
+    // 6. Source resolution
+    fetch('/api/charts/source-resolution?days=' + d).then(r => r.json()).then(data => {
+        destroy('resolution');
+        gCharts.resolution = new Chart(document.getElementById('g-resolution'), {
+            type: 'doughnut',
+            data: { labels: data.map(r => r.resolution), datasets: [{ data: data.map(r => r.plays), backgroundColor: C.COLORS }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } } }
+        });
+    });
+
+    // 7. Transcode ratio
+    fetch('/api/charts/transcode-ratio?days=' + d).then(r => r.json()).then(data => {
+        destroy('transcode');
+        gCharts.transcode = new Chart(document.getElementById('g-transcode'), {
+            type: 'doughnut',
+            data: { labels: data.map(r => r.play_method), datasets: [{ data: data.map(r => r.plays), backgroundColor: data.map(r => STREAM_COLORS[r.play_method] || '#999') }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } } }
+        });
+    });
+
+    // 8. Top platforms by stream type
+    fetch('/api/charts/top-platforms-stream-type?days=' + d).then(r => r.json()).then(data => {
+        destroy('platformStream');
+        var clients = [...new Set(data.map(r => r.client))];
+        // Sort by total plays, take top 10
+        var totals = {};
+        data.forEach(r => { totals[r.client] = (totals[r.client] || 0) + r.plays; });
+        clients.sort((a, b) => totals[b] - totals[a]);
+        clients = clients.slice(0, 10);
+        var methods = [...new Set(data.map(r => r.play_method))];
+        var map = {};
+        data.forEach(r => { map[r.client + '|' + r.play_method] = r.plays; });
+        gCharts.platformStream = new Chart(document.getElementById('g-platform-stream'), {
+            type: 'bar',
+            data: {
+                labels: clients,
+                datasets: methods.map(m => ({
+                    label: m, data: clients.map(c => map[c + '|' + m] || 0),
+                    backgroundColor: STREAM_COLORS[m] || '#999'
+                }))
+            },
+            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, y: { stacked: true } }, plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12 } } } }
+        });
+    });
+
+    // 9. Top users by stream type
+    fetch('/api/charts/top-users-stream-type?days=' + d).then(r => r.json()).then(data => {
+        destroy('userStream');
+        var users = [...new Set(data.map(r => r.user_name))];
+        var totals = {};
+        data.forEach(r => { totals[r.user_name] = (totals[r.user_name] || 0) + r.plays; });
+        users.sort((a, b) => totals[b] - totals[a]);
+        users = users.slice(0, 10);
+        var methods = [...new Set(data.map(r => r.play_method))];
+        var map = {};
+        data.forEach(r => { map[r.user_name + '|' + r.play_method] = r.plays; });
+        gCharts.userStream = new Chart(document.getElementById('g-user-stream'), {
+            type: 'bar',
+            data: {
+                labels: users,
+                datasets: methods.map(m => ({
+                    label: m, data: users.map(u => map[u + '|' + m] || 0),
+                    backgroundColor: STREAM_COLORS[m] || '#999'
+                }))
+            },
+            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, y: { stacked: true } }, plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12 } } } }
+        });
+    });
+}
+
+loadGraphs();
+</script>
+{% endblock %}

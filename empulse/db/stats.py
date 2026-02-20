@@ -354,6 +354,133 @@ async def get_library_plays_per_day(db: aiosqlite.Connection, item_type: str, da
     return [dict(r) for r in rows]
 
 
+async def get_plays_by_day_of_week(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
+    cursor = await db.execute(
+        """SELECT CAST(strftime('%w', started_at) AS INTEGER) as dow,
+                  COUNT(*) as plays, SUM(duration_seconds) as total_duration
+           FROM history
+           WHERE started_at >= datetime('now', ?)
+           GROUP BY dow ORDER BY dow""",
+        [f"-{days} days"],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_plays_by_hour(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
+    cursor = await db.execute(
+        """SELECT CAST(strftime('%H', started_at) AS INTEGER) as hour,
+                  COUNT(*) as plays, SUM(duration_seconds) as total_duration
+           FROM history
+           WHERE started_at >= datetime('now', ?)
+           GROUP BY hour ORDER BY hour""",
+        [f"-{days} days"],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_plays_per_month(db: aiosqlite.Connection, months: int = 12) -> list[dict]:
+    cursor = await db.execute(
+        """SELECT strftime('%Y-%m', started_at) as month,
+                  COUNT(*) as plays, SUM(duration_seconds) as total_duration
+           FROM history
+           WHERE started_at >= datetime('now', ?)
+           GROUP BY month ORDER BY month""",
+        [f"-{months} months"],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_plays_by_date_stacked(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
+    cursor = await db.execute(
+        """SELECT DATE(started_at) as date, item_type,
+                  COUNT(*) as plays, SUM(duration_seconds) as total_duration
+           FROM history
+           WHERE started_at >= datetime('now', ?)
+           GROUP BY date, item_type
+           ORDER BY date""",
+        [f"-{days} days"],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_plays_by_stream_type(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
+    cursor = await db.execute(
+        """SELECT DATE(started_at) as date, play_method,
+                  COUNT(*) as plays
+           FROM history
+           WHERE started_at >= datetime('now', ?)
+           GROUP BY date, play_method
+           ORDER BY date""",
+        [f"-{days} days"],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_source_resolution_distribution(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
+    cursor = await db.execute(
+        """SELECT
+               CASE
+                   WHEN json_extract(stream_info, '$.video.height') >= 2160 THEN '4K'
+                   WHEN json_extract(stream_info, '$.video.height') >= 1080 THEN '1080p'
+                   WHEN json_extract(stream_info, '$.video.height') >= 720 THEN '720p'
+                   WHEN json_extract(stream_info, '$.video.height') >= 480 THEN '480p'
+                   WHEN json_extract(stream_info, '$.video.height') > 0 THEN 'Other'
+                   ELSE 'Unknown'
+               END as resolution,
+               COUNT(*) as plays
+           FROM history
+           WHERE started_at >= datetime('now', ?)
+           GROUP BY resolution
+           ORDER BY plays DESC""",
+        [f"-{days} days"],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_transcode_ratio(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
+    cursor = await db.execute(
+        """SELECT play_method, COUNT(*) as plays
+           FROM history
+           WHERE started_at >= datetime('now', ?) AND play_method IS NOT NULL
+           GROUP BY play_method ORDER BY plays DESC""",
+        [f"-{days} days"],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_top_platforms_with_stream_type(db: aiosqlite.Connection, days: int = 30, limit: int = 10) -> list[dict]:
+    cursor = await db.execute(
+        """SELECT client, play_method, COUNT(*) as plays
+           FROM history
+           WHERE started_at >= datetime('now', ?) AND client IS NOT NULL
+           GROUP BY client, play_method
+           ORDER BY plays DESC""",
+        [f"-{days} days"],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_top_users_with_stream_type(db: aiosqlite.Connection, days: int = 30, limit: int = 10) -> list[dict]:
+    cursor = await db.execute(
+        """SELECT user_id, user_name, play_method, COUNT(*) as plays
+           FROM history
+           WHERE started_at >= datetime('now', ?)
+           GROUP BY user_id, play_method
+           ORDER BY plays DESC""",
+        [f"-{days} days"],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
 async def get_most_played(db: aiosqlite.Connection, limit: int = 10) -> list[dict]:
     cursor = await db.execute(
         """SELECT item_name, series_name, item_type, year, COUNT(*) as plays,

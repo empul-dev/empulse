@@ -59,6 +59,21 @@
      hx-trigger="load, refresh-stats from:body"
      hx-swap="innerHTML">
 </div>
+
+<div class="section-header">
+    <h2>Recently Added</h2>
+    <div class="recently-added-filters">
+        <button class="filter-btn active" onclick="loadRecentlyAdded('', this)">All</button>
+        <button class="filter-btn" onclick="loadRecentlyAdded('Movie', this)">Movies</button>
+        <button class="filter-btn" onclick="loadRecentlyAdded('Episode', this)">Episodes</button>
+        <button class="filter-btn" onclick="loadRecentlyAdded('Audio', this)">Music</button>
+    </div>
+</div>
+<div id="recently-added"
+     hx-get="/api/recently-added?limit=10"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -66,6 +81,14 @@
 function setToggle(btn) {
     btn.parentElement.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+}
+
+function loadRecentlyAdded(type, btn) {
+    btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    var url = '/api/recently-added?limit=10';
+    if (type) url += '&item_type=' + type;
+    htmx.ajax('GET', url, '#recently-added');
 }
 </script>
 {% endblock %}

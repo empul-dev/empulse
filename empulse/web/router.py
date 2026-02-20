@@ -124,6 +124,13 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
     })
 
 
+@router.get("/graphs")
+async def graphs_page(request: Request):
+    return templates.TemplateResponse("graphs.html", {
+        "request": request, "active": "graphs",
+    })
+
+
 @router.get("/libraries")
 async def libraries_page(request: Request):
     db = get_db()
