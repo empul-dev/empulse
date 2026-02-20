@@ -1,4 +1,4 @@
-from emtulli.models import SessionInfo, HistoryRecord, UserInfo
+from empulse.models import SessionInfo, HistoryRecord, UserInfo
 
 
 class TestSessionInfo:

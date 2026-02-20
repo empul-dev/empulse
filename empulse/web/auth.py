@@ -9,7 +9,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 
-COOKIE_NAME = "emtulli_session"
+COOKIE_NAME = "empulse_session"
 SESSION_MAX_AGE = 7 * 24 * 3600  # 7 days
 
 

@@ -5,13 +5,13 @@ from datetime import date, timedelta
 from urllib.parse import quote
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
-from emtulli.app import templates
-from emtulli.config import settings
-from emtulli.database import get_db
-from emtulli.db import history as history_db, stats as stats_db
-from emtulli.models import SessionInfo, HistoryRecord
+from empulse.app import templates
+from empulse.config import settings
+from empulse.database import get_db
+from empulse.db import history as history_db, stats as stats_db
+from empulse.models import SessionInfo, HistoryRecord
 
-logger = logging.getLogger("emtulli.api")
+logger = logging.getLogger("empulse.api")
 router = APIRouter()
 
 VALID_ID = re.compile(r'^[a-zA-Z0-9_-]+$')
@@ -344,13 +344,13 @@ async def chart_library_daily_plays(item_type: str, days: int = 30):
 async def test_connection(request: Request):
     emby_client = getattr(request.app.state, "emby_client", None)
     if not emby_client:
-        from emtulli.emby.client import EmbyClient
+        from empulse.emby.client import EmbyClient
         emby_client = EmbyClient()
 
     try:
         info = await emby_client.get_server_info()
         db = get_db()
-        from emtulli.db.libraries import upsert_server_info
+        from empulse.db.libraries import upsert_server_info
         await upsert_server_info(db, {
             "server_name": info.get("ServerName", ""),
             "version": info.get("Version", ""),

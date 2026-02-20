@@ -17,10 +17,10 @@ _PROJECT_DIR = _THIS_DIR.parent
 class Settings(BaseSettings):
     emby_url: str = "http://localhost:8096"
     emby_api_key: str = ""
-    emtulli_host: str = "127.0.0.1"
-    emtulli_port: int = 8189
+    empulse_host: str = "127.0.0.1"
+    empulse_port: int = 8189
     poll_interval: int = 10
-    db_path: str = str(_PROJECT_DIR / "emtulli.db")
+    db_path: str = str(_PROJECT_DIR / "empulse.db")
     auth_password: str = ""
     secret_key: str = ""
 
@@ -32,7 +32,7 @@ settings = Settings()
 # Auto-generate a persistent secret key if not provided
 if not settings.secret_key:
     import secrets as _secrets
-    _secret_file = Path(settings.db_path).parent / ".emtulli_secret"
+    _secret_file = Path(settings.db_path).parent / ".empulse_secret"
     try:
         if _secret_file.exists():
             settings.secret_key = _secret_file.read_text().strip()

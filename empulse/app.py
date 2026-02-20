@@ -7,10 +7,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
-from emtulli.config import settings
-from emtulli.database import init_db, get_db
+from empulse.config import settings
+from empulse.database import init_db, get_db
 
-logger = logging.getLogger("emtulli")
+logger = logging.getLogger("empulse")
 
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -30,11 +30,11 @@ async def lifespan(app: FastAPI):
     ws_task = None
 
     if settings.emby_api_key:
-        from emtulli.activity.poller import SessionPoller
-        from emtulli.emby.client import EmbyClient
-        from emtulli.activity.processor import ActivityProcessor
-        from emtulli.activity.session_state import SessionStateTracker
-        from emtulli.web.websocket import manager as ws_manager
+        from empulse.activity.poller import SessionPoller
+        from empulse.emby.client import EmbyClient
+        from empulse.activity.processor import ActivityProcessor
+        from empulse.activity.session_state import SessionStateTracker
+        from empulse.web.websocket import manager as ws_manager
 
         emby_client = EmbyClient()
         state_tracker = SessionStateTracker()
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
         poller_task = asyncio.create_task(poller.run())
         logger.info("Session poller started")
 
-        from emtulli.emby.websocket import EmbyWebSocket
+        from empulse.emby.websocket import EmbyWebSocket
         emby_ws = EmbyWebSocket(poller)
         ws_task = asyncio.create_task(emby_ws.run())
         app.state.emby_ws = emby_ws
@@ -80,19 +80,19 @@ def create_app() -> FastAPI:
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
 
-    app = FastAPI(title="Emtulli", lifespan=lifespan)
+    app = FastAPI(title="Empulse", lifespan=lifespan)
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
-    from emtulli.web.router import router as web_router
-    from emtulli.web.api import router as api_router
-    from emtulli.web.websocket import router as ws_router
+    from empulse.web.router import router as web_router
+    from empulse.web.api import router as api_router
+    from empulse.web.websocket import router as ws_router
 
     app.include_router(web_router)
     app.include_router(api_router, prefix="/api")
     app.include_router(ws_router)
 
     if settings.auth_password:
-        from emtulli.web.auth import AuthMiddleware
+        from empulse.web.auth import AuthMiddleware
         app.add_middleware(
             AuthMiddleware,
             password=settings.auth_password,

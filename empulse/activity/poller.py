@@ -1,12 +1,12 @@
 import asyncio
 import logging
 
-from emtulli.config import settings
-from emtulli.emby.client import EmbyClient
-from emtulli.activity.processor import ActivityProcessor
-from emtulli.web.websocket import BrowserWSManager
+from empulse.config import settings
+from empulse.emby.client import EmbyClient
+from empulse.activity.processor import ActivityProcessor
+from empulse.web.websocket import BrowserWSManager
 
-logger = logging.getLogger("emtulli.poller")
+logger = logging.getLogger("empulse.poller")
 
 
 class SessionPoller:
@@ -49,8 +49,8 @@ class SessionPoller:
     async def _sync_metadata(self):
         """Sync users and libraries from Emby on startup."""
         try:
-            from emtulli.database import get_db
-            from emtulli.db import users as users_db, libraries as libraries_db
+            from empulse.database import get_db
+            from empulse.db import users as users_db, libraries as libraries_db
 
             db = get_db()
 

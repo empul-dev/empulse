@@ -192,7 +192,7 @@ document.body.addEventListener("htmx:responseError", function(evt) {
     }
 
     // Expose for user/library pages
-    window.emtulliCharts = {
+    window.empulseCharts = {
         COLORS: COLORS,
         setupDefaults: setupDefaults,
         destroyChart: destroyChart,

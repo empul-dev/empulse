@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 
-logger = logging.getLogger("emtulli.state")
+logger = logging.getLogger("empulse.state")
 
 
 class SessionStateTracker:

@@ -1,11 +1,11 @@
 import uvicorn
-from emtulli.config import settings
+from empulse.config import settings
 
 if __name__ == "__main__":
     uvicorn.run(
-        "emtulli.app:create_app",
+        "empulse.app:create_app",
         factory=True,
-        host=settings.emtulli_host,
-        port=settings.emtulli_port,
+        host=settings.empulse_host,
+        port=settings.empulse_port,
         reload=True,
     )

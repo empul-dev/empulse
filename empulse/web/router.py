@@ -4,14 +4,14 @@ import hmac
 
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse
-from emtulli.app import templates
-from emtulli.config import settings
-from emtulli.database import get_db
-from emtulli.db import users as users_db, libraries as libraries_db, history as history_db, stats as stats_db
-from emtulli.models import UserInfo, HistoryRecord
-from emtulli.web.auth import create_session_token, COOKIE_NAME
+from empulse.app import templates
+from empulse.config import settings
+from empulse.database import get_db
+from empulse.db import users as users_db, libraries as libraries_db, history as history_db, stats as stats_db
+from empulse.models import UserInfo, HistoryRecord
+from empulse.web.auth import create_session_token, COOKIE_NAME
 
-logger = logging.getLogger("emtulli.router")
+logger = logging.getLogger("empulse.router")
 
 router = APIRouter()
 
@@ -166,7 +166,7 @@ async def login_page(request: Request, error: str = ""):
 
 @router.post("/login")
 async def login_submit(request: Request, password: str = Form(...)):
-    from emtulli.web.auth import login_limiter, SESSION_MAX_AGE, check_origin
+    from empulse.web.auth import login_limiter, SESSION_MAX_AGE, check_origin
 
     client_ip = request.client.host if request.client else "unknown"
 

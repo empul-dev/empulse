@@ -1,4 +1,4 @@
-from emtulli.database import get_db
+from empulse.database import get_db
 
 
 def get_database():

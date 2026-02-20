@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 
-from emtulli.db import history as history_db, users as users_db, libraries as libraries_db, stats as stats_db
+from empulse.db import history as history_db, users as users_db, libraries as libraries_db, stats as stats_db
 
 
 class TestHistoryCRUD:

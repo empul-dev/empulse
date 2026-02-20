@@ -12,4 +12,4 @@ dist/
 build/
 .pytest_cache/
 .ruff_cache/
-.emtulli_secret
+.empulse_secret

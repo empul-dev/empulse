@@ -4,15 +4,15 @@ import pytest_asyncio
 from unittest.mock import patch, AsyncMock
 from httpx import AsyncClient, ASGITransport
 
-from emtulli.app import create_app
-from emtulli.db import history as history_db
+from empulse.app import create_app
+from empulse.db import history as history_db
 
 
 @pytest_asyncio.fixture
 async def client():
     """Create a test client with mocked DB."""
-    with patch("emtulli.app.init_db", new_callable=AsyncMock), \
-         patch("emtulli.app.settings") as mock_settings:
+    with patch("empulse.app.init_db", new_callable=AsyncMock), \
+         patch("empulse.app.settings") as mock_settings:
         mock_settings.emby_api_key = ""  # Disable polling
         mock_settings.emby_url = "http://localhost:8096"
         mock_settings.poll_interval = 10
@@ -24,16 +24,16 @@ async def client():
 
         # We need to mock get_db for route handlers
         import aiosqlite
-        from emtulli.database import SCHEMA
+        from empulse.database import SCHEMA
 
         db = await aiosqlite.connect(":memory:")
         db.row_factory = aiosqlite.Row
         await db.executescript(SCHEMA)
         await db.commit()
 
-        with patch("emtulli.web.router.get_db", return_value=db), \
-             patch("emtulli.web.api.get_db", return_value=db), \
-             patch("emtulli.database.get_db", return_value=db):
+        with patch("empulse.web.router.get_db", return_value=db), \
+             patch("empulse.web.api.get_db", return_value=db), \
+             patch("empulse.database.get_db", return_value=db):
 
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -49,7 +49,7 @@ class TestPageRoutes:
         r = await client.get("/")
         assert r.status_code == 200
         assert "Dashboard" in r.text
-        assert "Emtulli" in r.text
+        assert "Empulse" in r.text
 
     @pytest.mark.asyncio
     async def test_history_page(self, client):
@@ -71,7 +71,7 @@ class TestPageRoutes:
 
     @pytest.mark.asyncio
     async def test_user_detail_page(self, client):
-        from emtulli.db import users as users_db
+        from empulse.db import users as users_db
         db = client._test_db
         await users_db.upsert_user(db, {
             "emby_user_id": "u1", "username": "Alice",

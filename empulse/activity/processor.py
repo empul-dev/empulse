@@ -3,11 +3,11 @@ import logging
 from datetime import datetime, timezone
 from typing import Callable
 
-from emtulli.activity.session_state import SessionStateTracker
-from emtulli.emby.models import EmbySessionInfo
-from emtulli.db import history as history_db, users as users_db
+from empulse.activity.session_state import SessionStateTracker
+from empulse.emby.models import EmbySessionInfo
+from empulse.db import history as history_db, users as users_db
 
-logger = logging.getLogger("emtulli.processor")
+logger = logging.getLogger("empulse.processor")
 
 
 class ActivityProcessor:

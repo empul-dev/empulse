@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ user.username }} — Emtulli{% endblock %}
+{% block title %}{{ user.username }} — Empulse{% endblock %}
 
 {% block content %}
 <div class="user-hero">
@@ -85,7 +85,7 @@
 {% block scripts %}
 <script>
 (function() {
-    var C = window.emtulliCharts;
+    var C = window.empulseCharts;
     if (!C) return;
     C.setupDefaults();
     var accent = C.getCSS("--accent") || "#c8a438";

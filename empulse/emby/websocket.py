@@ -4,9 +4,9 @@ import logging
 
 import websockets
 
-from emtulli.config import settings
+from empulse.config import settings
 
-logger = logging.getLogger("emtulli.emby_ws")
+logger = logging.getLogger("empulse.emby_ws")
 
 # Events that indicate playback state changes
 PLAYBACK_EVENTS = {

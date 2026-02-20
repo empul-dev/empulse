@@ -1,10 +1,10 @@
 import pytest
 import pytest_asyncio
 
-from emtulli.activity.processor import ActivityProcessor
-from emtulli.activity.session_state import SessionStateTracker
-from emtulli.emby.models import EmbySessionInfo
-from emtulli.db import history as history_db
+from empulse.activity.processor import ActivityProcessor
+from empulse.activity.session_state import SessionStateTracker
+from empulse.emby.models import EmbySessionInfo
+from empulse.db import history as history_db
 
 
 class TestActivityProcessor:

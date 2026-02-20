@@ -20,7 +20,7 @@ def event_loop():
 @pytest_asyncio.fixture
 async def db():
     """Create a fresh in-memory database for each test."""
-    from emtulli.database import SCHEMA
+    from empulse.database import SCHEMA
     conn = await aiosqlite.connect(":memory:")
     conn.row_factory = aiosqlite.Row
     await conn.executescript(SCHEMA)

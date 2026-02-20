@@ -1,15 +1,15 @@
 services:
-  emtulli:
+  empulse:
     build: .
     ports:
       - "8189:8189"
     volumes:
-      - emtulli-data:/app/data
+      - empulse-data:/app/data
     environment:
       - EMBY_URL=${EMBY_URL}
       - EMBY_API_KEY=${EMBY_API_KEY}
-      - DB_PATH=/app/data/emtulli.db
+      - DB_PATH=/app/data/empulse.db
     restart: unless-stopped
 
 volumes:
-  emtulli-data:
+  empulse-data:

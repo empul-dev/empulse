@@ -1,4 +1,4 @@
-from emtulli.emby.models import EmbySessionInfo, EmbyUser, EmbyLibrary
+from empulse.emby.models import EmbySessionInfo, EmbyUser, EmbyLibrary
 
 
 class TestEmbySessionInfo:

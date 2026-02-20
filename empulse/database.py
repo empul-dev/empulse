@@ -2,9 +2,9 @@ import aiosqlite
 import logging
 from pathlib import Path
 
-from emtulli.config import settings
+from empulse.config import settings
 
-logger = logging.getLogger("emtulli.db")
+logger = logging.getLogger("empulse.db")
 
 _db: aiosqlite.Connection | None = None
 

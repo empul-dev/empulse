@@ -1,9 +1,9 @@
 import logging
 import httpx
-from emtulli.config import settings
-from emtulli.emby.models import EmbySessionInfo, EmbyUser, EmbyLibrary
+from empulse.config import settings
+from empulse.emby.models import EmbySessionInfo, EmbyUser, EmbyLibrary
 
-logger = logging.getLogger("emtulli.emby")
+logger = logging.getLogger("empulse.emby")
 
 
 class EmbyClient:

@@ -1,7 +1,7 @@
 [project]
-name = "emtulli"
+name = "empulse"
 version = "0.1.0"
-description = "Tautulli-like monitoring for Emby Server"
+description = "Activity monitoring for Emby Server"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

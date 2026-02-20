@@ -1,4 +1,4 @@
-from emtulli.activity.session_state import SessionStateTracker
+from empulse.activity.session_state import SessionStateTracker
 
 
 class TestSessionStateTracker:

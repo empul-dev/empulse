@@ -2,7 +2,7 @@ import json
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-logger = logging.getLogger("emtulli.ws")
+logger = logging.getLogger("empulse.ws")
 router = APIRouter()
 
 
@@ -42,9 +42,9 @@ manager = BrowserWSManager()
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     # Authenticate WebSocket connections when auth is enabled
-    from emtulli.config import settings
+    from empulse.config import settings
     if settings.auth_password:
-        from emtulli.web.auth import verify_session_token, COOKIE_NAME
+        from empulse.web.auth import verify_session_token, COOKIE_NAME
         token = ws.cookies.get(COOKIE_NAME)
         if not token or not verify_session_token(token, settings.secret_key):
             await ws.close(code=1008)
