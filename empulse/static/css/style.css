@@ -1,15 +1,15 @@
-/* === Tautulli-inspired Dark Theme === */
+/* === Emby-inspired Dark Theme === */
 :root {
-    --bg-primary: #1a1a2e;
-    --bg-secondary: #16213e;
-    --bg-card: #1e2a45;
-    --bg-card-poster: #12182b;
+    --bg-primary: #101010;
+    --bg-secondary: #1a1a1a;
+    --bg-card: #1c1c1e;
+    --bg-card-poster: #141414;
     --text-primary: #e0e0e0;
-    --text-secondary: #9ca3af;
-    --text-muted: #6b7280;
-    --accent: #c8a438;
-    --accent-dim: rgba(200, 164, 56, 0.15);
-    --border: #2a3550;
+    --text-secondary: #999;
+    --text-muted: #666;
+    --accent: #52b54b;
+    --accent-dim: rgba(82, 181, 75, 0.15);
+    --border: #2a2a2a;
     --success: #22c55e;
     --warning: #eab308;
     --danger: #ef4444;
@@ -743,7 +743,7 @@ table a {
 }
 
 .history-row.expanded {
-    background: rgba(200, 164, 56, 0.06);
+    background: rgba(82, 181, 75, 0.06);
     border-bottom-color: transparent;
 }
 
@@ -828,7 +828,7 @@ table a {
 
 .detail-stream-tbl td {
     padding: 0.15rem 0.4rem !important;
-    border-bottom: 1px solid rgba(42, 53, 80, 0.4) !important;
+    border-bottom: 1px solid rgba(42, 42, 42, 0.6) !important;
     background: transparent !important;
 }
 
@@ -1123,7 +1123,7 @@ table a {
     grid-template-columns: 100px 1fr 30px 1fr;
     padding: 0.25rem 1rem;
     font-size: 0.82em;
-    border-bottom: 1px solid rgba(42, 53, 80, 0.5);
+    border-bottom: 1px solid rgba(42, 42, 42, 0.7);
     align-items: center;
 }
 

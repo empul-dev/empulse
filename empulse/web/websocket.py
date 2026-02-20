@@ -43,10 +43,10 @@ manager = BrowserWSManager()
 async def websocket_endpoint(ws: WebSocket):
     # Authenticate WebSocket connections when auth is enabled
     from empulse.config import settings
-    if settings.auth_password:
+    if settings.auth_password or settings.emby_api_key:
         from empulse.web.auth import verify_session_token, COOKIE_NAME
         token = ws.cookies.get(COOKIE_NAME)
-        if not token or not verify_session_token(token, settings.secret_key):
+        if not token or verify_session_token(token, settings.secret_key) is None:
             await ws.close(code=1008)
             return
 

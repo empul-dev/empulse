@@ -79,8 +79,8 @@ document.body.addEventListener("htmx:responseError", function(evt) {
     var chartDaily = null, chartType = null, chartPlatform = null;
 
     var COLORS = [
-        "#c8a438", "#22c55e", "#eab308", "#ef4444",
-        "#a855f7", "#06b6d4", "#f97316", "#ec4899"
+        "#52b54b", "#06b6d4", "#a855f7", "#ef4444",
+        "#eab308", "#f97316", "#ec4899", "#22d3ee"
     ];
 
     function getCSS(prop) {
@@ -88,8 +88,8 @@ document.body.addEventListener("htmx:responseError", function(evt) {
     }
 
     function setupDefaults() {
-        var textMuted = getCSS("--text-muted") || "#6b7280";
-        var border = getCSS("--border") || "#2a3550";
+        var textMuted = getCSS("--text-muted") || "#666";
+        var border = getCSS("--border") || "#2a2a2a";
         Chart.defaults.color = textMuted;
         Chart.defaults.borderColor = border;
         Chart.defaults.font.family = "system-ui, sans-serif";
@@ -115,7 +115,7 @@ document.body.addEventListener("htmx:responseError", function(evt) {
 
         setupDefaults();
         var days = getDays();
-        var accent = getCSS("--accent") || "#c8a438";
+        var accent = getCSS("--accent") || "#52b54b";
 
         // Daily plays
         fetch("/api/charts/daily-plays?days=" + days)

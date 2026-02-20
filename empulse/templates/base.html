@@ -20,7 +20,19 @@
             <li><a href="/graphs" {% if active == 'graphs' %}class="active"{% endif %}>Graphs</a></li>
             <li><a href="/users" {% if active == 'users' %}class="active"{% endif %}>Users</a></li>
             <li><a href="/libraries" {% if active == 'libraries' %}class="active"{% endif %}>Libraries</a></li>
+            {% if not current_user or current_user.role == 'admin' %}
             <li><a href="/settings" {% if active == 'settings' %}class="active"{% endif %}>Settings</a></li>
+            {% endif %}
+            {% if current_user %}
+            <li class="nav-user">
+                <details class="dropdown">
+                    <summary>{{ current_user.username }}</summary>
+                    <ul dir="rtl">
+                        <li><a href="/logout">Sign out</a></li>
+                    </ul>
+                </details>
+            </li>
+            {% endif %}
         </ul>
     </nav>
 

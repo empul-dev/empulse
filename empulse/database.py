@@ -142,6 +142,20 @@ CREATE TABLE IF NOT EXISTS notification_log (
     error TEXT,
     sent_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS login_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT UNIQUE NOT NULL,
+    emby_user_id TEXT,
+    username TEXT,
+    role TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    ip_address TEXT,
+    user_agent TEXT,
+    revoked INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_login_sessions_token ON login_sessions(token_hash);
 """
 
 
@@ -162,12 +176,37 @@ async def init_db():
 
 
 async def _migrate(db: aiosqlite.Connection):
-    """Add columns that may be missing from older databases."""
+    """Add columns/tables that may be missing from older databases."""
     cursor = await db.execute("PRAGMA table_info(history)")
     cols = {row[1] for row in await cursor.fetchall()}
     if "stream_info" not in cols:
         await db.execute("ALTER TABLE history ADD COLUMN stream_info TEXT DEFAULT '{}'")
         logger.info("Migration: added stream_info column to history")
+
+    # Ensure login_sessions table exists (for pre-existing DBs)
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS login_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token_hash TEXT UNIQUE NOT NULL,
+            emby_user_id TEXT,
+            username TEXT,
+            role TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            ip_address TEXT,
+            user_agent TEXT,
+            revoked INTEGER DEFAULT 0
+        )
+    """)
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_login_sessions_token ON login_sessions(token_hash)"
+    )
+
+    # Cleanup expired login sessions
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    await db.execute("DELETE FROM login_sessions WHERE expires_at < ?", [now])
+
     await db.commit()
 
 

@@ -1,6 +1,8 @@
 import logging
+from datetime import datetime, timezone, timedelta
 
 import hmac
+import httpx
 
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse
@@ -9,7 +11,9 @@ from empulse.config import settings
 from empulse.database import get_db
 from empulse.db import users as users_db, libraries as libraries_db, history as history_db, stats as stats_db
 from empulse.models import UserInfo, HistoryRecord
-from empulse.web.auth import create_session_token, COOKIE_NAME
+from empulse.web.auth import (
+    create_session_token, hash_token, COOKIE_NAME, SESSION_MAX_AGE,
+)
 
 logger = logging.getLogger("empulse.router")
 
@@ -157,47 +161,146 @@ async def library_detail(request: Request, item_type: str):
 
 
 _LOGIN_ERRORS = {
-    "invalid": "Invalid password",
+    "invalid": "Invalid username or password.",
     "rate_limited": "Too many attempts. Please try again later.",
     "rejected": "Request rejected.",
+    "emby_down": "Emby server is unavailable. Try the local admin password.",
 }
 
 
 @router.get("/login")
 async def login_page(request: Request, error: str = ""):
     error_msg = _LOGIN_ERRORS.get(error, "")
+    has_fallback = bool(settings.auth_password)
     return templates.TemplateResponse("login.html", {
         "request": request, "active": "", "error": error_msg,
+        "has_fallback": has_fallback,
     })
 
 
 @router.post("/login")
-async def login_submit(request: Request, password: str = Form(...)):
-    from empulse.web.auth import login_limiter, SESSION_MAX_AGE, check_origin
+async def login_submit(
+    request: Request,
+    username: str = Form(""),
+    password: str = Form(""),
+):
+    from empulse.web.auth import login_limiter, check_origin
 
     client_ip = request.client.host if request.client else "unknown"
 
-    # CSRF origin check
     if not check_origin(request):
         return RedirectResponse("/login?error=rejected", status_code=302)
 
-    # Rate limit check
     if login_limiter.is_limited(client_ip):
         return RedirectResponse("/login?error=rate_limited", status_code=302)
 
-    if settings.auth_password and hmac.compare_digest(password, settings.auth_password):
-        token = create_session_token(settings.secret_key)
-        response = RedirectResponse("/", status_code=302)
-        response.set_cookie(
-            COOKIE_NAME, token,
-            httponly=True, samesite="lax", max_age=SESSION_MAX_AGE,
-            secure=request.url.scheme == "https",
-        )
-        login_limiter.reset(client_ip)
-        return response
+    if not password:
+        return RedirectResponse("/login?error=invalid", status_code=302)
 
-    login_limiter.record(client_ip)
-    return RedirectResponse("/login?error=invalid", status_code=302)
+    user_id = None
+    display_name = None
+    role = None
+
+    # Try Emby authentication first
+    emby_client = getattr(request.app.state, "emby_client", None)
+    emby_down = False
+    if emby_client and username:
+        try:
+            result = await emby_client.authenticate_user(username, password)
+            if result:
+                user_id = result["user_id"]
+                display_name = result["username"]
+                role = "admin" if result["is_admin"] else "viewer"
+            else:
+                # Bad credentials via Emby
+                login_limiter.record(client_ip)
+                return RedirectResponse("/login?error=invalid", status_code=302)
+        except (httpx.TimeoutException, httpx.ConnectError):
+            logger.warning("Emby unavailable for auth, trying fallback")
+            emby_down = True
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Emby auth error: {e}")
+            emby_down = True
+
+    # Fallback: AUTH_PASSWORD (works when Emby is down or no username given)
+    if user_id is None and settings.auth_password:
+        if hmac.compare_digest(password, settings.auth_password):
+            user_id = "__admin__"
+            display_name = username or "Admin"
+            role = "admin"
+        elif not emby_down:
+            # Password didn't match fallback, and Emby wasn't tried / didn't error
+            login_limiter.record(client_ip)
+            return RedirectResponse("/login?error=invalid", status_code=302)
+
+    # If Emby was down and fallback password didn't match
+    if user_id is None and emby_down:
+        if settings.auth_password:
+            login_limiter.record(client_ip)
+            return RedirectResponse("/login?error=invalid", status_code=302)
+        return RedirectResponse("/login?error=emby_down", status_code=302)
+
+    if user_id is None:
+        login_limiter.record(client_ip)
+        return RedirectResponse("/login?error=invalid", status_code=302)
+
+    # Create session token and DB entry
+    token = create_session_token(settings.secret_key, user_id, role)
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(seconds=SESSION_MAX_AGE)
+
+    db = get_db()
+    await db.execute(
+        """INSERT INTO login_sessions
+           (token_hash, emby_user_id, username, role, created_at, expires_at, ip_address, user_agent)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        [
+            hash_token(token),
+            user_id if user_id != "__admin__" else None,
+            display_name,
+            role,
+            now.isoformat(),
+            expires.isoformat(),
+            client_ip,
+            request.headers.get("user-agent", "")[:256],
+        ],
+    )
+
+    # Upsert user in users table (sync is_admin from Emby)
+    if user_id != "__admin__":
+        await users_db.upsert_user(db, {
+            "emby_user_id": user_id,
+            "username": display_name,
+            "is_admin": 1 if role == "admin" else 0,
+            "thumb_url": None,
+            "last_seen": now.isoformat(),
+        })
+
+    await db.commit()
+
+    login_limiter.reset(client_ip)
+    response = RedirectResponse("/", status_code=302)
+    response.set_cookie(
+        COOKIE_NAME, token,
+        httponly=True, samesite="lax", max_age=SESSION_MAX_AGE,
+        secure=request.url.scheme == "https",
+    )
+    return response
+
+
+@router.get("/logout")
+async def logout(request: Request):
+    token = request.cookies.get(COOKIE_NAME)
+    if token:
+        db = get_db()
+        await db.execute(
+            "UPDATE login_sessions SET revoked = 1 WHERE token_hash = ?",
+            [hash_token(token)],
+        )
+        await db.commit()
+    response = RedirectResponse("/login", status_code=302)
+    response.delete_cookie(COOKIE_NAME)
+    return response
 
 
 @router.get("/settings")

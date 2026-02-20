@@ -73,6 +73,32 @@ class EmbyClient:
         r.raise_for_status()
         return r.json().get("Items", [])
 
+    async def authenticate_user(self, username: str, password: str) -> dict | None:
+        """Authenticate a user against Emby via AuthenticateByName.
+
+        Returns {"user_id": ..., "username": ..., "is_admin": bool} on success,
+        None for bad credentials. Raises httpx exceptions on network/timeout errors.
+        """
+        auth_header = (
+            'MediaBrowser Client="Empulse", Device="Server", '
+            'DeviceId="empulse-auth", Version="1.0"'
+        )
+        r = await self._client.post(
+            f"{self.base_url}/Users/AuthenticateByName",
+            headers={"X-Emby-Authorization": auth_header},
+            json={"Username": username, "Pw": password},
+        )
+        if r.status_code == 401:
+            return None
+        r.raise_for_status()
+        data = r.json()
+        user = data["User"]
+        return {
+            "user_id": user["Id"],
+            "username": user["Name"],
+            "is_admin": bool(user.get("Policy", {}).get("IsAdministrator", False)),
+        }
+
     def get_user_image_url(self, user_id: str) -> str:
         return f"/api/img/user/{user_id}"
 

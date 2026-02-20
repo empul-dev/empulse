@@ -10,10 +10,10 @@ from empulse.db import history as history_db
 
 @pytest_asyncio.fixture
 async def client():
-    """Create a test client with mocked DB."""
+    """Create a test client with mocked DB. No auth enabled for page/API tests."""
     with patch("empulse.app.init_db", new_callable=AsyncMock), \
          patch("empulse.app.settings") as mock_settings:
-        mock_settings.emby_api_key = ""  # Disable polling
+        mock_settings.emby_api_key = ""  # Disable polling + auth
         mock_settings.emby_url = "http://localhost:8096"
         mock_settings.poll_interval = 10
         mock_settings.db_path = ":memory:"
@@ -22,7 +22,6 @@ async def client():
 
         app = create_app()
 
-        # We need to mock get_db for route handlers
         import aiosqlite
         from empulse.database import SCHEMA
 

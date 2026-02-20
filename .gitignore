@@ -13,3 +13,4 @@ build/
 .pytest_cache/
 .ruff_cache/
 .empulse_secret
+.emtulli_secret

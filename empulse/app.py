@@ -7,6 +7,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
+from starlette.requests import Request
+from starlette.templating import _TemplateResponse
 
 from empulse.config import settings
 from empulse.database import init_db, get_db
@@ -14,7 +16,19 @@ from empulse.database import init_db, get_db
 logger = logging.getLogger("empulse")
 
 BASE_DIR = Path(__file__).parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+class EmpulseTemplates(Jinja2Templates):
+    """Auto-inject current_user into all template contexts."""
+
+    def TemplateResponse(self, name, context, **kwargs):
+        request: Request | None = context.get("request")
+        if request and not context.get("current_user"):
+            context["current_user"] = getattr(request.state, "user", None)
+        return super().TemplateResponse(name, context, **kwargs)
+
+
+templates = EmpulseTemplates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["cache_v"] = str(int(time.time()))
 
 
@@ -22,10 +36,16 @@ templates.env.globals["cache_v"] = str(int(time.time()))
 async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
-    if not settings.auth_password:
+
+    # Create EmbyClient for auth even without api_key (needs emby_url)
+    from empulse.emby.client import EmbyClient
+    auth_emby_client = EmbyClient()
+    app.state.emby_client = auth_emby_client
+
+    if not settings.auth_password and not settings.emby_api_key:
         logger.warning(
-            "No AUTH_PASSWORD set — the application is accessible without authentication! "
-            "Set AUTH_PASSWORD in your .env file to enable authentication."
+            "No AUTH_PASSWORD or EMBY_API_KEY set — the application is accessible without authentication! "
+            "Set AUTH_PASSWORD in your .env file or configure EMBY_API_KEY to enable authentication."
         )
 
     poller_task = None
@@ -38,12 +58,11 @@ async def lifespan(app: FastAPI):
 
     if settings.emby_api_key:
         from empulse.activity.poller import SessionPoller
-        from empulse.emby.client import EmbyClient
         from empulse.activity.processor import ActivityProcessor
         from empulse.activity.session_state import SessionStateTracker
         from empulse.web.websocket import manager as ws_manager
 
-        emby_client = EmbyClient()
+        emby_client = auth_emby_client  # Reuse the already-created client
         state_tracker = SessionStateTracker()
         processor = ActivityProcessor(state_tracker, get_db)
         processor.notification_engine = notification_engine
@@ -110,11 +129,10 @@ def create_app() -> FastAPI:
     app.include_router(api_router, prefix="/api")
     app.include_router(ws_router)
 
-    if settings.auth_password:
+    if settings.auth_password or settings.emby_api_key:
         from empulse.web.auth import AuthMiddleware
         app.add_middleware(
             AuthMiddleware,
-            password=settings.auth_password,
             secret=settings.secret_key,
         )
 
