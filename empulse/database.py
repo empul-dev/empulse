@@ -114,14 +114,6 @@ CREATE TABLE IF NOT EXISTS notification_channels (
     created_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS ip_locations (
-    ip TEXT PRIMARY KEY,
-    city TEXT,
-    country TEXT,
-    latitude REAL DEFAULT 0,
-    longitude REAL DEFAULT 0
-);
-
 CREATE TABLE IF NOT EXISTS newsletter_config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     enabled INTEGER DEFAULT 0,
@@ -176,12 +168,6 @@ async def _migrate(db: aiosqlite.Connection):
     if "stream_info" not in cols:
         await db.execute("ALTER TABLE history ADD COLUMN stream_info TEXT DEFAULT '{}'")
         logger.info("Migration: added stream_info column to history")
-    if "city" not in cols:
-        await db.execute("ALTER TABLE history ADD COLUMN city TEXT")
-        await db.execute("ALTER TABLE history ADD COLUMN country TEXT")
-        await db.execute("ALTER TABLE history ADD COLUMN latitude REAL")
-        await db.execute("ALTER TABLE history ADD COLUMN longitude REAL")
-        logger.info("Migration: added geo columns to history")
     await db.commit()
 
 

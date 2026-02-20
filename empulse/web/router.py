@@ -131,13 +131,6 @@ async def graphs_page(request: Request):
     })
 
 
-@router.get("/map")
-async def map_page(request: Request):
-    return templates.TemplateResponse("map.html", {
-        "request": request, "active": "map",
-    })
-
-
 @router.get("/libraries")
 async def libraries_page(request: Request):
     db = get_db()

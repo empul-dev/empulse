@@ -489,19 +489,6 @@ class TestAPIRoutes:
     # --- Phase 3: Map, Newsletter, Locations ---
 
     @pytest.mark.asyncio
-    async def test_map_page(self, client):
-        r = await client.get("/map")
-        assert r.status_code == 200
-        assert "Activity Map" in r.text
-        assert "leaflet" in r.text.lower()
-
-    @pytest.mark.asyncio
-    async def test_locations_api_empty(self, client):
-        r = await client.get("/api/locations")
-        assert r.status_code == 200
-        assert r.json() == []
-
-    @pytest.mark.asyncio
     async def test_newsletter_config_crud(self, client):
         # Initially empty
         r = await client.get("/api/newsletter/config")

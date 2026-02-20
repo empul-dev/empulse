@@ -258,20 +258,6 @@ class ActivityProcessor:
                 "watched": 1 if watched else 0,
             }
 
-            # Resolve geo-location for IP address
-            ip = session.get("ip_address")
-            if ip:
-                try:
-                    from empulse.geo import lookup_ip
-                    geo = await lookup_ip(db, ip)
-                    if geo:
-                        record["city"] = geo["city"]
-                        record["country"] = geo["country"]
-                        record["latitude"] = geo["latitude"]
-                        record["longitude"] = geo["longitude"]
-                except Exception as e:
-                    logger.debug(f"Geo lookup failed: {e}")
-
             await history_db.insert_history(db, record)
 
             if user_id:

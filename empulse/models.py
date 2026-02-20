@@ -79,10 +79,6 @@ class HistoryRecord(BaseModel):
     transcode_video_codec: str | None = None
     transcode_audio_codec: str | None = None
     stream_info: str = "{}"
-    city: str | None = None
-    country: str | None = None
-    latitude: float | None = None
-    longitude: float | None = None
     started_at: str = ""
     stopped_at: str = ""
     duration_seconds: int = 0

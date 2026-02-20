@@ -10,7 +10,6 @@ HISTORY_COLUMNS = frozenset({
     "video_decision", "audio_decision", "stream_info",
     "started_at", "stopped_at", "duration_seconds", "paused_seconds",
     "percent_complete", "watched",
-    "city", "country", "latitude", "longitude",
 })
 
 

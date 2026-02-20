@@ -210,42 +210,6 @@ class TestNtfyChannel:
             await send_ntfy({}, "playback_start", {"user_name": "Test"})
 
 
-class TestGeoLocation:
-    @pytest.mark.asyncio
-    async def test_private_ip_returns_none(self, db):
-        from empulse.geo import lookup_ip
-        result = await lookup_ip(db, "192.168.1.1")
-        assert result is None
-        result = await lookup_ip(db, "127.0.0.1")
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_empty_ip_returns_none(self, db):
-        from empulse.geo import lookup_ip
-        result = await lookup_ip(db, "")
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_cached_result(self, db):
-        from empulse.geo import lookup_ip
-        # Insert a cached result
-        await db.execute(
-            "INSERT INTO ip_locations (ip, city, country, latitude, longitude) VALUES (?, ?, ?, ?, ?)",
-            ["8.8.8.8", "Mountain View", "United States", 37.386, -122.084],
-        )
-        await db.commit()
-        result = await lookup_ip(db, "8.8.8.8")
-        assert result is not None
-        assert result["city"] == "Mountain View"
-        assert result["country"] == "United States"
-
-    @pytest.mark.asyncio
-    async def test_get_all_locations_empty(self, db):
-        from empulse.geo import get_all_locations
-        result = await get_all_locations(db)
-        assert result == []
-
-
 class TestNewsletter:
     @pytest.mark.asyncio
     async def test_config_crud(self, db):

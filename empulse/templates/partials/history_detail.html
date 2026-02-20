@@ -125,7 +125,6 @@
             <span><strong>Product:</strong> {{ record.client or '' }}</span>
             <span><strong>Platform:</strong> {{ record.platform_name }}</span>
             {% if record.ip_address %}<span><strong>IP:</strong> {{ record.ip_address }}</span>{% endif %}
-            {% if record.city or record.country %}<span><strong>Location:</strong> {{ record.city }}{% if record.city and record.country %}, {% endif %}{{ record.country }}</span>{% endif %}
         </div>
         <div class="detail-actions">
             <button class="btn-delete"

@@ -212,7 +212,7 @@ async def delete_history(history_id: int):
 EXPORT_FIELDS = [
     "started_at", "stopped_at", "user_name", "item_name", "series_name",
     "item_type", "duration_seconds", "percent_complete", "play_method",
-    "client", "device_name", "ip_address", "city", "country",
+    "client", "device_name", "ip_address",
 ]
 EXPORT_MAX_ROWS = 10_000
 
@@ -488,14 +488,6 @@ async def chart_top_users_stream_type(days: int = 30):
     db = get_db()
     rows = await stats_db.get_top_users_with_stream_type(db, days=days)
     return JSONResponse(rows)
-
-
-@router.get("/locations")
-async def get_locations():
-    db = get_db()
-    from empulse.geo import get_all_locations
-    locations = await get_all_locations(db)
-    return JSONResponse(locations)
 
 
 @router.get("/notification-channels")
