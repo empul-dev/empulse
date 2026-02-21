@@ -239,6 +239,7 @@ _LOGIN_ERRORS = {
     "rate_limited": "Too many attempts. Please try again later.",
     "rejected": "Request rejected.",
     "emby_down": "Emby server is unavailable. Try the local admin password.",
+    "disabled": "Your account has not been enabled yet. Ask an admin to enable it.",
 }
 
 
@@ -351,6 +352,18 @@ async def login_submit(
             "thumb_url": None,
             "last_seen": now.isoformat(),
         })
+        # Emby admins are auto-enabled
+        if role == "admin":
+            await users_db.set_user_enabled(db, user_id, True)
+        # Check if user account is enabled
+        if not await users_db.is_user_enabled(db, user_id):
+            # Remove the session we just inserted
+            await db.execute(
+                "DELETE FROM login_sessions WHERE token_hash = ?",
+                [hash_token(token)],
+            )
+            await db.commit()
+            return RedirectResponse("/login?error=disabled", status_code=302)
 
     await db.commit()
 

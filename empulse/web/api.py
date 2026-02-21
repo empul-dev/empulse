@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from empulse.app import templates
 from empulse.config import settings
 from empulse.database import get_db
-from empulse.db import history as history_db, stats as stats_db
+from empulse.db import history as history_db, stats as stats_db, users as users_db
 from empulse.models import SessionInfo, HistoryRecord
 
 logger = logging.getLogger("empulse.api")
@@ -800,3 +800,24 @@ async def test_connection(request: Request):
     except Exception as e:
         logger.error(f"Connection test failed: {e}")
         return '<p class="error">Connection failed. Check server logs for details.</p>'
+
+
+@router.put("/users/{user_id}/enabled")
+async def set_user_enabled(request: Request, user_id: str):
+    if not _validate_id(user_id):
+        return Response(status_code=400)
+    data = await request.json()
+    enabled = bool(data.get("enabled", False))
+    db = get_db()
+    user = await users_db.get_user(db, user_id)
+    if not user:
+        return Response(status_code=404)
+    await users_db.set_user_enabled(db, user_id, enabled)
+    # If disabling, revoke all active login sessions for this user
+    if not enabled:
+        await db.execute(
+            "UPDATE login_sessions SET revoked = 1 WHERE emby_user_id = ? AND revoked = 0",
+            [user_id],
+        )
+        await db.commit()
+    return JSONResponse({"status": "updated", "enabled": enabled})

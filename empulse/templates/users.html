@@ -7,33 +7,45 @@
 </div>
 
 {% if users %}
-<div class="users-grid">
-    {% for user in users %}
-    <a href="/users/{{ user.emby_user_id }}" class="user-card">
-        <div class="user-card-avatar">
-            {% if user.thumb_url %}
-            <img src="{{ user.thumb_url }}" alt="">
-            {% else %}
-            <div class="avatar-fallback">{{ (user.username or "?")[0]|upper }}</div>
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>User</th>
+            <th>Total Plays</th>
+            <th>Total Duration</th>
+            <th>Last Seen</th>
+            {% if current_user and current_user.role == 'admin' %}
+            <th>Login</th>
             {% endif %}
-        </div>
-        <div class="user-card-info">
-            <div class="user-card-name">{{ user.username or "Unknown" }}</div>
-            <div class="user-card-stats">
-                <span class="user-card-stat">
-                    <span class="user-card-stat-value">{{ user.total_plays }}</span>
-                    <span class="user-card-stat-label">plays</span>
-                </span>
-                <span class="user-card-stat">
-                    <span class="user-card-stat-value">{{ user.total_duration_display }}</span>
-                    <span class="user-card-stat-label">watch time</span>
-                </span>
-            </div>
-            <div class="user-card-seen">{{ user.last_seen_display }}</div>
-        </div>
-    </a>
-    {% endfor %}
-</div>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td><a href="/users/{{ user.emby_user_id }}">{{ user.username or "Unknown" }}</a></td>
+            <td>{{ user.total_plays }}</td>
+            <td>{{ user.total_duration_display }}</td>
+            <td>{{ user.last_seen or "Never" }}</td>
+            {% if current_user and current_user.role == 'admin' %}
+            <td>
+                {% if user.is_admin %}
+                    <small>Admin</small>
+                {% else %}
+                    <button class="toggle-enabled {% if user.enabled %}enabled{% else %}disabled{% endif %}"
+                            data-user-id="{{ user.emby_user_id }}"
+                            data-enabled="{{ 'true' if user.enabled else 'false' }}"
+                            onclick="toggleUserEnabled(this)">
+                        {{ "Enabled" if user.enabled else "Disabled" }}
+                    </button>
+                {% endif %}
+            </td>
+            {% endif %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
 {% else %}
 <div class="empty-state">
     <svg class="empty-state-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
@@ -42,4 +54,29 @@
     <a href="/settings" class="empty-state-action">Go to Settings</a>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function toggleUserEnabled(btn) {
+    const userId = btn.dataset.userId;
+    const currentlyEnabled = btn.dataset.enabled === 'true';
+    const newEnabled = !currentlyEnabled;
+    btn.disabled = true;
+    try {
+        const r = await fetch(`/api/users/${userId}/enabled`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({enabled: newEnabled}),
+        });
+        if (r.ok) {
+            btn.dataset.enabled = newEnabled ? 'true' : 'false';
+            btn.textContent = newEnabled ? 'Enabled' : 'Disabled';
+            btn.className = 'toggle-enabled ' + (newEnabled ? 'enabled' : 'disabled');
+        }
+    } finally {
+        btn.disabled = false;
+    }
+}
+</script>
 {% endblock %}

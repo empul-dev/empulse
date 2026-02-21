@@ -354,3 +354,163 @@ class TestMiddleware:
                     assert r.status_code == 403
 
             await db.close()
+
+    @pytest.mark.asyncio
+    async def test_disabled_emby_user_rejected(self):
+        """Non-admin Emby users are disabled by default and can't log in."""
+        with patch("empulse.app.init_db", new_callable=AsyncMock), \
+             patch("empulse.app.settings") as mock_settings:
+            mock_settings.emby_api_key = "testkey"
+            mock_settings.emby_url = "http://localhost:8096"
+            mock_settings.poll_interval = 10
+            mock_settings.db_path = ":memory:"
+            mock_settings.auth_password = ""
+            mock_settings.secret_key = "testsecret"
+
+            from empulse.app import create_app
+            app = create_app()
+
+            import aiosqlite
+            from empulse.database import SCHEMA
+            db = await aiosqlite.connect(":memory:")
+            db.row_factory = aiosqlite.Row
+            await db.executescript(SCHEMA)
+            await db.commit()
+
+            # Mock Emby auth to return a non-admin user
+            mock_emby = AsyncMock()
+            mock_emby.authenticate_user = AsyncMock(return_value={
+                "user_id": "emby-user-1",
+                "username": "RegularUser",
+                "is_admin": False,
+            })
+            app.state.emby_client = mock_emby
+
+            with patch("empulse.web.router.get_db", return_value=db), \
+                 patch("empulse.web.api.get_db", return_value=db), \
+                 patch("empulse.web.router.settings", mock_settings), \
+                 patch("empulse.database.get_db", return_value=db):
+                transport = ASGITransport(app=app)
+                async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
+                    r = await ac.post("/login", data={"username": "RegularUser", "password": "pass"})
+                    assert r.status_code == 302
+                    assert "/login?error=disabled" in r.headers["location"]
+
+            await db.close()
+
+    @pytest.mark.asyncio
+    async def test_emby_admin_auto_enabled(self):
+        """Emby admin users are auto-enabled and can log in immediately."""
+        with patch("empulse.app.init_db", new_callable=AsyncMock), \
+             patch("empulse.app.settings") as mock_settings:
+            mock_settings.emby_api_key = "testkey"
+            mock_settings.emby_url = "http://localhost:8096"
+            mock_settings.poll_interval = 10
+            mock_settings.db_path = ":memory:"
+            mock_settings.auth_password = ""
+            mock_settings.secret_key = "testsecret"
+
+            from empulse.app import create_app
+            app = create_app()
+
+            import aiosqlite
+            from empulse.database import SCHEMA
+            db = await aiosqlite.connect(":memory:")
+            db.row_factory = aiosqlite.Row
+            await db.executescript(SCHEMA)
+            await db.commit()
+
+            mock_emby = AsyncMock()
+            mock_emby.authenticate_user = AsyncMock(return_value={
+                "user_id": "emby-admin-1",
+                "username": "AdminUser",
+                "is_admin": True,
+            })
+            app.state.emby_client = mock_emby
+
+            with patch("empulse.web.router.get_db", return_value=db), \
+                 patch("empulse.web.api.get_db", return_value=db), \
+                 patch("empulse.web.router.settings", mock_settings), \
+                 patch("empulse.database.get_db", return_value=db):
+                transport = ASGITransport(app=app)
+                async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
+                    r = await ac.post("/login", data={"username": "AdminUser", "password": "pass"})
+                    assert r.status_code == 302
+                    assert r.headers.get("location") == "/"
+                    assert "empulse_session" in r.headers.get("set-cookie", "")
+
+            await db.close()
+
+    @pytest.mark.asyncio
+    async def test_admin_can_enable_user(self):
+        """Admin can enable a disabled user via API, and disabled user gets sessions revoked."""
+        with patch("empulse.app.init_db", new_callable=AsyncMock), \
+             patch("empulse.app.settings") as mock_settings:
+            mock_settings.emby_api_key = ""
+            mock_settings.emby_url = "http://localhost:8096"
+            mock_settings.poll_interval = 10
+            mock_settings.db_path = ":memory:"
+            mock_settings.auth_password = "testpass"
+            mock_settings.secret_key = "testsecret"
+
+            from empulse.app import create_app
+            app = create_app()
+
+            import aiosqlite
+            from empulse.database import SCHEMA
+            db = await aiosqlite.connect(":memory:")
+            db.row_factory = aiosqlite.Row
+            await db.executescript(SCHEMA)
+            await db.commit()
+
+            # Create admin token
+            admin_token = create_session_token("testsecret", "__admin__", "admin")
+            from datetime import datetime, timezone, timedelta
+            now = datetime.now(timezone.utc)
+            expires = now + timedelta(days=7)
+            await db.execute(
+                """INSERT INTO login_sessions
+                   (token_hash, emby_user_id, username, role, created_at, expires_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                [hash_token(admin_token), None, "Admin", "admin",
+                 now.isoformat(), expires.isoformat()],
+            )
+            # Create a disabled user
+            await db.execute(
+                """INSERT INTO users (emby_user_id, username, is_admin, enabled)
+                   VALUES (?, ?, ?, ?)""",
+                ["user-1", "TestUser", 0, 0],
+            )
+            await db.commit()
+
+            with patch("empulse.web.router.get_db", return_value=db), \
+                 patch("empulse.web.api.get_db", return_value=db), \
+                 patch("empulse.database.get_db", return_value=db):
+                transport = ASGITransport(app=app)
+                async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                    ac.cookies.set("empulse_session", admin_token)
+
+                    # Enable the user
+                    r = await ac.put("/api/users/user-1/enabled",
+                                     json={"enabled": True})
+                    assert r.status_code == 200
+                    data = r.json()
+                    assert data["enabled"] is True
+
+                    # Verify in DB
+                    cursor = await db.execute(
+                        "SELECT enabled FROM users WHERE emby_user_id = ?", ["user-1"])
+                    row = await cursor.fetchone()
+                    assert row[0] == 1
+
+                    # Disable the user
+                    r = await ac.put("/api/users/user-1/enabled",
+                                     json={"enabled": False})
+                    assert r.status_code == 200
+
+                    cursor = await db.execute(
+                        "SELECT enabled FROM users WHERE emby_user_id = ?", ["user-1"])
+                    row = await cursor.fetchone()
+                    assert row[0] == 0
+
+            await db.close()

@@ -194,6 +194,7 @@ class UserInfo(BaseModel):
     emby_user_id: str
     username: str | None = None
     is_admin: bool = False
+    enabled: bool = False
     thumb_url: str | None = None
     last_seen: str | None = None
     total_plays: int = 0

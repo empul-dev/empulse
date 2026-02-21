@@ -9,12 +9,16 @@ from empulse.web.websocket import BrowserWSManager
 logger = logging.getLogger("empulse.poller")
 
 
+METADATA_SYNC_INTERVAL = 3600  # Re-sync libraries/users every hour
+
+
 class SessionPoller:
     def __init__(self, client: EmbyClient, processor: ActivityProcessor, ws_manager: BrowserWSManager):
         self.client = client
         self.processor = processor
         self.ws_manager = ws_manager
         self._poll_event = asyncio.Event()
+        self._last_metadata_sync = 0.0
 
     async def trigger_poll(self):
         """Trigger an immediate poll (called from WebSocket listener)."""
@@ -22,8 +26,10 @@ class SessionPoller:
 
     async def run(self):
         """Main polling loop."""
+        import time
         logger.info(f"Poller starting (interval: {settings.poll_interval}s)")
         await self._sync_metadata()
+        self._last_metadata_sync = time.monotonic()
 
         while True:
             try:
@@ -31,6 +37,11 @@ class SessionPoller:
                 await self.ws_manager.broadcast("now-playing")
             except Exception as e:
                 logger.error(f"Poll error: {e}")
+
+            # Periodic metadata re-sync
+            if time.monotonic() - self._last_metadata_sync >= METADATA_SYNC_INTERVAL:
+                await self._sync_metadata()
+                self._last_metadata_sync = time.monotonic()
 
             # Wait for either the interval or an immediate trigger
             try:

@@ -15,6 +15,22 @@ async def upsert_user(db: aiosqlite.Connection, data: dict):
     await db.commit()
 
 
+async def set_user_enabled(db: aiosqlite.Connection, emby_user_id: str, enabled: bool):
+    await db.execute(
+        "UPDATE users SET enabled = ? WHERE emby_user_id = ?",
+        [1 if enabled else 0, emby_user_id],
+    )
+    await db.commit()
+
+
+async def is_user_enabled(db: aiosqlite.Connection, emby_user_id: str) -> bool:
+    cursor = await db.execute(
+        "SELECT enabled FROM users WHERE emby_user_id = ?", [emby_user_id]
+    )
+    row = await cursor.fetchone()
+    return bool(row and row[0])
+
+
 async def update_user_stats(db: aiosqlite.Connection, user_id: str, duration: int):
     await db.execute(
         """UPDATE users SET

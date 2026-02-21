@@ -156,6 +156,7 @@ ADMIN_PREFIXES = (
 ADMIN_METHODS_ROUTES = [
     # (method, prefix) — routes that require admin for specific methods
     ("DELETE", "/api/history/"),
+    ("PUT", "/api/users/"),
 ]
 
 

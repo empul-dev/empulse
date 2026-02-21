@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS users (
     emby_user_id TEXT UNIQUE NOT NULL,
     username TEXT,
     is_admin INTEGER DEFAULT 0,
+    enabled INTEGER DEFAULT 0,
     thumb_url TEXT,
     last_seen TEXT,
     total_plays INTEGER DEFAULT 0,
@@ -182,6 +183,15 @@ async def _migrate(db: aiosqlite.Connection):
     if "stream_info" not in cols:
         await db.execute("ALTER TABLE history ADD COLUMN stream_info TEXT DEFAULT '{}'")
         logger.info("Migration: added stream_info column to history")
+
+    # Add enabled column to users if missing
+    cursor = await db.execute("PRAGMA table_info(users)")
+    user_cols = {row[1] for row in await cursor.fetchall()}
+    if "enabled" not in user_cols:
+        await db.execute("ALTER TABLE users ADD COLUMN enabled INTEGER DEFAULT 0")
+        # Auto-enable existing admins
+        await db.execute("UPDATE users SET enabled = 1 WHERE is_admin = 1")
+        logger.info("Migration: added enabled column to users")
 
     # Ensure login_sessions table exists (for pre-existing DBs)
     await db.execute("""
