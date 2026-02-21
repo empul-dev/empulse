@@ -4,14 +4,20 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Login — Empulse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <main class="container">
+    <div class="login-page">
+        <div class="login-bg-fallback"></div>
+        <div class="login-poster-wall" id="poster-wall"></div>
+        <div class="login-overlay"></div>
         <div class="login-wrap">
             <div class="login-card">
                 <h2>Empulse</h2>
+                <p class="login-subtitle">Sign in to your media server</p>
                 {% if error %}
                 <div class="error-msg">{{ error }}</div>
                 {% endif %}
@@ -29,6 +35,25 @@
                 {% endif %}
             </div>
         </div>
-    </main>
+    </div>
+    <script>
+    (function() {
+        var wall = document.getElementById('poster-wall');
+        fetch('/api/random-posters?limit=36')
+            .then(function(r) { return r.json(); })
+            .then(function(ids) {
+                if (!ids.length) return;
+                var html = '';
+                // Duplicate for fuller coverage
+                var all = ids.concat(ids).slice(0, 48);
+                for (var i = 0; i < all.length; i++) {
+                    html += '<img src="/api/img/' + all[i] + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+                }
+                wall.innerHTML = html;
+                setTimeout(function() { wall.classList.add('loaded'); }, 200);
+            })
+            .catch(function() {});
+    })();
+    </script>
 </body>
 </html>

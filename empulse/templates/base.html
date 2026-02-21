@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Empulse{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="/static/css/style.css?v={{ cache_v }}">
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
@@ -13,6 +15,11 @@
     <nav class="container-fluid">
         <ul>
             <li><strong><a href="/" class="nav-brand">Empulse</a></strong></li>
+            <li>
+                <button class="nav-hamburger" onclick="this.closest('nav').classList.toggle('nav-open')" aria-label="Menu">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+            </li>
         </ul>
         <ul>
             <li><a href="/" {% if active == 'dashboard' %}class="active"{% endif %}>Dashboard</a></li>

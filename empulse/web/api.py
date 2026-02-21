@@ -679,6 +679,35 @@ async def restore_database(request: Request):
     return JSONResponse({"status": "restored", "message": "Database restored. Restart the application to apply changes."})
 
 
+@router.get("/random-posters")
+async def random_posters(request: Request, limit: int = 24):
+    """Return random item IDs from Emby for the login poster wall."""
+    emby_client = getattr(request.app.state, "emby_client", None)
+    if not emby_client:
+        return JSONResponse([])
+    limit = max(1, min(limit, 48))
+    try:
+        params = {
+            **emby_client._params,
+            "SortBy": "Random",
+            "Recursive": "true",
+            "Limit": str(limit),
+            "IncludeItemTypes": "Movie,Series",
+            "ImageTypes": "Primary",
+            "Fields": "PrimaryImageAspectRatio",
+        }
+        r = await emby_client._client.get(
+            f"{emby_client.base_url}/Items", params=params
+        )
+        r.raise_for_status()
+        items = r.json().get("Items", [])
+        ids = [item["Id"] for item in items if item.get("Id")]
+        return JSONResponse(ids, headers={"Cache-Control": "public, max-age=300"})
+    except Exception as e:
+        logger.warning(f"Random posters fetch failed: {e}")
+        return JSONResponse([])
+
+
 @router.post("/test-connection")
 async def test_connection(request: Request):
     emby_client = getattr(request.app.state, "emby_client", None)

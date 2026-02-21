@@ -30,5 +30,8 @@
     {% endfor %}
 </div>
 {% else %}
-<p class="empty-state">Nothing is currently being played.</p>
+<div class="empty-state">
+    <svg class="empty-state-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    <div class="empty-state-text">Nothing is currently being played.</div>
+</div>
 {% endif %}

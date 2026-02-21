@@ -92,7 +92,7 @@ document.body.addEventListener("htmx:responseError", function(evt) {
         var border = getCSS("--border") || "#2a2a2a";
         Chart.defaults.color = textMuted;
         Chart.defaults.borderColor = border;
-        Chart.defaults.font.family = "system-ui, sans-serif";
+        Chart.defaults.font.family = "'Source Sans 3', system-ui, sans-serif";
         Chart.defaults.font.size = 11;
         Chart.defaults.plugins.legend.display = false;
     }
