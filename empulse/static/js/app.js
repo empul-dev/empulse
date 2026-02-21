@@ -67,6 +67,15 @@ function initStatCards() {
 initStatCards();
 document.body.addEventListener("htmx:afterSwap", initStatCards);
 
+// Prevent now-playing cards from re-animating on HTMX poll refreshes
+(function() {
+    var np = document.getElementById("now-playing");
+    if (!np) return;
+    np.addEventListener("htmx:afterSettle", function() {
+        np.classList.add("no-entrance");
+    });
+})();
+
 // HTMX 401 handling for auth
 document.body.addEventListener("htmx:responseError", function(evt) {
     if (evt.detail.xhr && evt.detail.xhr.status === 401) {

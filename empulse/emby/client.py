@@ -65,10 +65,8 @@ class EmbyClient:
             "Recursive": "true",
             "Limit": str(limit),
             "Fields": "DateCreated,ProductionYear,Overview",
-            "ExcludeItemTypes": "Season,Series,CollectionFolder",
+            "IncludeItemTypes": item_type or "Movie,Series",
         }
-        if item_type:
-            params["IncludeItemTypes"] = item_type
         r = await self._client.get(f"{self.base_url}/Items", params=params)
         r.raise_for_status()
         return r.json().get("Items", [])
