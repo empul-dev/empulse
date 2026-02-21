@@ -18,6 +18,9 @@ class SessionStateTracker:
             data["started_at"] = now
             data["updated_at"] = now
             data["paused_seconds"] = 0
+            data["start_progress_ticks"] = data.get("progress_ticks", 0)
+            data["history_id"] = None
+            data["last_db_write"] = None
             # If the session is already paused when first seen, start tracking the pause
             if data.get("is_paused"):
                 data["pause_start"] = now
@@ -48,7 +51,12 @@ class SessionStateTracker:
             transition = "updated"
 
         data["started_at"] = existing["started_at"]
+        data["start_progress_ticks"] = existing.get("start_progress_ticks", 0)
         data["updated_at"] = now
+        data["history_id"] = existing.get("history_id")
+        data["base_duration"] = existing.get("base_duration", 0)
+        data["base_paused"] = existing.get("base_paused", 0)
+        data["last_db_write"] = existing.get("last_db_write")
         self._sessions[session_key] = data
         return transition
 
@@ -63,6 +71,17 @@ class SessionStateTracker:
                 session["paused_seconds"] = session.get("paused_seconds", 0) + int(pause_dur)
             logger.info(f"Session ended: {session_key} - {session.get('user_name')}")
         return session
+
+    def set_history_id(self, session_key: str, history_id: int, base_duration: int = 0, base_paused: int = 0):
+        """Associate a DB history row with this session.
+
+        base_duration/base_paused: accumulated values from a prior merged record,
+        so updates can add the current session's values on top.
+        """
+        if session_key in self._sessions:
+            self._sessions[session_key]["history_id"] = history_id
+            self._sessions[session_key]["base_duration"] = base_duration
+            self._sessions[session_key]["base_paused"] = base_paused
 
     def get_all_sessions(self) -> list[dict]:
         return list(self._sessions.values())

@@ -15,6 +15,7 @@ class ActivityProcessor:
         self.state = state_tracker
         self.get_db = db_factory
         self.notification_engine = None
+        self._pending_updates: list[str] = []
 
     def _build_stream_info(self, s: EmbySessionInfo) -> str:
         """Build a JSON string with source and transcode stream details."""
@@ -140,12 +141,12 @@ class ActivityProcessor:
         current_keys = self.state.get_active_keys()
         new_keys = set(active.keys())
 
-        # Stopped sessions
+        # Stopped sessions — finalize their history records
         stopped = current_keys - new_keys
         for key in stopped:
             session = self.state.remove_session(key)
             if session:
-                await self._write_history(session)
+                await self._finalize_history(session)
                 await self._emit("playback_stop", session)
 
         # New or updated sessions
@@ -153,6 +154,7 @@ class ActivityProcessor:
             data = self._build_session_data(emby_session)
             transition = self.state.update_session(key, data)
             if transition == "new":
+                await self._start_history(key, data)
                 await self._emit("playback_start", data)
                 if data.get("play_method") == "Transcode":
                     await self._emit("transcode", data)
@@ -161,6 +163,13 @@ class ActivityProcessor:
             elif transition == "resumed":
                 await self._emit("playback_resume", data)
 
+            # Queue in-progress history updates (state changes flush immediately)
+            if transition in ("updated", "paused", "resumed"):
+                self._queue_history_update(key, force=transition != "updated")
+
+        # Flush all queued updates in a single transaction
+        await self._flush_history_updates()
+
     async def _emit(self, event_type: str, data: dict):
         if self.notification_engine:
             try:
@@ -168,64 +177,81 @@ class ActivityProcessor:
             except Exception as e:
                 logger.error(f"Notification emit error: {e}")
 
-    async def _write_history(self, session: dict):
-        now = datetime.now(timezone.utc).isoformat()
-        started = session.get("started_at", now)
+    def _calc_progress(self, session: dict) -> dict:
+        """Calculate duration/progress stats from a session dict.
+
+        Accounts for base_duration/base_paused from merged records so the DB
+        total accumulates correctly across resumed sessions.
+        """
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        started = session.get("started_at", now_iso)
         paused_seconds = session.get("paused_seconds", 0)
 
         try:
             start_dt = datetime.fromisoformat(started)
         except (ValueError, TypeError):
-            start_dt = datetime.now(timezone.utc)
+            start_dt = now
 
-        stop_dt = datetime.now(timezone.utc)
-        duration = int((stop_dt - start_dt).total_seconds())
-        actual_duration = max(0, duration - paused_seconds)
+        wall_duration = int((now - start_dt).total_seconds())
+        wall_actual = max(0, wall_duration - paused_seconds)
+
+        # Prefer tick-based duration from the player's reported position.
+        # Wall-clock is unreliable when sessions appear/disappear from the API.
+        start_ticks = session.get("start_progress_ticks", 0)
+        end_ticks = session.get("progress_ticks", 0)
+        tick_duration = max(0, (end_ticks - start_ticks) // 10_000_000)
+
+        # Use whichever is larger — tick-based catches late detection,
+        # wall-clock catches re-watches of the same segment.
+        session_duration = max(tick_duration, wall_actual)
+
+        # Add base values from a prior merged record
+        base_duration = session.get("base_duration", 0)
+        base_paused = session.get("base_paused", 0)
+        total_duration = base_duration + session_duration
+        total_paused = base_paused + paused_seconds
 
         runtime = session.get("runtime_ticks", 0)
         progress = session.get("progress_ticks", 0)
         percent = round(progress / runtime * 100, 1) if runtime else 0
         watched = percent >= 80
 
+        return {
+            "stopped_at": now_iso,
+            "duration_seconds": total_duration,
+            "paused_seconds": total_paused,
+            "percent_complete": percent,
+            "watched": 1 if watched else 0,
+            "progress_ticks": progress,
+            "stream_info": session.get("stream_info", "{}"),
+            "_session_duration": session_duration,  # just this session's portion
+        }
+
+    async def _start_history(self, session_key: str, session: dict):
+        """Create a history record when playback starts (or merge into a recent one)."""
         db = self.get_db()
         user_id = session.get("user_id")
         item_id = session.get("item_id")
+        stats = self._calc_progress(session)
 
-        # Try to merge with a recent history record for the same user+item
+        # Check if we should merge into a recent record for same user+item
         existing = None
         if user_id and item_id:
             existing = await history_db.find_recent_history(db, user_id, item_id)
 
         if existing:
-            # Merge: keep original start time, accumulate duration and pause
-            merged_duration = existing["duration_seconds"] + actual_duration
-            merged_paused = existing.get("paused_seconds", 0) + paused_seconds
-            # Use the higher progress/percent
-            merged_percent = max(existing.get("percent_complete", 0), percent)
-            merged_watched = 1 if merged_percent >= 80 else 0
-            merged_progress = max(existing.get("progress_ticks", 0), progress)
-
-            await history_db.merge_history(db, existing["id"], {
-                "stopped_at": now,
-                "duration_seconds": merged_duration,
-                "paused_seconds": merged_paused,
-                "percent_complete": merged_percent,
-                "watched": merged_watched,
-                "progress_ticks": merged_progress,
-                "stream_info": session.get("stream_info", "{}"),
-            })
-
-            # Update user stats only for the new portion
-            if user_id:
-                await users_db.update_user_stats(db, user_id, actual_duration)
-
-            if merged_watched and not existing.get("watched"):
-                await self._emit("watched", session)
-
+            history_id = existing["id"]
+            base_duration = existing.get("duration_seconds", 0)
+            base_paused = existing.get("paused_seconds", 0)
+            # Store base values so future updates accumulate correctly.
+            # Don't update DB here — the next poll cycle will do it with correct totals.
+            self.state.set_history_id(session_key, history_id, base_duration, base_paused)
             logger.info(
-                f"History merged (id={existing['id']}): {session.get('user_name')} - "
-                f"{session.get('item_name')} (+{actual_duration}s, {merged_percent}%)"
+                f"History resumed (id={history_id}): {session.get('user_name')} - "
+                f"{session.get('item_name')}"
             )
+            return
         else:
             record = {
                 "session_key": session.get("session_key", ""),
@@ -242,31 +268,156 @@ class ActivityProcessor:
                 "season_number": session.get("season_number"),
                 "episode_number": session.get("episode_number"),
                 "year": session.get("year"),
-                "runtime_ticks": runtime,
-                "progress_ticks": progress,
+                "runtime_ticks": session.get("runtime_ticks", 0),
+                "progress_ticks": stats["progress_ticks"],
                 "play_method": session.get("play_method"),
                 "transcode_video_codec": session.get("transcode_video_codec"),
                 "transcode_audio_codec": session.get("transcode_audio_codec"),
                 "video_decision": session.get("video_decision"),
                 "audio_decision": session.get("audio_decision"),
-                "stream_info": session.get("stream_info", "{}"),
-                "started_at": started,
-                "stopped_at": now,
-                "duration_seconds": actual_duration,
-                "paused_seconds": paused_seconds,
-                "percent_complete": percent,
-                "watched": 1 if watched else 0,
+                "stream_info": stats["stream_info"],
+                "started_at": session.get("started_at"),
+                "stopped_at": stats["stopped_at"],
+                "duration_seconds": stats["duration_seconds"],
+                "paused_seconds": stats["paused_seconds"],
+                "percent_complete": stats["percent_complete"],
+                "watched": stats["watched"],
             }
+            history_id = await history_db.insert_history_returning_id(db, record)
+            logger.info(
+                f"History started (id={history_id}): {session.get('user_name')} - "
+                f"{session.get('item_name')}"
+            )
 
-            await history_db.insert_history(db, record)
+        self.state.set_history_id(session_key, history_id)
+        # Mark the initial write so throttling starts from here
+        if session_key in self.state._sessions:
+            self.state._sessions[session_key]["last_db_write"] = datetime.now(timezone.utc).isoformat()
 
+    # How often (seconds) to write routine progress updates per session.
+    # State changes (pause/resume/stop) always write immediately.
+    DB_WRITE_INTERVAL = 30
+
+    def _queue_history_update(self, session_key: str, force: bool = False):
+        """Add a session to the pending-update queue if enough time has elapsed."""
+        session = self.state._sessions.get(session_key)
+        if not session or not session.get("history_id"):
+            return
+
+        if not force:
+            last_write = session.get("last_db_write")
+            if last_write:
+                try:
+                    elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(last_write)).total_seconds()
+                    if elapsed < self.DB_WRITE_INTERVAL:
+                        return
+                except (ValueError, TypeError):
+                    pass
+
+        self._pending_updates.append(session_key)
+
+    async def _flush_history_updates(self):
+        """Batch-write all queued history updates in a single transaction."""
+        pending = getattr(self, "_pending_updates", [])
+        if not pending:
+            return
+        self._pending_updates = []
+
+        db = self.get_db()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        try:
+            for session_key in pending:
+                session = self.state._sessions.get(session_key)
+                if not session:
+                    continue
+                history_id = session.get("history_id")
+                if not history_id:
+                    continue
+                stats = self._calc_progress(session)
+                await db.execute(
+                    "UPDATE history SET stopped_at = ?, duration_seconds = ?, paused_seconds = ?, "
+                    "percent_complete = ?, watched = ?, progress_ticks = ?, stream_info = ? WHERE id = ?",
+                    [
+                        stats["stopped_at"],
+                        stats["duration_seconds"],
+                        stats["paused_seconds"],
+                        stats["percent_complete"],
+                        stats["watched"],
+                        stats.get("progress_ticks", 0),
+                        stats.get("stream_info", "{}"),
+                        history_id,
+                    ],
+                )
+                session["last_db_write"] = now_iso
+            await db.commit()
+        except Exception as e:
+            logger.error(f"Failed to flush {len(pending)} history updates: {e}")
+
+    async def _finalize_history(self, session: dict):
+        """Finalize a history record when playback stops and update user stats."""
+        history_id = session.get("history_id")
+        stats = self._calc_progress(session)
+        db = self.get_db()
+        user_id = session.get("user_id")
+
+        if history_id:
+            # Update the existing record with final values
+            try:
+                await history_db.update_active_history(db, history_id, stats)
+            except Exception as e:
+                logger.error(f"Failed to finalize history {history_id}: {e}")
+
+            # Update user stats with only this session's duration (not the merged total)
             if user_id:
-                await users_db.update_user_stats(db, user_id, actual_duration)
+                await users_db.update_user_stats(db, user_id, stats["_session_duration"])
 
-            if watched:
+            if stats["watched"]:
                 await self._emit("watched", session)
 
             logger.info(
-                f"History written: {session.get('user_name')} - {session.get('item_name')} "
-                f"({actual_duration}s, {percent}%)"
+                f"History finalized (id={history_id}): {session.get('user_name')} - "
+                f"{session.get('item_name')} ({stats['duration_seconds']}s, {stats['percent_complete']}%)"
             )
+        else:
+            # Fallback: no history_id (shouldn't happen normally, but handle gracefully)
+            logger.warning(
+                f"No history_id for stopped session: {session.get('user_name')} - "
+                f"{session.get('item_name')}, writing new record"
+            )
+            record = {
+                "session_key": session.get("session_key", ""),
+                "user_id": user_id,
+                "user_name": session.get("user_name"),
+                "client": session.get("client"),
+                "device_name": session.get("device_name"),
+                "ip_address": session.get("ip_address"),
+                "item_id": session.get("item_id"),
+                "item_name": session.get("item_name"),
+                "item_type": session.get("item_type"),
+                "series_name": session.get("series_name"),
+                "series_id": session.get("series_id"),
+                "season_number": session.get("season_number"),
+                "episode_number": session.get("episode_number"),
+                "year": session.get("year"),
+                "runtime_ticks": session.get("runtime_ticks", 0),
+                "progress_ticks": stats["progress_ticks"],
+                "play_method": session.get("play_method"),
+                "transcode_video_codec": session.get("transcode_video_codec"),
+                "transcode_audio_codec": session.get("transcode_audio_codec"),
+                "video_decision": session.get("video_decision"),
+                "audio_decision": session.get("audio_decision"),
+                "stream_info": stats["stream_info"],
+                "started_at": session.get("started_at"),
+                "stopped_at": stats["stopped_at"],
+                "duration_seconds": stats["duration_seconds"],
+                "paused_seconds": stats["paused_seconds"],
+                "percent_complete": stats["percent_complete"],
+                "watched": stats["watched"],
+            }
+            await history_db.insert_history(db, record)
+
+            if user_id:
+                await users_db.update_user_stats(db, user_id, stats["duration_seconds"])
+
+            if stats["watched"]:
+                await self._emit("watched", session)
