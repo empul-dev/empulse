@@ -4,85 +4,149 @@
 {% block content %}
 <div class="section-header">
     <h2>Newsletter</h2>
-    <a href="/settings" class="toolbar-btn">Back to Settings</a>
+    <a href="/settings" class="toolbar-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Settings
+    </a>
 </div>
 
-<article>
-    <header>Newsletter Settings</header>
-    <form id="newsletter-form" onsubmit="saveNewsletter(event)">
-        <label><input type="checkbox" id="nl-enabled" {% if config.get('enabled') %}checked{% endif %}> Enable Newsletter</label>
+<form id="newsletter-form" onsubmit="saveNewsletter(event)">
 
-        <div class="grid">
-            <label>Schedule
-                <select id="nl-schedule">
-                    <option value="daily" {% if config.get('schedule') == 'daily' %}selected{% endif %}>Daily</option>
-                    <option value="weekly" {% if config.get('schedule', 'weekly') == 'weekly' %}selected{% endif %}>Weekly</option>
-                    <option value="monthly" {% if config.get('schedule') == 'monthly' %}selected{% endif %}>Monthly</option>
-                </select>
+<!-- ===== Schedule ===== -->
+<div class="settings-section">
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Schedule</span>
+    </div>
+
+    <div class="chart-card">
+        <div class="settings-card-body">
+            <label class="settings-checkbox" style="margin-bottom: 0.75rem;">
+                <input type="checkbox" id="nl-enabled" {% if config.get('enabled') %}checked{% endif %}>
+                Enable Newsletter
             </label>
-            <label>Day of Week (for weekly)
-                <select id="nl-dow">
-                    {% for d, name in [(0,'Monday'),(1,'Tuesday'),(2,'Wednesday'),(3,'Thursday'),(4,'Friday'),(5,'Saturday'),(6,'Sunday')] %}
-                    <option value="{{ d }}" {% if config.get('day_of_week', 0) == d %}selected{% endif %}>{{ name }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <label>Send Hour (UTC)
-                <input type="number" id="nl-hour" value="{{ config.get('hour', 9) }}" min="0" max="23">
+
+            <div class="settings-form-grid-3">
+                <div class="settings-field">
+                    <label class="settings-label">Schedule</label>
+                    <select id="nl-schedule" class="settings-input">
+                        <option value="daily" {% if config.get('schedule') == 'daily' %}selected{% endif %}>Daily</option>
+                        <option value="weekly" {% if config.get('schedule', 'weekly') == 'weekly' %}selected{% endif %}>Weekly</option>
+                        <option value="monthly" {% if config.get('schedule') == 'monthly' %}selected{% endif %}>Monthly</option>
+                    </select>
+                </div>
+                <div class="settings-field">
+                    <label class="settings-label">Day of Week (for weekly)</label>
+                    <select id="nl-dow" class="settings-input">
+                        {% for d, name in [(0,'Monday'),(1,'Tuesday'),(2,'Wednesday'),(3,'Thursday'),(4,'Friday'),(5,'Saturday'),(6,'Sunday')] %}
+                        <option value="{{ d }}" {% if config.get('day_of_week', 0) == d %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="settings-field">
+                    <label class="settings-label">Send Hour (UTC)</label>
+                    <input type="number" id="nl-hour" value="{{ config.get('hour', 9) }}" min="0" max="23" class="settings-input">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Content ===== -->
+<div class="settings-section">
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>Content</span>
+    </div>
+
+    <div class="chart-card">
+        <div class="settings-card-body">
+            <div class="settings-form-grid">
+                <div class="settings-field">
+                    <label class="settings-label">Recently Added — Days</label>
+                    <input type="number" id="nl-ra-days" value="{{ config.get('recently_added_days', 7) }}" min="1" max="30" class="settings-input">
+                </div>
+                <div class="settings-field">
+                    <label class="settings-label">Recently Added — Max Items</label>
+                    <input type="number" id="nl-ra-limit" value="{{ config.get('recently_added_limit', 20) }}" min="1" max="50" class="settings-input">
+                </div>
+            </div>
+            <label class="settings-checkbox">
+                <input type="checkbox" id="nl-stats" {% if config.get('include_stats', 1) %}checked{% endif %}>
+                Include Watch Statistics
             </label>
         </div>
+    </div>
+</div>
 
-        <div class="grid">
-            <label>Recently Added — Days
-                <input type="number" id="nl-ra-days" value="{{ config.get('recently_added_days', 7) }}" min="1" max="30">
-            </label>
-            <label>Recently Added — Max Items
-                <input type="number" id="nl-ra-limit" value="{{ config.get('recently_added_limit', 20) }}" min="1" max="50">
+<!-- ===== SMTP Settings ===== -->
+<div class="settings-section">
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <span>SMTP Settings</span>
+    </div>
+
+    <div class="chart-card">
+        <div class="settings-card-body">
+            <div class="settings-form-grid">
+                <div class="settings-field">
+                    <label class="settings-label">SMTP Host</label>
+                    <input type="text" id="nl-smtp-host" value="{{ config.get('smtp_host', '') }}" placeholder="smtp.gmail.com" class="settings-input">
+                </div>
+                <div class="settings-field">
+                    <label class="settings-label">SMTP Port</label>
+                    <input type="number" id="nl-smtp-port" value="{{ config.get('smtp_port', 587) }}" min="1" max="65535" class="settings-input">
+                </div>
+            </div>
+            <div class="settings-form-grid">
+                <div class="settings-field">
+                    <label class="settings-label">SMTP User</label>
+                    <input type="text" id="nl-smtp-user" value="{{ config.get('smtp_user', '') }}" placeholder="user@example.com" class="settings-input">
+                </div>
+                <div class="settings-field">
+                    <label class="settings-label">SMTP Password</label>
+                    <input type="password" id="nl-smtp-pass" value="{{ config.get('smtp_pass', '') }}" class="settings-input">
+                </div>
+            </div>
+            <div class="settings-form-grid">
+                <div class="settings-field">
+                    <label class="settings-label">From Address</label>
+                    <input type="email" id="nl-from" value="{{ config.get('from_addr', '') }}" placeholder="empulse@example.com" class="settings-input">
+                </div>
+                <div class="settings-field">
+                    <label class="settings-label">To Addresses (comma-separated)</label>
+                    <input type="text" id="nl-to" value="{{ config.get('to_addrs', '') }}" placeholder="admin@example.com, user@example.com" class="settings-input">
+                </div>
+            </div>
+            <label class="settings-checkbox">
+                <input type="checkbox" id="nl-tls" {% if config.get('smtp_tls', 1) %}checked{% endif %}>
+                Use TLS (STARTTLS)
             </label>
         </div>
+    </div>
+</div>
 
-        <label><input type="checkbox" id="nl-stats" {% if config.get('include_stats', 1) %}checked{% endif %}> Include Watch Statistics</label>
+<!-- ===== Actions ===== -->
+<div class="settings-actions" style="margin: 1rem 0 1.5rem;">
+    <button type="submit" class="settings-btn settings-btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save Settings
+    </button>
+    <button type="button" class="settings-btn settings-btn-secondary" onclick="previewNewsletter()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Preview
+    </button>
+    <button type="button" class="settings-btn settings-btn-secondary" onclick="sendNewsletter()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Send Now
+    </button>
+</div>
+<div id="newsletter-result"></div>
+{% if config.get('last_sent') %}
+<p style="font-size:0.78em; color:var(--text-muted);">Last sent: {{ config.get('last_sent', '')[:19] }}</p>
+{% endif %}
 
-        <fieldset>
-            <legend>SMTP Settings</legend>
-            <div class="grid">
-                <label>SMTP Host
-                    <input type="text" id="nl-smtp-host" value="{{ config.get('smtp_host', '') }}" placeholder="smtp.gmail.com">
-                </label>
-                <label>SMTP Port
-                    <input type="number" id="nl-smtp-port" value="{{ config.get('smtp_port', 587) }}" min="1" max="65535">
-                </label>
-            </div>
-            <div class="grid">
-                <label>SMTP User
-                    <input type="text" id="nl-smtp-user" value="{{ config.get('smtp_user', '') }}" placeholder="user@example.com">
-                </label>
-                <label>SMTP Password
-                    <input type="password" id="nl-smtp-pass" value="{{ config.get('smtp_pass', '') }}">
-                </label>
-            </div>
-            <div class="grid">
-                <label>From Address
-                    <input type="email" id="nl-from" value="{{ config.get('from_addr', '') }}" placeholder="empulse@example.com">
-                </label>
-                <label>To Addresses (comma-separated)
-                    <input type="text" id="nl-to" value="{{ config.get('to_addrs', '') }}" placeholder="admin@example.com, user@example.com">
-                </label>
-            </div>
-            <label><input type="checkbox" id="nl-tls" {% if config.get('smtp_tls', 1) %}checked{% endif %}> Use TLS (STARTTLS)</label>
-        </fieldset>
-
-        <div style="display:flex; gap:1rem; flex-wrap:wrap;">
-            <button type="submit">Save Settings</button>
-            <button type="button" class="secondary" onclick="previewNewsletter()">Preview</button>
-            <button type="button" class="contrast" onclick="sendNewsletter()">Send Now</button>
-        </div>
-    </form>
-    <div id="newsletter-result"></div>
-    {% if config.get('last_sent') %}
-    <p><small>Last sent: {{ config.get('last_sent', '')[:19] }}</small></p>
-    {% endif %}
-</article>
+</form>
 {% endblock %}
 
 {% block scripts %}

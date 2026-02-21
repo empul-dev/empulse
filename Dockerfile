@@ -1,14 +1,24 @@
-FROM python:3.13-slim
+# ---- Build stage: install dependencies with uv on alpine ----
+FROM python:3.13-alpine AS builder
 
-WORKDIR /app
+WORKDIR /build
 
 RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml .
 RUN uv pip install --system --no-cache .
 
+# ---- Runtime stage: clean alpine without build tools ----
+FROM python:3.13-alpine
+
+WORKDIR /app
+
+# Copy only the installed packages from builder
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
+
+# Copy app source
 COPY . .
-RUN uv pip install --system --no-cache -e .
 
 EXPOSE 8189
 

@@ -57,7 +57,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 async function toggleUserEnabled(btn) {
     const userId = btn.dataset.userId;
     const currentlyEnabled = btn.dataset.enabled === 'true';

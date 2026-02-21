@@ -4,200 +4,256 @@
 {% block content %}
 <div class="section-header">
     <h2>Notification Channels</h2>
-    <a href="/settings" class="toolbar-btn">Back to Settings</a>
+    <a href="/settings" class="toolbar-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Settings
+    </a>
 </div>
 
-<article>
-    <header>Channels</header>
-    <div id="channels-list">
-        {% if channels %}
-        <table class="history-tbl">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Triggers</th>
-                    <th>Enabled</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for ch in channels %}
-                <tr id="channel-row-{{ ch.id }}">
-                    <td>{{ ch.name }}</td>
-                    <td><span class="play-method-badge">{{ ch.channel_type }}</span></td>
-                    <td>{{ ch.triggers }}</td>
-                    <td>{{ "Yes" if ch.enabled else "No" }}</td>
-                    <td class="channel-actions">
-                        <button class="toolbar-btn" onclick="editChannel({{ ch.id }})">Edit</button>
-                        <button class="toolbar-btn" onclick="testChannel({{ ch.id }})">Test</button>
-                        <button class="btn-delete" onclick="deleteChannel({{ ch.id }})">Delete</button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<!-- ===== Active Channels ===== -->
+<div class="settings-section">
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>
+        <span>Active Channels</span>
+    </div>
+
+    <div class="chart-card">
+        <div id="channels-list">
+            {% if channels %}
+            <div class="settings-card-body" style="padding:0;">
+                <table class="history-tbl">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Triggers</th>
+                            <th>Enabled</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ch in channels %}
+                        <tr id="channel-row-{{ ch.id }}">
+                            <td>{{ ch.name }}</td>
+                            <td><span class="play-method-badge">{{ ch.channel_type }}</span></td>
+                            <td>{{ ch.triggers }}</td>
+                            <td>{{ "Yes" if ch.enabled else "No" }}</td>
+                            <td class="channel-actions">
+                                <button class="toolbar-btn" onclick="editChannel({{ ch.id }})">Edit</button>
+                                <button class="toolbar-btn" onclick="testChannel({{ ch.id }})">Test</button>
+                                <button class="btn-delete" onclick="deleteChannel({{ ch.id }})">Delete</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="settings-card-body">
+                <p class="empty-state">No notification channels configured.</p>
+            </div>
+            {% endif %}
+        </div>
+        <div id="channel-test-result" class="settings-card-body" style="padding-top:0;"></div>
+    </div>
+</div>
+
+<!-- ===== Add / Edit Channel ===== -->
+<div class="settings-section">
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Add / Edit Channel</span>
+    </div>
+
+    <div class="chart-card">
+        <div class="settings-card-body">
+            <form id="channel-form" onsubmit="saveChannel(event)">
+                <input type="hidden" id="ch-id" value="">
+                <div class="settings-form-grid">
+                    <div class="settings-field">
+                        <label class="settings-label">Name</label>
+                        <input type="text" id="ch-name" required placeholder="My Discord" class="settings-input">
+                    </div>
+                    <div class="settings-field">
+                        <label class="settings-label">Type</label>
+                        <select id="ch-type" class="settings-input" onchange="toggleTypeFields()">
+                            <option value="discord">Discord</option>
+                            <option value="webhook">Generic Webhook</option>
+                            <option value="email">Email (SMTP)</option>
+                            <option value="telegram">Telegram</option>
+                            <option value="ntfy">Ntfy</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-field" id="ch-url-wrap">
+                    <label class="settings-label">Webhook URL</label>
+                    <input type="url" id="ch-url" placeholder="https://discord.com/api/webhooks/..." class="settings-input">
+                </div>
+
+                <div id="webhook-extra" style="display:none">
+                    <div class="settings-form-grid">
+                        <div class="settings-field">
+                            <label class="settings-label">HTTP Method</label>
+                            <select id="ch-method" class="settings-input">
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                            </select>
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label">Custom Headers (JSON)</label>
+                            <input type="text" id="ch-headers" placeholder='{"Authorization": "Bearer ..."}' class="settings-input">
+                        </div>
+                    </div>
+                    <div class="settings-field">
+                        <label class="settings-label">Body Template (use {user}, {title}, {event})</label>
+                        <textarea id="ch-body" rows="3" placeholder="Leave empty for default JSON payload" class="settings-input"></textarea>
+                    </div>
+                </div>
+
+                <div id="email-extra" style="display:none">
+                    <div class="settings-form-grid">
+                        <div class="settings-field">
+                            <label class="settings-label">SMTP Host</label>
+                            <input type="text" id="ch-smtp-host" placeholder="smtp.gmail.com" class="settings-input">
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label">SMTP Port</label>
+                            <input type="number" id="ch-smtp-port" value="587" min="1" max="65535" class="settings-input">
+                        </div>
+                    </div>
+                    <div class="settings-form-grid">
+                        <div class="settings-field">
+                            <label class="settings-label">SMTP User</label>
+                            <input type="text" id="ch-smtp-user" placeholder="user@example.com" class="settings-input">
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label">SMTP Password</label>
+                            <input type="password" id="ch-smtp-pass" placeholder="app password" class="settings-input">
+                        </div>
+                    </div>
+                    <div class="settings-form-grid">
+                        <div class="settings-field">
+                            <label class="settings-label">From Address</label>
+                            <input type="email" id="ch-from-addr" placeholder="empulse@example.com" class="settings-input">
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label">To Address</label>
+                            <input type="email" id="ch-to-addr" placeholder="admin@example.com" class="settings-input">
+                        </div>
+                    </div>
+                    <label class="settings-checkbox"><input type="checkbox" id="ch-smtp-tls" checked> Use TLS (STARTTLS)</label>
+                </div>
+
+                <div id="telegram-extra" style="display:none">
+                    <div class="settings-form-grid">
+                        <div class="settings-field">
+                            <label class="settings-label">Bot Token</label>
+                            <input type="text" id="ch-bot-token" placeholder="123456:ABC-DEF..." class="settings-input">
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label">Chat ID</label>
+                            <input type="text" id="ch-chat-id" placeholder="-1001234567890" class="settings-input">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="ntfy-extra" style="display:none">
+                    <div class="settings-form-grid">
+                        <div class="settings-field">
+                            <label class="settings-label">Server URL</label>
+                            <input type="text" id="ch-ntfy-url" value="https://ntfy.sh" placeholder="https://ntfy.sh" class="settings-input">
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label">Topic</label>
+                            <input type="text" id="ch-ntfy-topic" placeholder="empulse-notifications" class="settings-input">
+                        </div>
+                    </div>
+                    <div class="settings-field">
+                        <label class="settings-label">Auth Token (optional)</label>
+                        <input type="text" id="ch-ntfy-auth" placeholder="tk_..." class="settings-input">
+                    </div>
+                </div>
+
+                <div class="settings-fieldset">
+                    <div class="settings-fieldset-label">Triggers</div>
+                    <div class="settings-checkbox-grid">
+                        <label class="settings-checkbox"><input type="checkbox" class="ch-trigger" value="playback_start"> Playback Start</label>
+                        <label class="settings-checkbox"><input type="checkbox" class="ch-trigger" value="playback_stop"> Playback Stop</label>
+                        <label class="settings-checkbox"><input type="checkbox" class="ch-trigger" value="playback_pause"> Playback Pause</label>
+                        <label class="settings-checkbox"><input type="checkbox" class="ch-trigger" value="playback_resume"> Playback Resume</label>
+                        <label class="settings-checkbox"><input type="checkbox" class="ch-trigger" value="watched"> Watched (>=80%)</label>
+                        <label class="settings-checkbox"><input type="checkbox" class="ch-trigger" value="transcode"> Transcode Detected</label>
+                    </div>
+                </div>
+
+                <div class="settings-fieldset">
+                    <div class="settings-fieldset-label">Conditions (optional)</div>
+                    <div class="settings-form-grid-3">
+                        <div class="settings-field">
+                            <label class="settings-label">User IDs (comma-separated)</label>
+                            <input type="text" id="ch-cond-users" placeholder="user1, user2" class="settings-input">
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label">Item Types (comma-separated)</label>
+                            <input type="text" id="ch-cond-types" placeholder="Movie, Episode, Audio" class="settings-input">
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label">Min Duration (seconds)</label>
+                            <input type="number" id="ch-cond-min-dur" value="0" min="0" class="settings-input">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-actions" style="margin-top: 0.75rem;">
+                    <button type="submit" class="settings-btn settings-btn-primary">Save Channel</button>
+                    <button type="button" class="settings-btn settings-btn-secondary" onclick="resetForm()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Recent Log ===== -->
+<div class="settings-section">
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Recent Log</span>
+    </div>
+
+    <div class="chart-card">
+        {% if logs %}
+        <div class="settings-card-body" style="padding:0;">
+            <table class="history-tbl">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Event</th>
+                        <th>Summary</th>
+                        <th>Status</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.sent_at[:19] }}</td>
+                        <td>{{ log.event_type }}</td>
+                        <td>{{ log.event_summary or "" }}</td>
+                        <td><span class="play-method-badge {% if log.status == 'sent' %}direct-play{% else %}transcode{% endif %}">{{ log.status }}</span></td>
+                        <td>{{ log.error or "" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
-        <p class="empty-state">No notification channels configured.</p>
+        <div class="settings-card-body">
+            <p class="empty-state">No notifications sent yet.</p>
+        </div>
         {% endif %}
     </div>
-    <div id="channel-test-result"></div>
-</article>
-
-<article>
-    <header>Add / Edit Channel</header>
-    <form id="channel-form" onsubmit="saveChannel(event)">
-        <input type="hidden" id="ch-id" value="">
-        <div class="grid">
-            <label>Name
-                <input type="text" id="ch-name" required placeholder="My Discord">
-            </label>
-            <label>Type
-                <select id="ch-type" onchange="toggleTypeFields()">
-                    <option value="discord">Discord</option>
-                    <option value="webhook">Generic Webhook</option>
-                    <option value="email">Email (SMTP)</option>
-                    <option value="telegram">Telegram</option>
-                    <option value="ntfy">Ntfy</option>
-                </select>
-            </label>
-        </div>
-
-        <label>Webhook URL
-            <input type="url" id="ch-url" placeholder="https://discord.com/api/webhooks/...">
-        </label>
-
-        <div id="webhook-extra" style="display:none">
-            <div class="grid">
-                <label>HTTP Method
-                    <select id="ch-method">
-                        <option value="POST">POST</option>
-                        <option value="PUT">PUT</option>
-                    </select>
-                </label>
-                <label>Custom Headers (JSON)
-                    <input type="text" id="ch-headers" placeholder='{"Authorization": "Bearer ..."}'>
-                </label>
-            </div>
-            <label>Body Template (optional — use {user}, {title}, {event}, etc.)
-                <textarea id="ch-body" rows="3" placeholder="Leave empty for default JSON payload"></textarea>
-            </label>
-        </div>
-
-        <div id="email-extra" style="display:none">
-            <div class="grid">
-                <label>SMTP Host
-                    <input type="text" id="ch-smtp-host" placeholder="smtp.gmail.com">
-                </label>
-                <label>SMTP Port
-                    <input type="number" id="ch-smtp-port" value="587" min="1" max="65535">
-                </label>
-            </div>
-            <div class="grid">
-                <label>SMTP User
-                    <input type="text" id="ch-smtp-user" placeholder="user@example.com">
-                </label>
-                <label>SMTP Password
-                    <input type="password" id="ch-smtp-pass" placeholder="app password">
-                </label>
-            </div>
-            <div class="grid">
-                <label>From Address
-                    <input type="email" id="ch-from-addr" placeholder="empulse@example.com">
-                </label>
-                <label>To Address
-                    <input type="email" id="ch-to-addr" placeholder="admin@example.com">
-                </label>
-            </div>
-            <label><input type="checkbox" id="ch-smtp-tls" checked> Use TLS (STARTTLS)</label>
-        </div>
-
-        <div id="telegram-extra" style="display:none">
-            <div class="grid">
-                <label>Bot Token
-                    <input type="text" id="ch-bot-token" placeholder="123456:ABC-DEF...">
-                </label>
-                <label>Chat ID
-                    <input type="text" id="ch-chat-id" placeholder="-1001234567890">
-                </label>
-            </div>
-        </div>
-
-        <div id="ntfy-extra" style="display:none">
-            <div class="grid">
-                <label>Server URL
-                    <input type="text" id="ch-ntfy-url" value="https://ntfy.sh" placeholder="https://ntfy.sh">
-                </label>
-                <label>Topic
-                    <input type="text" id="ch-ntfy-topic" placeholder="empulse-notifications">
-                </label>
-            </div>
-            <label>Auth Token (optional)
-                <input type="text" id="ch-ntfy-auth" placeholder="tk_...">
-            </label>
-        </div>
-
-        <fieldset>
-            <legend>Triggers</legend>
-            <div class="grid">
-                <label><input type="checkbox" class="ch-trigger" value="playback_start"> Playback Start</label>
-                <label><input type="checkbox" class="ch-trigger" value="playback_stop"> Playback Stop</label>
-                <label><input type="checkbox" class="ch-trigger" value="playback_pause"> Playback Pause</label>
-                <label><input type="checkbox" class="ch-trigger" value="playback_resume"> Playback Resume</label>
-                <label><input type="checkbox" class="ch-trigger" value="watched"> Watched (>=80%)</label>
-                <label><input type="checkbox" class="ch-trigger" value="transcode"> Transcode Detected</label>
-            </div>
-        </fieldset>
-
-        <fieldset>
-            <legend>Conditions (optional)</legend>
-            <div class="grid">
-                <label>User IDs (comma-separated, empty = all)
-                    <input type="text" id="ch-cond-users" placeholder="user1, user2">
-                </label>
-                <label>Item Types (comma-separated, empty = all)
-                    <input type="text" id="ch-cond-types" placeholder="Movie, Episode, Audio">
-                </label>
-                <label>Min Duration (seconds)
-                    <input type="number" id="ch-cond-min-dur" value="0" min="0">
-                </label>
-            </div>
-        </fieldset>
-
-        <button type="submit">Save Channel</button>
-        <button type="button" class="secondary" onclick="resetForm()">Cancel</button>
-    </form>
-</article>
-
-<article>
-    <header>Recent Notification Log</header>
-    {% if logs %}
-    <table class="history-tbl">
-        <thead>
-            <tr>
-                <th>Time</th>
-                <th>Event</th>
-                <th>Summary</th>
-                <th>Status</th>
-                <th>Error</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for log in logs %}
-            <tr>
-                <td>{{ log.sent_at[:19] }}</td>
-                <td>{{ log.event_type }}</td>
-                <td>{{ log.event_summary or "" }}</td>
-                <td><span class="play-method-badge {% if log.status == 'sent' %}direct-play{% else %}transcode{% endif %}">{{ log.status }}</span></td>
-                <td>{{ log.error or "" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="empty-state">No notifications sent yet.</p>
-    {% endif %}
-</article>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -208,9 +264,7 @@ function toggleTypeFields() {
     document.getElementById('email-extra').style.display = type === 'email' ? '' : 'none';
     document.getElementById('telegram-extra').style.display = type === 'telegram' ? '' : 'none';
     document.getElementById('ntfy-extra').style.display = type === 'ntfy' ? '' : 'none';
-    // URL field: show for discord/webhook, hide for others
-    var urlLabel = document.getElementById('ch-url').closest('label');
-    urlLabel.style.display = (type === 'discord' || type === 'webhook') ? '' : 'none';
+    document.getElementById('ch-url-wrap').style.display = (type === 'discord' || type === 'webhook') ? '' : 'none';
 }
 
 function resetForm() {
@@ -320,6 +374,8 @@ function editChannel(id) {
             document.getElementById('ch-cond-users').value = (cond.users || []).join(', ');
             document.getElementById('ch-cond-types').value = (cond.types || []).join(', ');
             document.getElementById('ch-cond-min-dur').value = cond.min_duration || 0;
+
+            document.getElementById('channel-form').scrollIntoView({ behavior: 'smooth' });
         });
 }
 

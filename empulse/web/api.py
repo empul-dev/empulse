@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import io
 import json
@@ -12,6 +13,26 @@ from empulse.config import settings
 from empulse.database import get_db
 from empulse.db import history as history_db, stats as stats_db, users as users_db
 from empulse.models import SessionInfo, HistoryRecord
+
+# SVG placeholder for missing images (film icon on dark background)
+_PLACEHOLDER_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450" viewBox="0 0 300 450">'
+    b'<rect width="300" height="450" rx="8" fill="#1a1a2e"/>'
+    b'<g transform="translate(110,175)" fill="none" stroke="#444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">'
+    b'<rect x="4" y="4" width="72" height="72" rx="8"/>'
+    b'<path d="M24 4v72M56 4v72M4 28h72M4 52h72"/>'
+    b'</g>'
+    b'</svg>'
+)
+
+
+def _placeholder_response() -> Response:
+    """Return a placeholder SVG for missing/broken images."""
+    return Response(
+        content=_PLACEHOLDER_SVG,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 logger = logging.getLogger("empulse.api")
 router = APIRouter()
@@ -258,31 +279,34 @@ async def export_history(
     )
 
 
+async def _fetch_emby_image(url: str, params: dict, retries: int = 1) -> tuple[bytes, str] | None:
+    """Fetch an image from Emby with retry. Returns (content, content_type) or None."""
+    import httpx
+    for attempt in range(1 + retries):
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.get(url, params=params)
+                if r.status_code == 200:
+                    return r.content, r.headers.get("content-type", "image/jpeg")
+        except Exception:
+            pass
+        if attempt < retries:
+            await asyncio.sleep(1)
+    return None
+
+
 @router.get("/img/{item_id}")
 async def image_proxy(item_id: str, w: int = 150):
     """Proxy Emby item images so the API key stays server-side."""
     if not _validate_id(item_id):
         return Response(content=b"", status_code=400)
     max_width = max(20, min(w, 600))
-    import httpx
     url = f"{settings.emby_url.rstrip('/')}/Items/{item_id}/Images/Primary"
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(url, params={"api_key": settings.emby_api_key, "maxWidth": str(max_width)})
-            if r.status_code == 200:
-                return Response(
-                    content=r.content,
-                    media_type=r.headers.get("content-type", "image/jpeg"),
-                    headers={"Cache-Control": "public, max-age=86400"},
-                )
-    except Exception:
-        pass
-    # 1x1 transparent pixel fallback
-    return Response(
-        content=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n\xb4\x00\x00\x00\x00IEND\xaeB`\x82",
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=3600"},
-    )
+    result = await _fetch_emby_image(url, {"api_key": settings.emby_api_key, "maxWidth": str(max_width)})
+    if result:
+        content, content_type = result
+        return Response(content=content, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
+    return _placeholder_response()
 
 
 @router.get("/img/backdrop/{item_id}")
@@ -290,24 +314,12 @@ async def backdrop_proxy(item_id: str):
     """Proxy Emby item backdrop images."""
     if not _validate_id(item_id):
         return Response(content=b"", status_code=400)
-    import httpx
     url = f"{settings.emby_url.rstrip('/')}/Items/{item_id}/Images/Backdrop"
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(url, params={"api_key": settings.emby_api_key, "maxWidth": "1280"})
-            if r.status_code == 200:
-                return Response(
-                    content=r.content,
-                    media_type=r.headers.get("content-type", "image/jpeg"),
-                    headers={"Cache-Control": "public, max-age=86400"},
-                )
-    except Exception:
-        pass
-    return Response(
-        content=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n\xb4\x00\x00\x00\x00IEND\xaeB`\x82",
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=3600"},
-    )
+    result = await _fetch_emby_image(url, {"api_key": settings.emby_api_key, "maxWidth": "1280"})
+    if result:
+        content, content_type = result
+        return Response(content=content, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
+    return _placeholder_response()
 
 
 @router.get("/img/user/{user_id}")
@@ -315,24 +327,12 @@ async def user_image_proxy(user_id: str):
     """Proxy Emby user images."""
     if not _validate_id(user_id):
         return Response(content=b"", status_code=400)
-    import httpx
     url = f"{settings.emby_url.rstrip('/')}/Users/{user_id}/Images/Primary"
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(url, params={"api_key": settings.emby_api_key, "maxWidth": "80"})
-            if r.status_code == 200:
-                return Response(
-                    content=r.content,
-                    media_type=r.headers.get("content-type", "image/jpeg"),
-                    headers={"Cache-Control": "public, max-age=86400"},
-                )
-    except Exception:
-        pass
-    return Response(
-        content=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n\xb4\x00\x00\x00\x00IEND\xaeB`\x82",
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=3600"},
-    )
+    result = await _fetch_emby_image(url, {"api_key": settings.emby_api_key, "maxWidth": "80"})
+    if result:
+        content, content_type = result
+        return Response(content=content, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
+    return _placeholder_response()
 
 
 def _fill_date_gaps(rows: list[dict], days: int) -> list[dict]:

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script>(function(){var s=localStorage.getItem('empulse-theme'),t=s||(matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t)})()</script>
+    <script nonce="{{ csp_nonce }}">(function(){var s=localStorage.getItem('empulse-theme'),t=s||(matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t)})()</script>
     <title>{% block title %}Empulse{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -68,7 +68,7 @@
 
     <script nonce="{{ csp_nonce }}" src="/static/js/app.js?v={{ cache_v }}"></script>
     {% block scripts %}{% endblock %}
-    <script>
+    <script nonce="{{ csp_nonce }}">
     (function(){var b=document.getElementById('scroll-top');if(!b)return;window.addEventListener('scroll',function(){b.classList.toggle('visible',window.scrollY>300)},{passive:true})})();
     </script>
 </body>

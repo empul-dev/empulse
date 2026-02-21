@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script>(function(){var s=localStorage.getItem('empulse-theme'),t=s||(matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t)})()</script>
+    <script nonce="{{ csp_nonce }}">(function(){var s=localStorage.getItem('empulse-theme'),t=s||(matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t)})()</script>
     <title>Login — Empulse</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -45,7 +45,7 @@
             </div>
         </div>
     </div>
-    <script>
+    <script nonce="{{ csp_nonce }}">
     (function() {
         var wall = document.getElementById('poster-wall');
         var POSTERS_PER_ROW = 10;

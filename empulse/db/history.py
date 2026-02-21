@@ -24,6 +24,38 @@ async def insert_history(db: aiosqlite.Connection, data: dict):
     await db.commit()
 
 
+async def insert_history_returning_id(db: aiosqlite.Connection, data: dict) -> int:
+    """Insert a history record and return its row ID."""
+    safe_data = {k: v for k, v in data.items() if k in HISTORY_COLUMNS}
+    cols = ", ".join(safe_data.keys())
+    placeholders = ", ".join(["?"] * len(safe_data))
+    cursor = await db.execute(
+        f"INSERT INTO history ({cols}) VALUES ({placeholders})",
+        list(safe_data.values()),
+    )
+    await db.commit()
+    return cursor.lastrowid
+
+
+async def update_active_history(db: aiosqlite.Connection, history_id: int, data: dict):
+    """Update an in-progress history record with current progress/duration."""
+    await db.execute(
+        "UPDATE history SET stopped_at = ?, duration_seconds = ?, paused_seconds = ?, "
+        "percent_complete = ?, watched = ?, progress_ticks = ?, stream_info = ? WHERE id = ?",
+        [
+            data["stopped_at"],
+            data["duration_seconds"],
+            data["paused_seconds"],
+            data["percent_complete"],
+            data["watched"],
+            data.get("progress_ticks", 0),
+            data.get("stream_info", "{}"),
+            history_id,
+        ],
+    )
+    await db.commit()
+
+
 SORTABLE_COLUMNS = {
     "date": "started_at",
     "user": "user_name",

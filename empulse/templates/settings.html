@@ -2,66 +2,186 @@
 {% block title %}Settings — Empulse{% endblock %}
 
 {% block content %}
-<h2>Settings</h2>
-
-<div class="settings-card">
-    <div class="settings-card-header">Emby Server Connection</div>
-    <form hx-post="/api/test-connection" hx-target="#connection-result" hx-swap="innerHTML">
-        <label>Emby URL
-            <input type="text" name="emby_url" value="{{ settings.emby_url }}" readonly>
-        </label>
-        <label>API Key
-            <input type="text" name="emby_api_key" value="{{ '••••••••' if settings.emby_api_key else '' }}" readonly>
-        </label>
-        <button type="submit" class="btn-primary">Test Connection</button>
-    </form>
-    <div id="connection-result"></div>
+<div class="section-header">
+    <h2>Settings</h2>
 </div>
 
-{% if server_info %}
-<div class="settings-card">
-    <div class="settings-card-header">Server Info</div>
-    <dl>
-        <dt>Server Name</dt><dd>{{ server_info.server_name or "N/A" }}</dd>
-        <dt>Version</dt><dd>{{ server_info.version or "N/A" }}</dd>
-        <dt>OS</dt><dd>{{ server_info.os or "N/A" }}</dd>
-        <dt>Local Address</dt><dd>{{ server_info.local_address or "N/A" }}</dd>
-        <dt>WAN Address</dt><dd>{{ server_info.wan_address or "N/A" }}</dd>
-    </dl>
-</div>
-{% endif %}
-
-<div class="settings-card">
-    <div class="settings-card-header">Backup &amp; Restore</div>
-    <p>Download the current database or restore from a backup.</p>
-    <div class="settings-row">
-        <a href="/api/backup" class="btn-secondary">Download Backup</a>
-        <form id="restore-form" onsubmit="restoreDb(event)" class="settings-restore-form">
-            <label>Restore from file
-                <input type="file" name="file" accept=".db" required>
-            </label>
-            <button type="submit" class="btn-secondary">Restore Database</button>
-        </form>
+<!-- ===== Server Connection ===== -->
+<div class="settings-section">
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
+        <span>Server Connection</span>
     </div>
-    <div id="restore-result"></div>
+
+    <div class="settings-grid">
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Emby Server</span>
+                <span class="chart-desc">Connection details for your Emby media server.</span>
+            </div>
+            <div class="settings-card-body">
+                <form hx-post="/api/test-connection" hx-target="#connection-result" hx-swap="innerHTML">
+                    <div class="settings-field-grid">
+                        <div class="settings-field">
+                            <label class="settings-label">URL</label>
+                            <input type="text" name="emby_url" value="{{ settings.emby_url }}" readonly class="settings-input">
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label">API Key</label>
+                            <input type="text" name="emby_api_key" value="{{ '••••••••' if settings.emby_api_key else '' }}" readonly class="settings-input">
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="settings-btn settings-btn-primary">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            Test Connection
+                        </button>
+                    </div>
+                    <div id="connection-result"></div>
+                </form>
+            </div>
+        </div>
+
+        {% if server_info %}
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Server Info</span>
+                <span class="chart-desc">Details reported by the connected Emby instance.</span>
+            </div>
+            <div class="settings-card-body">
+                <div class="settings-info-grid">
+                    <div class="settings-info-item">
+                        <span class="settings-info-label">Server Name</span>
+                        <span class="settings-info-value">{{ server_info.server_name or "N/A" }}</span>
+                    </div>
+                    <div class="settings-info-item">
+                        <span class="settings-info-label">Version</span>
+                        <span class="settings-info-value">{{ server_info.version or "N/A" }}</span>
+                    </div>
+                    <div class="settings-info-item">
+                        <span class="settings-info-label">Operating System</span>
+                        <span class="settings-info-value">{{ server_info.os or "N/A" }}</span>
+                    </div>
+                    {% if server_info.local_address %}
+                    <div class="settings-info-item">
+                        <span class="settings-info-label">Local Address</span>
+                        <span class="settings-info-value">{{ server_info.local_address }}</span>
+                    </div>
+                    {% endif %}
+                    {% if server_info.wan_address %}
+                    <div class="settings-info-item">
+                        <span class="settings-info-label">WAN Address</span>
+                        <span class="settings-info-value">{{ server_info.wan_address }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="settings-info-item">
+                        <span class="settings-info-label">Poll Interval</span>
+                        <span class="settings-info-value">{{ settings.poll_interval }}s</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
 </div>
 
-<div class="settings-card">
-    <div class="settings-card-header">Notifications</div>
-    <p>Configure Discord, Email, Telegram, Ntfy and webhook notifications for playback events.</p>
-    <a href="/settings/notifications" class="btn-primary btn-link">Manage Notifications</a>
+<!-- ===== Data Management ===== -->
+<div class="settings-section">
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Data Management</span>
+    </div>
+
+    <div class="settings-grid">
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Backup</span>
+                <span class="chart-desc">Download a copy of the current database.</span>
+            </div>
+            <div class="settings-card-body">
+                <div class="settings-actions">
+                    <a href="/api/backup" class="settings-btn settings-btn-secondary">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Download Backup
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Restore</span>
+                <span class="chart-desc">Replace the current database from a backup file.</span>
+            </div>
+            <div class="settings-card-body">
+                <form id="restore-form">
+                    <div class="settings-field">
+                        <label class="settings-label">Database file (.db)</label>
+                        <input type="file" name="file" accept=".db" required class="settings-input">
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="settings-btn settings-btn-secondary">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+                            Restore Database
+                        </button>
+                    </div>
+                </form>
+                <div id="restore-result"></div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="settings-card">
-    <div class="settings-card-header">Newsletter</div>
-    <p>Periodic email summaries with recently added media and watch statistics.</p>
-    <a href="/settings/newsletter" class="btn-primary btn-link">Manage Newsletter</a>
+<!-- ===== Integrations ===== -->
+<div class="settings-section">
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span>Integrations</span>
+    </div>
+
+    <div class="settings-grid">
+        <div class="chart-card settings-link-card">
+            <a href="/settings/notifications" class="settings-link-inner">
+                <div class="settings-link-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>
+                </div>
+                <div>
+                    <div class="settings-link-title">Notifications</div>
+                    <div class="settings-link-desc">Configure Discord, Email, Telegram, Ntfy and webhook notifications for playback events.</div>
+                </div>
+                <svg class="settings-link-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </a>
+        </div>
+
+        <div class="chart-card settings-link-card">
+            <a href="/settings/newsletter" class="settings-link-inner">
+                <div class="settings-link-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </div>
+                <div>
+                    <div class="settings-link-title">Newsletter</div>
+                    <div class="settings-link-desc">Periodic email summaries with recently added media and watch statistics.</div>
+                </div>
+                <svg class="settings-link-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </a>
+        </div>
+    </div>
 </div>
 
-<div class="settings-card">
-    <div class="settings-card-header">About</div>
-    <p>Empulse v0.1.0 — Activity monitoring for Emby Server</p>
-    <p><small style="color:var(--text-muted)">Poll interval: {{ settings.poll_interval }}s</small></p>
+<!-- ===== About ===== -->
+<div class="settings-section">
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span>About</span>
+    </div>
+
+    <div class="chart-card" style="max-width: 480px;">
+        <div class="settings-card-body" style="text-align: center; padding: 1.5rem;">
+            <div style="font-family: var(--font-display); font-size: 1.2em; font-weight: 700; color: var(--accent); margin-bottom: 0.3rem;">Empulse</div>
+            <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 0.5rem;">v0.1.0</div>
+            <div style="font-size: 0.78em; color: var(--text-muted);">Activity monitoring for Emby Server</div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 

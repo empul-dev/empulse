@@ -41,6 +41,13 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
 
+    # Invalidate all login sessions on startup so restarts force re-login
+    from empulse.database import get_db
+    db = get_db()
+    await db.execute("DELETE FROM login_sessions")
+    await db.commit()
+    logger.info("All login sessions cleared on startup")
+
     # Create EmbyClient for auth even without api_key (needs emby_url)
     from empulse.emby.client import EmbyClient
     auth_emby_client = EmbyClient()
@@ -154,7 +161,7 @@ def create_app() -> FastAPI:
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            f"script-src 'self' 'nonce-{nonce}' https://unpkg.com https://cdn.jsdelivr.net; "
+            "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
             "font-src https://fonts.gstatic.com; "
             "img-src 'self' data:; "
