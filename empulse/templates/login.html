@@ -2,16 +2,24 @@
 <html lang="en" data-theme="dark">
 <head>
     <meta charset="utf-8">
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>(function(){var s=localStorage.getItem('empulse-theme'),t=s||(matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t)})()</script>
     <title>Login — Empulse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <main class="container">
+    <div class="login-page">
+        <div class="login-bg-fallback"></div>
+        <div class="login-poster-wall" id="poster-wall"></div>
+        <div class="login-overlay"></div>
         <div class="login-wrap">
             <div class="login-card">
                 <h2>Empulse</h2>
+                <p class="login-subtitle">Sign in to your media server</p>
                 {% if error %}
                 <div class="error-msg">{{ error }}</div>
                 {% endif %}
@@ -29,6 +37,41 @@
                 {% endif %}
             </div>
         </div>
-    </main>
+    </div>
+    <script>
+    (function() {
+        var wall = document.getElementById('poster-wall');
+        var POSTERS_PER_ROW = 10;
+        var NUM_ROWS = 6;
+
+        fetch('/api/random-posters?limit=36')
+            .then(function(r) { return r.json(); })
+            .then(function(ids) {
+                if (!ids.length) return;
+                // Duplicate to fill all rows
+                var all = [];
+                while (all.length < POSTERS_PER_ROW * NUM_ROWS) {
+                    all = all.concat(ids);
+                }
+                all = all.slice(0, POSTERS_PER_ROW * NUM_ROWS);
+
+                // Build row strips
+                for (var row = 0; row < NUM_ROWS; row++) {
+                    var strip = document.createElement('div');
+                    strip.className = 'poster-row ' + (row % 2 === 0 ? 'poster-row-left' : 'poster-row-right');
+                    var imgs = '';
+                    for (var col = 0; col < POSTERS_PER_ROW; col++) {
+                        var id = all[row * POSTERS_PER_ROW + col];
+                            imgs += '<img src="/api/img/' + id + '?w=40" alt="" loading="lazy" onload="this.classList.add(\'loaded\')" onerror="this.style.display=\'none\'">';
+                    }
+                    // Duplicate images for seamless loop
+                    strip.innerHTML = imgs + imgs;
+                    wall.appendChild(strip);
+                }
+                setTimeout(function() { wall.classList.add('loaded'); }, 200);
+            })
+            .catch(function() {});
+    })();
+    </script>
 </body>
 </html>
