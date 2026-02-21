@@ -50,12 +50,22 @@ class EmbyClient:
         return r.json().get("TotalRecordCount", 0)
 
     async def get_item(self, item_id: str) -> dict:
+        """Fetch full item metadata. Uses /Items?Ids= which works without user context."""
         r = await self._client.get(
-            f"{self.base_url}/Items/{item_id}",
-            params=self._params,
+            f"{self.base_url}/Items",
+            params={
+                **self._params,
+                "Ids": item_id,
+                "Fields": "Overview,People,Genres,Studios,CommunityRating,CriticRating,"
+                          "OfficialRating,ProductionYear,PremiereDate,ExternalUrls,"
+                          "ProviderIds,MediaStreams,RunTimeTicks,Taglines,OriginalTitle",
+            },
         )
         r.raise_for_status()
-        return r.json()
+        items = r.json().get("Items", [])
+        if not items:
+            return {}
+        return items[0]
 
     async def get_recently_added(self, limit: int = 10, item_type: str = "") -> list[dict]:
         params = {

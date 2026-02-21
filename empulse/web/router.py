@@ -76,6 +76,49 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
         except Exception as e:
             logger.warning(f"Could not fetch item {item_id}: {e}")
 
+    # Fallback to local history data when Emby returns nothing (404 / deleted items)
+    local_record = None
+    if not item_data:
+        import json as _json
+        cursor = await db.execute(
+            "SELECT item_name, item_type, year, series_name, series_id, "
+            "season_number, episode_number, runtime_ticks, stream_info "
+            "FROM history WHERE item_id = ? ORDER BY started_at DESC LIMIT 1",
+            [item_id],
+        )
+        local_record = await cursor.fetchone()
+        if local_record:
+            rec = dict(local_record)
+            item_data = {
+                "Id": item_id,
+                "Name": rec.get("item_name") or "Unknown",
+                "Type": rec.get("item_type") or "",
+                "ProductionYear": rec.get("year"),
+                "SeriesName": rec.get("series_name") or "",
+                "SeriesId": rec.get("series_id") or "",
+                "ParentIndexNumber": rec.get("season_number"),
+                "IndexNumber": rec.get("episode_number"),
+                "RunTimeTicks": rec.get("runtime_ticks") or 0,
+            }
+            # Parse stream_info JSON for video/audio badges
+            try:
+                si = _json.loads(rec.get("stream_info") or "{}")
+                if si.get("video"):
+                    v = si["video"]
+                    item_data["_local_video"] = {
+                        "Codec": v.get("codec", ""),
+                        "Height": v.get("height"),
+                        "Width": v.get("width"),
+                    }
+                if si.get("audio"):
+                    a = si["audio"]
+                    item_data["_local_audio"] = {
+                        "Codec": a.get("codec", ""),
+                        "Channels": a.get("channels"),
+                    }
+            except (_json.JSONDecodeError, TypeError):
+                pass
+
     # For series, use series name for stats
     is_series = type == "series" or item_data.get("Type") == "Series"
     series_name = name or item_data.get("SeriesName") or item_data.get("Name", "")
@@ -95,10 +138,16 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
     genres = item_data.get("Genres", [])
     studios = [s["Name"] for s in item_data.get("Studios", [])] if item_data.get("Studios") else []
 
-    # Media info from MediaStreams
+    # Media info from MediaStreams or local fallback
     media_streams = item_data.get("MediaStreams", [])
     video_stream = next((s for s in media_streams if s.get("Type") == "Video"), {})
     audio_stream = next((s for s in media_streams if s.get("Type") == "Audio"), {})
+
+    # Use local stream info if Emby didn't provide MediaStreams
+    if not video_stream and item_data.get("_local_video"):
+        video_stream = item_data["_local_video"]
+    if not audio_stream and item_data.get("_local_audio"):
+        audio_stream = item_data["_local_audio"]
 
     runtime_ticks = item_data.get("RunTimeTicks", 0)
     runtime_mins = int(runtime_ticks / 600_000_000) if runtime_ticks else 0
@@ -106,6 +155,22 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
     # Premiere date
     premiere = item_data.get("PremiereDate", "")
     aired = premiere[:10] if len(premiere) >= 10 else ""
+
+    # Production year fallback (show year if available and no aired date)
+    year = item_data.get("ProductionYear")
+
+    # Ratings and external links
+    community_rating = item_data.get("CommunityRating")
+    critic_rating = item_data.get("CriticRating")
+    official_rating = item_data.get("OfficialRating", "")
+    tagline = (item_data.get("Taglines") or [""])[0]
+    original_title = item_data.get("OriginalTitle", "")
+    external_urls = item_data.get("ExternalUrls", [])
+
+    # ProviderIds (IMDB/TMDB) — keys are inconsistently capitalized in Emby
+    provider_ids = item_data.get("ProviderIds", {})
+    imdb_id = provider_ids.get("Imdb") or provider_ids.get("IMDB") or provider_ids.get("imdb", "")
+    tmdb_id = provider_ids.get("Tmdb") or provider_ids.get("TMDB") or provider_ids.get("tmdb", "")
 
     return templates.TemplateResponse("item.html", {
         "request": request,
@@ -123,6 +188,15 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
         "audio_stream": audio_stream,
         "runtime_mins": runtime_mins,
         "aired": aired,
+        "year": year,
+        "community_rating": community_rating,
+        "critic_rating": critic_rating,
+        "official_rating": official_rating,
+        "tagline": tagline,
+        "original_title": original_title,
+        "external_urls": external_urls,
+        "imdb_id": imdb_id,
+        "tmdb_id": tmdb_id,
         "global_stats": global_stats,
         "user_stats": user_stats,
     })
