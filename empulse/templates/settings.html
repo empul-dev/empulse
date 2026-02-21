@@ -34,9 +34,9 @@
 <div class="settings-card">
     <div class="settings-card-header">Backup &amp; Restore</div>
     <p>Download the current database or restore from a backup.</p>
-    <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+    <div class="settings-row">
         <a href="/api/backup" class="btn-secondary">Download Backup</a>
-        <form id="restore-form" onsubmit="restoreDb(event)" style="flex: 1; min-width: 200px;">
+        <form id="restore-form" onsubmit="restoreDb(event)" class="settings-restore-form">
             <label>Restore from file
                 <input type="file" name="file" accept=".db" required>
             </label>
@@ -49,13 +49,13 @@
 <div class="settings-card">
     <div class="settings-card-header">Notifications</div>
     <p>Configure Discord, Email, Telegram, Ntfy and webhook notifications for playback events.</p>
-    <a href="/settings/notifications" class="btn-primary" style="text-decoration:none">Manage Notifications</a>
+    <a href="/settings/notifications" class="btn-primary btn-link">Manage Notifications</a>
 </div>
 
 <div class="settings-card">
     <div class="settings-card-header">Newsletter</div>
     <p>Periodic email summaries with recently added media and watch statistics.</p>
-    <a href="/settings/newsletter" class="btn-primary" style="text-decoration:none">Manage Newsletter</a>
+    <a href="/settings/newsletter" class="btn-primary btn-link">Manage Newsletter</a>
 </div>
 
 <div class="settings-card">

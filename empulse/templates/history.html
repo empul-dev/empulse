@@ -22,24 +22,24 @@
 
     <div class="history-toolbar-group filter-buttons">
         <button class="filter-btn active" data-filter="item_type" data-value=""
-                onclick="toggleFilter(this)">All</button>
+                aria-pressed="true" onclick="toggleFilter(this)">All</button>
         <button class="filter-btn" data-filter="item_type" data-value="Movie"
-                onclick="toggleFilter(this)">Movies</button>
+                aria-pressed="false" onclick="toggleFilter(this)">Movies</button>
         <button class="filter-btn" data-filter="item_type" data-value="Episode"
-                onclick="toggleFilter(this)">TV Shows</button>
+                aria-pressed="false" onclick="toggleFilter(this)">TV Shows</button>
         <button class="filter-btn" data-filter="item_type" data-value="Audio"
-                onclick="toggleFilter(this)">Music</button>
+                aria-pressed="false" onclick="toggleFilter(this)">Music</button>
     </div>
 
     <div class="history-toolbar-group filter-buttons">
         <button class="filter-btn active" data-filter="play_method" data-value=""
-                onclick="toggleFilter(this)">All</button>
+                aria-pressed="true" onclick="toggleFilter(this)">All</button>
         <button class="filter-btn direct-play" data-filter="play_method" data-value="DirectPlay"
-                onclick="toggleFilter(this)">Direct Play</button>
+                aria-pressed="false" onclick="toggleFilter(this)">Direct Play</button>
         <button class="filter-btn direct-stream" data-filter="play_method" data-value="DirectStream"
-                onclick="toggleFilter(this)">Direct Stream</button>
+                aria-pressed="false" onclick="toggleFilter(this)">Direct Stream</button>
         <button class="filter-btn transcode" data-filter="play_method" data-value="Transcode"
-                onclick="toggleFilter(this)">Transcode</button>
+                aria-pressed="false" onclick="toggleFilter(this)">Transcode</button>
     </div>
 
     <div class="history-toolbar-group">
@@ -83,8 +83,9 @@
 <script>
 function toggleFilter(btn) {
     var group = btn.closest('.filter-buttons');
-    group.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    group.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
     btn.classList.add('active');
+    btn.setAttribute('aria-pressed', 'true');
 
     var name = btn.dataset.filter;
     var hidden = document.querySelector('#history-filters input[name="' + name + '"]');

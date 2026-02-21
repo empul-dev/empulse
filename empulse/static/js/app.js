@@ -88,9 +88,16 @@ document.body.addEventListener("htmx:responseError", function(evt) {
     var chartDaily = null, chartType = null, chartPlatform = null;
 
     var COLORS = [
-        "#52b54b", "#06b6d4", "#a855f7", "#ef4444",
-        "#eab308", "#f97316", "#ec4899", "#22d3ee"
+        "#52b54b", "#4db6ac", "#7e57c2", "#d4a76a",
+        "#26a69a", "#e57373", "#5c6bc0", "#8bc34a"
     ];
+
+    var TYPE_COLORS = {
+        Movie:   "#52b54b",
+        Episode: "#4db6ac",
+        Audio:   "#7e57c2",
+        Other:   "#78909c"
+    };
 
     function getCSS(prop) {
         return getComputedStyle(document.documentElement).getPropertyValue(prop).trim();
@@ -104,6 +111,9 @@ document.body.addEventListener("htmx:responseError", function(evt) {
         Chart.defaults.font.family = "'Source Sans 3', system-ui, sans-serif";
         Chart.defaults.font.size = 11;
         Chart.defaults.plugins.legend.display = false;
+        // Hide hard axis border lines — grid lines are enough
+        Chart.defaults.scale = Chart.defaults.scale || {};
+        Chart.defaults.scale.border = { display: false };
     }
 
     function getDays() {
@@ -147,6 +157,10 @@ document.body.addEventListener("htmx:responseError", function(evt) {
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 chartDaily = destroyChart(chartDaily);
+                var ctx = dailyEl.getContext("2d");
+                var grad = ctx.createLinearGradient(0, 0, 0, dailyEl.parentElement.clientHeight || 200);
+                grad.addColorStop(0, "rgba(82, 181, 75, 0.7)");
+                grad.addColorStop(1, "rgba(82, 181, 75, 0.05)");
                 chartDaily = new Chart(dailyEl, {
                     type: "line",
                     data: {
@@ -155,7 +169,7 @@ document.body.addEventListener("htmx:responseError", function(evt) {
                             label: label,
                             data: data.map(pickValue),
                             borderColor: accent,
-                            backgroundColor: accent + "33",
+                            backgroundColor: grad,
                             fill: true,
                             tension: 0.3,
                             pointRadius: 2
@@ -182,7 +196,9 @@ document.body.addEventListener("htmx:responseError", function(evt) {
                         labels: data.map(function(d) { return d.item_type; }),
                         datasets: [{
                             data: data.map(pickValue),
-                            backgroundColor: COLORS.slice(0, data.length)
+                            backgroundColor: data.map(function(d) {
+                                return TYPE_COLORS[d.item_type] || COLORS[0];
+                            })
                         }]
                     },
                     options: {
@@ -225,7 +241,8 @@ document.body.addEventListener("htmx:responseError", function(evt) {
         COLORS: COLORS,
         setupDefaults: setupDefaults,
         destroyChart: destroyChart,
-        getCSS: getCSS
+        getCSS: getCSS,
+        reload: loadCharts
     };
 
     // Load charts when stats-cards swaps (initial load, days change, push update).
@@ -244,4 +261,47 @@ document.body.addEventListener("htmx:responseError", function(evt) {
     setTimeout(function() {
         if (!chartsLoaded) loadCharts();
     }, 100);
+})();
+
+// Close nav user dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    var navUser = document.querySelector('.nav-user.open');
+    if (navUser && !navUser.contains(e.target)) {
+        navUser.classList.remove('open');
+    }
+});
+
+// Theme toggle with sweep animation (View Transitions API)
+function toggleTheme() {
+    var html = document.documentElement;
+    var current = html.getAttribute('data-theme');
+    var next = current === 'light' ? 'dark' : 'light';
+
+    // Get button position for sweep origin
+    var btn = document.querySelector('.theme-toggle');
+    var rect = btn ? btn.getBoundingClientRect() : { left: window.innerWidth - 48, top: 24, width: 24, height: 24 };
+    var x = rect.left + rect.width / 2;
+    var y = rect.top + rect.height / 2;
+    html.style.setProperty('--sweep-x', x + 'px');
+    html.style.setProperty('--sweep-y', y + 'px');
+
+    function applyTheme() {
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('empulse-theme', next);
+        // Re-render charts so grid/text colors match new theme
+        if (window.empulseCharts && window.empulseCharts.reload) {
+            window.empulseCharts.reload();
+        }
+    }
+
+    if (document.startViewTransition) {
+        document.startViewTransition(applyTheme);
+    } else {
+        applyTheme();
+    }
+}
+// Restore theme preference
+(function() {
+    var saved = localStorage.getItem('empulse-theme');
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
 })();

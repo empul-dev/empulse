@@ -27,14 +27,24 @@
     </div>
 </div>
 
+<div class="section-header">
+    <h2>Charts</h2>
+    <div class="stat-controls">
+        <div class="toggle-group" id="user-metric-toggle">
+            <button class="toggle-btn active" data-value="plays" onclick="setUserToggle(this)">Play Count</button>
+            <button class="toggle-btn" data-value="duration" onclick="setUserToggle(this)">Play Duration</button>
+        </div>
+    </div>
+</div>
+
 <div class="charts-section">
     <div class="charts-grid">
         <div class="chart-card wide">
-            <div class="chart-header">Daily Plays</div>
+            <div class="chart-header" id="user-daily-header">Daily Plays</div>
             <div class="chart-body"><canvas id="user-chart-daily"></canvas></div>
         </div>
         <div class="chart-card">
-            <div class="chart-header">Plays by Type</div>
+            <div class="chart-header" id="user-type-header">Plays by Type</div>
             <div class="chart-body"><canvas id="user-chart-type"></canvas></div>
         </div>
     </div>
@@ -55,8 +65,8 @@
 
 <div class="section-header"><h2>Recent Activity</h2></div>
 {% if history %}
-<figure>
-<table>
+<div class="history-table-wrap">
+<table class="history-tbl">
     <thead>
         <tr>
             <th>Title</th>
@@ -67,16 +77,16 @@
     </thead>
     <tbody>
         {% for h in history %}
-        <tr>
-            <td><a href="{{ h.item_link }}">{{ h.display_title }}</a></td>
-            <td>{{ h.item_type or "" }}</td>
-            <td>{{ h.duration_display }}</td>
-            <td>{{ h.started_at[:16] }}</td>
+        <tr class="history-row">
+            <td class="col-user"><a href="{{ h.item_link }}">{{ h.display_title }}</a></td>
+            <td class="col-date">{{ h.item_type or "" }}</td>
+            <td class="col-date">{{ h.duration_display }}</td>
+            <td class="col-date">{{ h.started_at[:16] }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
-</figure>
+</div>
 {% else %}
 <p class="empty-state">No watch history yet.</p>
 {% endif %}
@@ -90,51 +100,83 @@
     C.setupDefaults();
     var accent = C.getCSS("--accent") || "#52b54b";
     var userId = {{ user.emby_user_id | tojson }};
+    var chartDaily = null, chartType = null;
 
-    fetch("/api/charts/user/" + userId + "/daily-plays?days=30")
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            new Chart(document.getElementById("user-chart-daily"), {
-                type: "line",
-                data: {
-                    labels: data.map(function(d) { return d.date.slice(5); }),
-                    datasets: [{
-                        label: "Plays",
-                        data: data.map(function(d) { return d.plays; }),
-                        borderColor: accent,
-                        backgroundColor: accent + "33",
-                        fill: true,
-                        tension: 0.3,
-                        pointRadius: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
-                }
-            });
-        });
+    function getUserMetric() {
+        var active = document.querySelector("#user-metric-toggle .toggle-btn.active");
+        return active ? (active.dataset.value || "plays") : "plays";
+    }
 
-    fetch("/api/charts/user/" + userId + "/by-type?days=30")
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            new Chart(document.getElementById("user-chart-type"), {
-                type: "doughnut",
-                data: {
-                    labels: data.map(function(d) { return d.item_type; }),
-                    datasets: [{
-                        data: data.map(function(d) { return d.plays; }),
-                        backgroundColor: C.COLORS.slice(0, data.length)
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: true, position: "right", labels: { boxWidth: 12 } } }
-                }
+    function isUserDuration() { return getUserMetric() === "duration"; }
+
+    function loadUserCharts() {
+        var dur = isUserDuration();
+        var label = dur ? "Hours" : "Plays";
+        document.getElementById("user-daily-header").textContent = dur ? "Daily Play Duration" : "Daily Plays";
+        document.getElementById("user-type-header").textContent = dur ? "Duration by Type" : "Plays by Type";
+
+        fetch("/api/charts/user/" + userId + "/daily-plays?days=30")
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                chartDaily = C.destroyChart(chartDaily);
+                var el = document.getElementById("user-chart-daily");
+                var ctx = el.getContext("2d");
+                var grad = ctx.createLinearGradient(0, 0, 0, el.parentElement.clientHeight || 200);
+                grad.addColorStop(0, "rgba(82, 181, 75, 0.7)");
+                grad.addColorStop(1, "rgba(82, 181, 75, 0.05)");
+                chartDaily = new Chart(el, {
+                    type: "line",
+                    data: {
+                        labels: data.map(function(d) { return d.date.slice(5); }),
+                        datasets: [{
+                            label: label,
+                            data: data.map(function(d) { return dur ? d.total_duration / 3600 : d.plays; }),
+                            borderColor: accent,
+                            backgroundColor: grad,
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { y: { beginAtZero: true, ticks: { precision: dur ? 1 : 0 } } }
+                    }
+                });
             });
+
+        fetch("/api/charts/user/" + userId + "/by-type?days=30")
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                chartType = C.destroyChart(chartType);
+                chartType = new Chart(document.getElementById("user-chart-type"), {
+                    type: "doughnut",
+                    data: {
+                        labels: data.map(function(d) { return d.item_type; }),
+                        datasets: [{
+                            data: data.map(function(d) { return dur ? d.total_duration / 3600 : d.plays; }),
+                            backgroundColor: C.COLORS.slice(0, data.length)
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: true, position: "right", labels: { boxWidth: 12 } } }
+                    }
+                });
+            });
+    }
+
+    window.setUserToggle = function(btn) {
+        document.querySelectorAll("#user-metric-toggle .toggle-btn").forEach(function(b) {
+            b.classList.remove("active");
         });
+        btn.classList.add("active");
+        loadUserCharts();
+    };
+
+    loadUserCharts();
 })();
 </script>
 {% endblock %}

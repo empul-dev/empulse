@@ -491,6 +491,14 @@ async def chart_top_users_stream_type(days: int = 30):
     return JSONResponse(rows)
 
 
+@router.get("/charts/top-users")
+async def chart_top_users(days: int = 30, metric: str = "plays"):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_top_users(db, limit=10, days=days, metric=metric)
+    return JSONResponse(rows)
+
+
 @router.get("/notification-channels")
 async def list_notification_channels():
     db = get_db()
