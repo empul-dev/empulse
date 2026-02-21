@@ -36,7 +36,7 @@
     <p>Download the current database or restore from a backup.</p>
     <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
         <a href="/api/backup" role="button" class="secondary">Download Backup</a>
-        <form id="restore-form" onsubmit="restoreDb(event)" style="flex: 1; min-width: 200px;">
+        <form id="restore-form" style="flex: 1; min-width: 200px;">
             <label>Restore from file
                 <input type="file" name="file" accept=".db" required>
             </label>
@@ -66,24 +66,30 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function restoreDb(e) {
+<script nonce="{{ csp_nonce }}">
+function _setResult(el, cls, text) {
+    var p = document.createElement('p');
+    p.className = cls;
+    p.textContent = text;
+    el.replaceChildren(p);
+}
+document.getElementById('restore-form').addEventListener('submit', function(e) {
     e.preventDefault();
     if (!confirm('This will replace the current database. A backup of the current database will be saved. Continue?')) return;
     var form = document.getElementById('restore-form');
     var data = new FormData(form);
     var el = document.getElementById('restore-result');
-    el.innerHTML = '<p>Uploading...</p>';
+    _setResult(el, '', 'Uploading...');
     fetch('/api/restore', { method: 'POST', body: data })
         .then(function(r) { return r.json(); })
         .then(function(d) {
             if (d.error) {
-                el.innerHTML = '<p class="error">' + d.error + '</p>';
+                _setResult(el, 'error', d.error);
             } else {
-                el.innerHTML = '<p class="success">' + d.message + '</p>';
+                _setResult(el, 'success', d.message);
             }
         })
-        .catch(function() { el.innerHTML = '<p class="error">Upload failed</p>'; });
-}
+        .catch(function() { _setResult(el, 'error', 'Upload failed'); });
+});
 </script>
 {% endblock %}

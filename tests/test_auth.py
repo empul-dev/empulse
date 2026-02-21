@@ -113,8 +113,8 @@ def _make_test_app(auth_password="", emby_api_key="", secret_key="testsecret"):
 
 class TestMiddleware:
     @pytest.mark.asyncio
-    async def test_no_auth_transparent(self):
-        """When no password/api_key is set, all routes are accessible."""
+    async def test_no_auth_redirects_to_login(self):
+        """When no password/api_key is set, unauthenticated requests still redirect to login."""
         with patch("empulse.app.init_db", new_callable=AsyncMock), \
              patch("empulse.app.settings") as mock_settings:
             mock_settings.emby_api_key = ""
@@ -122,7 +122,7 @@ class TestMiddleware:
             mock_settings.poll_interval = 10
             mock_settings.db_path = ":memory:"
             mock_settings.auth_password = ""
-            mock_settings.secret_key = ""
+            mock_settings.secret_key = "testsecret"
 
             from empulse.app import create_app
             app = create_app()
@@ -135,10 +135,16 @@ class TestMiddleware:
             await db.commit()
 
             with patch("empulse.web.router.get_db", return_value=db), \
-                 patch("empulse.web.api.get_db", return_value=db):
+                 patch("empulse.web.api.get_db", return_value=db), \
+                 patch("empulse.database.get_db", return_value=db):
                 transport = ASGITransport(app=app)
-                async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
                     r = await ac.get("/")
+                    assert r.status_code == 302
+                    assert "/login" in r.headers.get("location", "")
+
+                    # Login page itself should still be accessible
+                    r = await ac.get("/login")
                     assert r.status_code == 200
 
             await db.close()
@@ -208,7 +214,7 @@ class TestMiddleware:
                  patch("empulse.database.get_db", return_value=db):
                 transport = ASGITransport(app=app)
                 async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
-                    r = await ac.post("/login", data={"username": "", "password": "testpass"})
+                    r = await ac.post("/login", data={"username": "", "password": "testpass"}, headers={"Origin": "http://test"})
                     assert r.status_code == 302
                     assert r.headers.get("location") == "/"
                     assert "empulse_session" in r.headers.get("set-cookie", "")
@@ -243,7 +249,7 @@ class TestMiddleware:
                  patch("empulse.database.get_db", return_value=db):
                 transport = ASGITransport(app=app)
                 async with AsyncClient(transport=transport, base_url="http://test") as ac:
-                    r = await ac.post("/login", data={"username": "", "password": "wrong"}, follow_redirects=False)
+                    r = await ac.post("/login", data={"username": "", "password": "wrong"}, headers={"Origin": "http://test"}, follow_redirects=False)
                     assert r.status_code == 302
                     assert "/login?error=invalid" in r.headers["location"]
 
@@ -278,14 +284,14 @@ class TestMiddleware:
                 transport = ASGITransport(app=app)
                 async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
                     # Login first
-                    r = await ac.post("/login", data={"username": "", "password": "testpass"})
+                    r = await ac.post("/login", data={"username": "", "password": "testpass"}, headers={"Origin": "http://test"})
                     assert r.status_code == 302
                     cookie = r.cookies.get("empulse_session")
                     assert cookie
 
-                    # Logout
+                    # Logout (POST since V-08 fix)
                     ac.cookies.set("empulse_session", cookie)
-                    r = await ac.get("/logout")
+                    r = await ac.post("/logout", headers={"Origin": "http://test"})
                     assert r.status_code == 302
                     assert "/login" in r.headers["location"]
 

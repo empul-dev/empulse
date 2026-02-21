@@ -498,9 +498,23 @@ async def list_notification_channels():
     return JSONResponse([dict(r) for r in rows])
 
 
+VALID_CHANNEL_TYPES = {"discord", "webhook", "email", "telegram", "ntfy"}
+
+
 @router.post("/notification-channels")
 async def create_notification_channel(request: Request):
     data = await request.json()
+
+    channel_type = data.get("channel_type", "")
+    if channel_type not in VALID_CHANNEL_TYPES:
+        return JSONResponse(
+            {"error": f"Invalid channel type. Must be one of: {', '.join(sorted(VALID_CHANNEL_TYPES))}"},
+            status_code=400,
+        )
+    name = str(data.get("name", ""))[:100]
+    if not name.strip():
+        return JSONResponse({"error": "Channel name is required"}, status_code=400)
+
     db = get_db()
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc).isoformat()
@@ -527,6 +541,14 @@ async def create_notification_channel(request: Request):
 @router.put("/notification-channels/{channel_id}")
 async def update_notification_channel(request: Request, channel_id: int):
     data = await request.json()
+
+    channel_type = data.get("channel_type", "")
+    if channel_type not in VALID_CHANNEL_TYPES:
+        return JSONResponse(
+            {"error": f"Invalid channel type. Must be one of: {', '.join(sorted(VALID_CHANNEL_TYPES))}"},
+            status_code=400,
+        )
+
     db = get_db()
     cursor = await db.execute("SELECT id FROM notification_channels WHERE id = ?", [channel_id])
     if not await cursor.fetchone():
@@ -534,8 +556,8 @@ async def update_notification_channel(request: Request, channel_id: int):
     await db.execute(
         "UPDATE notification_channels SET name=?, channel_type=?, config=?, triggers=?, conditions=?, enabled=? WHERE id=?",
         [
-            data.get("name", ""),
-            data.get("channel_type", ""),
+            str(data.get("name", ""))[:100],
+            channel_type,
             json.dumps(data.get("config", {})),
             json.dumps(data.get("triggers", [])),
             json.dumps(data.get("conditions", {})),
@@ -669,6 +691,32 @@ async def restore_database(request: Request):
     if len(data) > 500 * 1024 * 1024:
         return JSONResponse({"error": "File too large (max 500MB)"}, status_code=400)
 
+    # Validate the uploaded DB has the expected schema
+    import aiosqlite
+    import tempfile
+    import os
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        tmp.write(data)
+        tmp_path = tmp.name
+    try:
+        async with aiosqlite.connect(tmp_path) as test_db:
+            # Check that required tables exist
+            cursor = await test_db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+            tables = {row[0] for row in await cursor.fetchall()}
+            required = {"history", "users", "libraries"}
+            missing = required - tables
+            if missing:
+                return JSONResponse(
+                    {"error": f"Invalid database: missing tables {', '.join(sorted(missing))}"},
+                    status_code=400,
+                )
+    except Exception:
+        return JSONResponse({"error": "Uploaded file is not a valid database"}, status_code=400)
+    finally:
+        os.unlink(tmp_path)
+
     # Create backup of current DB before replacing
     backup_path = db_path.with_suffix(".db.bak")
     if db_path.exists():
@@ -676,7 +724,19 @@ async def restore_database(request: Request):
 
     # Write new DB
     db_path.write_bytes(data)
-    return JSONResponse({"status": "restored", "message": "Database restored. Restart the application to apply changes."})
+
+    # Invalidate all login sessions in the restored DB to prevent session hijacking
+    try:
+        async with aiosqlite.connect(str(db_path)) as new_db:
+            await new_db.execute("DELETE FROM login_sessions")
+            await new_db.commit()
+    except Exception:
+        pass  # Table may not exist in older backups; migration will handle it
+
+    return JSONResponse({
+        "status": "restored",
+        "message": "Database restored. All sessions invalidated. Restart the application to apply changes.",
+    })
 
 
 @router.post("/test-connection")

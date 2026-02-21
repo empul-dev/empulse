@@ -6,8 +6,8 @@
     <title>{% block title %}Empulse{% endblock %}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="/static/css/style.css?v={{ cache_v }}">
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <script nonce="{{ csp_nonce }}" src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <nav class="container-fluid">
@@ -28,7 +28,11 @@
                 <details class="dropdown">
                     <summary>{{ current_user.username }}</summary>
                     <ul dir="rtl">
-                        <li><a href="/logout">Sign out</a></li>
+                        <li>
+                            <form method="post" action="/logout" style="margin:0">
+                                <button type="submit" class="secondary outline" style="margin:0; padding:4px 12px; border:none; background:none; cursor:pointer;">Sign out</button>
+                            </form>
+                        </li>
                     </ul>
                 </details>
             </li>
@@ -44,7 +48,7 @@
         <small>Empulse — Emby monitoring</small>
     </footer>
 
-    <script src="/static/js/app.js?v={{ cache_v }}"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/app.js?v={{ cache_v }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -7,6 +7,7 @@ import ssl
 from datetime import datetime, timezone, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from html import escape
 
 import aiosqlite
 
@@ -100,15 +101,15 @@ async def build_newsletter_html(db: aiosqlite.Connection, config: dict, emby_cli
 
         users_html = ""
         for u in top_users:
-            users_html += f'<li>{u.get("user_name", "Unknown")} ({u.get("plays", 0)} plays)</li>'
+            users_html += f'<li>{escape(str(u.get("user_name", "Unknown")))} ({int(u.get("plays", 0))} plays)</li>'
 
         movies_html = ""
         for m in most_watched:
-            movies_html += f'<li>{m.get("item_name", "Unknown")} ({m.get("plays", 0)} plays)</li>'
+            movies_html += f'<li>{escape(str(m.get("item_name", "Unknown")))} ({int(m.get("plays", 0))} plays)</li>'
 
         shows_html = ""
         for s in most_watched_shows:
-            shows_html += f'<li>{s.get("series_name", "Unknown")} ({s.get("plays", 0)} plays)</li>'
+            shows_html += f'<li>{escape(str(s.get("series_name", "Unknown")))} ({int(s.get("plays", 0))} plays)</li>'
 
         stats_html = f"""
         <h2 style="color:#3498db; margin-top:30px">Watch Statistics ({days} days)</h2>
@@ -123,10 +124,10 @@ async def build_newsletter_html(db: aiosqlite.Connection, config: dict, emby_cli
     # Recently added grid
     items_html = ""
     for item in recently_added:
-        name = item.get("Name", "Unknown")
-        year = item.get("ProductionYear", "")
-        item_type = item.get("Type", "")
-        date_added = (item.get("DateCreated", "") or "")[:10]
+        name = escape(str(item.get("Name", "Unknown")))
+        year = escape(str(item.get("ProductionYear", "")))
+        item_type = escape(str(item.get("Type", "")))
+        date_added = escape((item.get("DateCreated", "") or "")[:10])
         items_html += f"""
         <div style="display:inline-block; width:140px; margin:8px; vertical-align:top; text-align:center;">
             <div style="background:#2a2a2a; border-radius:6px; padding:10px; height:100%;">

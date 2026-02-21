@@ -1,24 +1,26 @@
 import json
 import pytest
 import pytest_asyncio
+from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, AsyncMock
 from httpx import AsyncClient, ASGITransport
 
 from empulse.app import create_app
 from empulse.db import history as history_db
+from empulse.web.auth import create_session_token, hash_token, COOKIE_NAME, SESSION_MAX_AGE
 
 
 @pytest_asyncio.fixture
 async def client():
-    """Create a test client with mocked DB. No auth enabled for page/API tests."""
+    """Create a test client with mocked DB and an authenticated admin session."""
     with patch("empulse.app.init_db", new_callable=AsyncMock), \
          patch("empulse.app.settings") as mock_settings:
-        mock_settings.emby_api_key = ""  # Disable polling + auth
+        mock_settings.emby_api_key = ""
         mock_settings.emby_url = "http://localhost:8096"
         mock_settings.poll_interval = 10
         mock_settings.db_path = ":memory:"
-        mock_settings.auth_password = ""
-        mock_settings.secret_key = ""
+        mock_settings.auth_password = "testpass"
+        mock_settings.secret_key = "testsecret"
 
         app = create_app()
 
@@ -30,12 +32,30 @@ async def client():
         await db.executescript(SCHEMA)
         await db.commit()
 
+        # Create a valid admin session
+        token = create_session_token("testsecret", "__admin__", "admin")
+        now = datetime.now(timezone.utc)
+        expires = now + timedelta(seconds=SESSION_MAX_AGE)
+        await db.execute(
+            """INSERT INTO login_sessions
+               (token_hash, emby_user_id, username, role, created_at, expires_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            [hash_token(token), None, "TestAdmin", "admin",
+             now.isoformat(), expires.isoformat()],
+        )
+        await db.commit()
+
         with patch("empulse.web.router.get_db", return_value=db), \
              patch("empulse.web.api.get_db", return_value=db), \
              patch("empulse.database.get_db", return_value=db):
 
             transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            async with AsyncClient(
+                transport=transport,
+                base_url="http://test",
+                headers={"Origin": "http://test"},
+            ) as ac:
+                ac.cookies.set(COOKIE_NAME, token)
                 ac._test_db = db  # expose for seeding data
                 yield ac
 

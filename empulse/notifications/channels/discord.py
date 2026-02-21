@@ -1,5 +1,7 @@
 import httpx
 
+from empulse.notifications.url_validator import validate_outbound_url
+
 EVENT_COLORS = {
     "playback_start": 0x2ECC71,   # green
     "playback_stop": 0xE74C3C,    # red
@@ -23,6 +25,10 @@ async def send_discord(config: dict, event_type: str, data: dict):
     url = config.get("url", "")
     if not url:
         raise ValueError("Discord webhook URL not configured")
+
+    error = validate_outbound_url(url)
+    if error:
+        raise ValueError(f"Discord webhook URL blocked: {error}")
 
     title = data.get("item_name", "Unknown")
     series = data.get("series_name")

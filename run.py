@@ -1,3 +1,4 @@
+import os
 import uvicorn
 from empulse.config import settings
 
@@ -7,5 +8,5 @@ if __name__ == "__main__":
         factory=True,
         host=settings.empulse_host,
         port=settings.empulse_port,
-        reload=True,
+        reload=os.getenv("EMPULSE_DEV", "").lower() in ("1", "true"),
     )

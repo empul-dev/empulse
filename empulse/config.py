@@ -31,6 +31,7 @@ settings = Settings()
 
 # Auto-generate a persistent secret key if not provided
 if not settings.secret_key:
+    import logging as _logging
     import secrets as _secrets
     _secret_file = Path(settings.db_path).parent / ".empulse_secret"
     try:
@@ -40,5 +41,10 @@ if not settings.secret_key:
             settings.secret_key = _secrets.token_hex(32)
             _secret_file.write_text(settings.secret_key + "\n")
             _secret_file.chmod(0o600)
-    except OSError:
+    except OSError as _e:
+        _logging.getLogger("empulse.config").warning(
+            "Cannot persist secret key to %s: %s. "
+            "Sessions will not survive restarts.",
+            _secret_file, _e,
+        )
         settings.secret_key = _secrets.token_hex(32)

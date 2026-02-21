@@ -3,6 +3,7 @@ import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from html import escape
 
 logger = logging.getLogger("empulse.notifications.email")
 
@@ -49,18 +50,18 @@ def _build_plain(event_type: str, data: dict) -> str:
 
 
 def _build_html(event_type: str, data: dict) -> str:
-    label = EVENT_LABELS.get(event_type, event_type)
-    title = _build_title(event_type, data)
-    user = data.get("user_name", "Unknown")
+    label = escape(EVENT_LABELS.get(event_type, event_type))
+    title = escape(_build_title(event_type, data))
+    user = escape(data.get("user_name", "Unknown"))
 
     rows = [
         f"<tr><td><b>User</b></td><td>{user}</td></tr>",
         f"<tr><td><b>Title</b></td><td>{title}</td></tr>",
     ]
     if data.get("play_method"):
-        rows.append(f"<tr><td><b>Play Method</b></td><td>{data['play_method']}</td></tr>")
+        rows.append(f"<tr><td><b>Play Method</b></td><td>{escape(str(data['play_method']))}</td></tr>")
     if data.get("client"):
-        rows.append(f"<tr><td><b>Platform</b></td><td>{data['client']} ({data.get('device_name', '')})</td></tr>")
+        rows.append(f"<tr><td><b>Platform</b></td><td>{escape(str(data['client']))} ({escape(str(data.get('device_name', '')))})</td></tr>")
     if data.get("duration_seconds"):
         m, s = divmod(data["duration_seconds"], 60)
         h, m = divmod(m, 60)

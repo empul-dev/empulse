@@ -83,7 +83,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
     var C = window.empulseCharts;
     if (!C) return;

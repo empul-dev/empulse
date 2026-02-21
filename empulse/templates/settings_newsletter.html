@@ -86,7 +86,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 function saveNewsletter(e) {
     e.preventDefault();
     var payload = {
@@ -109,12 +109,20 @@ function saveNewsletter(e) {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(payload),
     }).then(function(r) {
+        var el = document.getElementById('newsletter-result');
         if (r.ok) {
-            document.getElementById('newsletter-result').innerHTML = '<p class="success">Settings saved.</p>';
+            _nlSetResult(el, 'success', 'Settings saved.');
         } else {
-            document.getElementById('newsletter-result').innerHTML = '<p class="error">Failed to save settings.</p>';
+            _nlSetResult(el, 'error', 'Failed to save settings.');
         }
     });
+}
+
+function _nlSetResult(el, cls, text) {
+    var p = document.createElement('p');
+    p.className = cls;
+    p.textContent = text;
+    el.replaceChildren(p);
 }
 
 function previewNewsletter() {
@@ -124,17 +132,17 @@ function previewNewsletter() {
 function sendNewsletter() {
     if (!confirm('Send the newsletter now?')) return;
     var el = document.getElementById('newsletter-result');
-    el.innerHTML = '<p>Sending...</p>';
+    _nlSetResult(el, '', 'Sending...');
     fetch('/api/newsletter/send', { method: 'POST' })
         .then(function(r) { return r.json(); })
         .then(function(d) {
             if (d.success) {
-                el.innerHTML = '<p class="success">' + d.message + '</p>';
+                _nlSetResult(el, 'success', d.message);
             } else {
-                el.innerHTML = '<p class="error">' + (d.message || 'Failed') + '</p>';
+                _nlSetResult(el, 'error', d.message || 'Failed');
             }
         })
-        .catch(function() { el.innerHTML = '<p class="error">Request failed</p>'; });
+        .catch(function() { _nlSetResult(el, 'error', 'Request failed'); });
 }
 </script>
 {% endblock %}
