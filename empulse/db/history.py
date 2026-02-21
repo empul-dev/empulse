@@ -106,9 +106,13 @@ async def get_history_count(
 
 
 async def find_recent_history(
-    db: aiosqlite.Connection, user_id: str, item_id: str, minutes: int = 30
+    db: aiosqlite.Connection, user_id: str, item_id: str, minutes: int = 1440
 ) -> dict | None:
-    """Find a recent history record for the same user+item (for session merging)."""
+    """Find a recent history record for the same user+item (for session merging).
+
+    Default window is 24 hours (1440 minutes) so that pause-resume cycles
+    and short breaks are consolidated into a single history entry.
+    """
     cursor = await db.execute(
         "SELECT * FROM history WHERE user_id = ? AND item_id = ? "
         "ORDER BY stopped_at DESC LIMIT 1",

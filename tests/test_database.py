@@ -147,7 +147,7 @@ class TestHistoryCRUD:
     @pytest.mark.asyncio
     async def test_find_recent_history_too_old(self, db):
         from datetime import datetime, timezone, timedelta
-        old_stop = (datetime.now(timezone.utc) - timedelta(minutes=60)).isoformat()
+        old_stop = (datetime.now(timezone.utc) - timedelta(hours=25)).isoformat()
         await history_db.insert_history(db, {
             "session_key": "s1",
             "user_id": "u1",

@@ -17,8 +17,12 @@ class SessionStateTracker:
         if session_key not in self._sessions:
             data["started_at"] = now
             data["updated_at"] = now
-            data["pause_start"] = None
             data["paused_seconds"] = 0
+            # If the session is already paused when first seen, start tracking the pause
+            if data.get("is_paused"):
+                data["pause_start"] = now
+            else:
+                data["pause_start"] = None
             self._sessions[session_key] = data
             logger.info(f"New session: {session_key} - {data.get('user_name')} playing {data.get('item_name')}")
             return "new"
