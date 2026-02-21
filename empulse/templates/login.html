@@ -39,17 +39,33 @@
     <script>
     (function() {
         var wall = document.getElementById('poster-wall');
+        var POSTERS_PER_ROW = 10;
+        var NUM_ROWS = 6;
+
         fetch('/api/random-posters?limit=36')
             .then(function(r) { return r.json(); })
             .then(function(ids) {
                 if (!ids.length) return;
-                var html = '';
-                // Duplicate for fuller coverage
-                var all = ids.concat(ids).slice(0, 48);
-                for (var i = 0; i < all.length; i++) {
-                    html += '<img src="/api/img/' + all[i] + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+                // Duplicate to fill all rows
+                var all = [];
+                while (all.length < POSTERS_PER_ROW * NUM_ROWS) {
+                    all = all.concat(ids);
                 }
-                wall.innerHTML = html;
+                all = all.slice(0, POSTERS_PER_ROW * NUM_ROWS);
+
+                // Build row strips
+                for (var row = 0; row < NUM_ROWS; row++) {
+                    var strip = document.createElement('div');
+                    strip.className = 'poster-row ' + (row % 2 === 0 ? 'poster-row-left' : 'poster-row-right');
+                    var imgs = '';
+                    for (var col = 0; col < POSTERS_PER_ROW; col++) {
+                        var id = all[row * POSTERS_PER_ROW + col];
+                            imgs += '<img src="/api/img/' + id + '?w=40" alt="" loading="lazy" onload="this.classList.add(\'loaded\')" onerror="this.style.display=\'none\'">';
+                    }
+                    // Duplicate images for seamless loop
+                    strip.innerHTML = imgs + imgs;
+                    wall.appendChild(strip);
+                }
                 setTimeout(function() { wall.classList.add('loaded'); }, 200);
             })
             .catch(function() {});

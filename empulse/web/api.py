@@ -259,15 +259,16 @@ async def export_history(
 
 
 @router.get("/img/{item_id}")
-async def image_proxy(item_id: str):
+async def image_proxy(item_id: str, w: int = 150):
     """Proxy Emby item images so the API key stays server-side."""
     if not _validate_id(item_id):
         return Response(content=b"", status_code=400)
+    max_width = max(20, min(w, 600))
     import httpx
     url = f"{settings.emby_url.rstrip('/')}/Items/{item_id}/Images/Primary"
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(url, params={"api_key": settings.emby_api_key, "maxWidth": "150"})
+            r = await client.get(url, params={"api_key": settings.emby_api_key, "maxWidth": str(max_width)})
             if r.status_code == 200:
                 return Response(
                     content=r.content,
