@@ -294,16 +294,16 @@ nav a.active {
     font-weight: 700;
 }
 
-.days-input {
-    width: 60px;
+input.days-input {
+    width: 60px !important;
     text-align: center;
-    padding: 0.3rem 0.4rem;
-    margin: 0;
+    padding: 0.3rem 0.4rem !important;
+    margin: 0 !important;
     font-family: var(--font-body);
-    font-size: 0.85em;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
+    font-size: 0.85em !important;
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-primary) !important;
     border-radius: 6px;
 }
 
@@ -749,14 +749,14 @@ nav a.active {
 }
 
 .filter-select {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-primary) !important;
     font-family: var(--font-body);
-    font-size: 0.82em;
-    padding: 0.35rem 0.6rem;
-    border-radius: 6px;
-    margin: 0;
+    font-size: 0.82em !important;
+    padding: 0.35rem 0.6rem !important;
+    border-radius: 6px !important;
+    margin: 0 !important;
     min-width: 120px;
 }
 
@@ -811,14 +811,14 @@ nav a.active {
 }
 
 .search-input {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-primary) !important;
     font-family: var(--font-body);
-    font-size: 0.82em;
-    padding: 0.35rem 0.6rem;
-    border-radius: 6px;
-    margin: 0;
+    font-size: 0.82em !important;
+    padding: 0.35rem 0.6rem !important;
+    border-radius: 6px !important;
+    margin: 0 !important;
     width: 180px;
 }
 
