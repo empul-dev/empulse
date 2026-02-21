@@ -2041,8 +2041,15 @@ input[readonly] {
 }
 
 /* === Login Page === */
+body:has(.login-page) {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
 .login-page {
-    min-height: 100vh;
+    height: 100vh;
+    height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2127,6 +2134,48 @@ input[readonly] {
     z-index: 1;
 }
 
+/* Light mode login adjustments */
+html[data-theme="light"] .login-card {
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.06),
+        0 8px 40px rgba(0, 0, 0, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+html[data-theme="light"] .login-card input[type="text"],
+html[data-theme="light"] .login-card input[type="password"] {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.12);
+    color: #1a1a1a;
+}
+
+html[data-theme="light"] .login-card input[type="text"]:focus,
+html[data-theme="light"] .login-card input[type="password"]:focus {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+html[data-theme="light"] .login-card label {
+    color: #666;
+}
+
+html[data-theme="light"] .login-card h2 {
+    color: var(--accent);
+}
+
+html[data-theme="light"] .login-subtitle {
+    color: #666;
+}
+
+html[data-theme="light"] .login-overlay {
+    background: radial-gradient(ellipse at center, rgba(255,255,255,0.20) 0%, rgba(245,245,245,0.70) 60%, rgba(245,245,245,0.88) 100%);
+}
+
+html[data-theme="light"] .login-poster-wall {
+    filter: brightness(0.6) saturate(1.2);
+}
+
 .login-wrap {
     position: relative;
     z-index: 2;
@@ -2136,13 +2185,16 @@ input[readonly] {
 }
 
 .login-card {
-    background: rgba(28, 28, 30, 0.85);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 2.5rem 2rem;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    background: rgba(28, 28, 30, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 2.5rem 2rem 2rem;
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.3),
+        0 8px 40px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
     animation: fadeSlideIn 0.5s ease-out;
 }
 
@@ -2165,23 +2217,35 @@ input[readonly] {
 
 .login-card label {
     font-family: var(--font-display);
-    font-size: 0.88em;
+    font-size: 0.82em;
     font-weight: 500;
-    color: var(--text-secondary);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.3rem;
+}
+
+.login-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
 
 .login-card input[type="text"],
 .login-card input[type="password"] {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 10px;
     color: var(--text-primary);
     font-family: var(--font-body);
-    transition: border-color var(--anim-fast);
+    padding: 0.65rem 0.9rem;
+    font-size: 0.92em;
+    transition: border-color var(--anim-fast), box-shadow var(--anim-fast), background var(--anim-fast);
 }
 
 .login-card input[type="text"]:focus,
 .login-card input[type="password"]:focus {
+    background: rgba(255, 255, 255, 0.08);
     border-color: var(--accent);
     outline: none;
     box-shadow: 0 0 0 3px var(--accent-dim);
@@ -2192,18 +2256,21 @@ input[readonly] {
     background: var(--accent);
     color: #000;
     border: none;
-    border-radius: 8px;
-    padding: 0.7rem;
+    border-radius: 10px;
+    padding: 0.75rem;
     font-family: var(--font-display);
     font-size: 0.95em;
     font-weight: 700;
     cursor: pointer;
-    transition: opacity var(--anim-fast), transform var(--anim-fast);
+    margin-top: 0.3rem;
+    transition: opacity var(--anim-fast), transform var(--anim-fast), box-shadow var(--anim-fast);
+    box-shadow: 0 2px 12px rgba(82, 181, 75, 0.25);
 }
 
 .login-card button[type="submit"]:hover {
-    opacity: 0.9;
+    opacity: 0.92;
     transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(82, 181, 75, 0.35);
 }
 
 .login-card .error-msg {
