@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import secrets
 import time
 from contextlib import asynccontextmanager
 
@@ -19,12 +20,15 @@ BASE_DIR = Path(__file__).parent
 
 
 class EmpulseTemplates(Jinja2Templates):
-    """Auto-inject current_user into all template contexts."""
+    """Auto-inject current_user and CSP nonce into all template contexts."""
 
     def TemplateResponse(self, name, context, **kwargs):
         request: Request | None = context.get("request")
-        if request and not context.get("current_user"):
-            context["current_user"] = getattr(request.state, "user", None)
+        if request:
+            if not context.get("current_user"):
+                context["current_user"] = getattr(request.state, "user", None)
+            if not context.get("csp_nonce"):
+                context["csp_nonce"] = getattr(request.state, "csp_nonce", "")
         return super().TemplateResponse(name, context, **kwargs)
 
 
@@ -129,27 +133,40 @@ def create_app() -> FastAPI:
     app.include_router(api_router, prefix="/api")
     app.include_router(ws_router)
 
-    if settings.auth_password or settings.emby_api_key:
-        from empulse.web.auth import AuthMiddleware
-        app.add_middleware(
-            AuthMiddleware,
-            secret=settings.secret_key,
-        )
+    # Auth middleware is always active — authentication is mandatory.
+    # If no AUTH_PASSWORD or EMBY_API_KEY is configured, the login page
+    # will show a setup message prompting the admin to configure auth.
+    from empulse.web.auth import AuthMiddleware
+    app.add_middleware(
+        AuthMiddleware,
+        secret=settings.secret_key,
+    )
 
     @app.middleware("http")
     async def security_headers(request, call_next):
+        # Generate per-request nonce for CSP script-src
+        nonce = secrets.token_urlsafe(16)
+        request.state.csp_nonce = nonce
+
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+            f"script-src 'self' 'nonce-{nonce}' https://unpkg.com https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "img-src 'self' data:; "
             "connect-src 'self' ws: wss:; "
             "frame-ancestors 'none'"
         )
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), payment=()"
+        )
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
         return response
 
     return app

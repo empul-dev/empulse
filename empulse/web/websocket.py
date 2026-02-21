@@ -44,9 +44,23 @@ async def websocket_endpoint(ws: WebSocket):
     # Authenticate WebSocket connections when auth is enabled
     from empulse.config import settings
     if settings.auth_password or settings.emby_api_key:
-        from empulse.web.auth import verify_session_token, COOKIE_NAME
+        from empulse.web.auth import verify_session_token, hash_token, COOKIE_NAME
+        from empulse.database import get_db
+
         token = ws.cookies.get(COOKIE_NAME)
         if not token or verify_session_token(token, settings.secret_key) is None:
+            await ws.close(code=1008)
+            return
+
+        # Check DB for revoked session (same check as AuthMiddleware)
+        db = get_db()
+        token_h = hash_token(token)
+        cursor = await db.execute(
+            "SELECT revoked FROM login_sessions WHERE token_hash = ?",
+            [token_h],
+        )
+        row = await cursor.fetchone()
+        if not row or row["revoked"]:
             await ws.close(code=1008)
             return
 

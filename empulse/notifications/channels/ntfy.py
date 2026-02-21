@@ -1,5 +1,7 @@
 import httpx
 
+from empulse.notifications.url_validator import validate_outbound_url
+
 EVENT_LABELS = {
     "playback_start": "Playback Started",
     "playback_stop": "Playback Stopped",
@@ -58,6 +60,10 @@ async def send_ntfy(config: dict, event_type: str, data: dict):
         headers["Authorization"] = f"Bearer {auth_token}"
 
     url = f"{server_url}/{topic}"
+
+    error = validate_outbound_url(url)
+    if error:
+        raise ValueError(f"Ntfy URL blocked: {error}")
 
     async with httpx.AsyncClient(timeout=10) as client:
         r = await client.post(url, content="\n".join(body_lines), headers=headers)

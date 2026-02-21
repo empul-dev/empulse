@@ -70,40 +70,65 @@ def verify_session_token(token: str, secret: str) -> SessionUser | None:
 
 
 class LoginRateLimiter:
-    """Simple in-memory rate limiter for login attempts."""
+    """In-memory rate limiter for login attempts (IP + account-level)."""
 
-    MAX_TRACKED_IPS = 10_000
+    MAX_TRACKED_KEYS = 10_000
 
-    def __init__(self, max_attempts: int = 5, window_seconds: int = 300):
+    def __init__(
+        self,
+        max_attempts: int = 5,
+        window_seconds: int = 300,
+        max_account_attempts: int = 10,
+        account_window_seconds: int = 600,
+    ):
         self.max_attempts = max_attempts
         self.window = window_seconds
+        self.max_account_attempts = max_account_attempts
+        self.account_window = account_window_seconds
         self._attempts: dict[str, list[float]] = defaultdict(list)
 
-    def is_limited(self, ip: str) -> bool:
+    def _key_limited(self, key: str, max_att: int, window: int) -> bool:
         now = time.time()
-        self._attempts[ip] = [t for t in self._attempts[ip] if now - t < self.window]
-        if len(self._attempts) > self.MAX_TRACKED_IPS:
-            self._cleanup(now)
-        return len(self._attempts[ip]) >= self.max_attempts
+        self._attempts[key] = [t for t in self._attempts[key] if now - t < window]
+        return len(self._attempts[key]) >= max_att
 
-    def record(self, ip: str):
-        self._attempts[ip].append(time.time())
+    def is_limited(self, ip: str, username: str = "") -> bool:
+        if len(self._attempts) > self.MAX_TRACKED_KEYS:
+            self._cleanup(time.time())
+        if self._key_limited(f"ip:{ip}", self.max_attempts, self.window):
+            return True
+        if username and self._key_limited(
+            f"user:{username.lower()}", self.max_account_attempts, self.account_window
+        ):
+            return True
+        return False
+
+    def record(self, ip: str, username: str = ""):
+        now = time.time()
+        self._attempts[f"ip:{ip}"].append(now)
+        if username:
+            self._attempts[f"user:{username.lower()}"].append(now)
 
     def reset(self, ip: str):
-        self._attempts.pop(ip, None)
+        self._attempts.pop(f"ip:{ip}", None)
 
     def _cleanup(self, now: float):
-        expired = [ip for ip, ts in self._attempts.items()
-                   if not ts or now - ts[-1] > self.window]
-        for ip in expired:
-            del self._attempts[ip]
+        max_window = max(self.window, self.account_window)
+        expired = [k for k, ts in self._attempts.items()
+                   if not ts or now - ts[-1] > max_window]
+        for k in expired:
+            del self._attempts[k]
 
 
 login_limiter = LoginRateLimiter()
 
 
 def check_origin(request: Request) -> bool:
-    """Verify the request Origin/Referer matches the server host (CSRF protection)."""
+    """Verify the request Origin/Referer matches the server host (CSRF protection).
+
+    Denies requests without Origin or Referer on state-changing methods,
+    since browsers always send Origin on cross-origin form POSTs.
+    """
     expected_host = request.headers.get("host", "")
 
     origin = request.headers.get("origin")
@@ -114,8 +139,9 @@ def check_origin(request: Request) -> bool:
     if referer:
         return urlparse(referer).netloc == expected_host
 
-    # No Origin or Referer — allow (same-origin or non-browser client)
-    return True
+    # No Origin or Referer — deny for state-changing methods (browsers
+    # always send Origin on cross-origin POST/PUT/DELETE).
+    return False
 
 
 # Routes that require admin role

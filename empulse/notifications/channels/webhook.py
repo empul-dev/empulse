@@ -1,11 +1,17 @@
 import json
 import httpx
 
+from empulse.notifications.url_validator import validate_outbound_url
+
 
 async def send_webhook(config: dict, event_type: str, data: dict):
     url = config.get("url", "")
     if not url:
         raise ValueError("Webhook URL not configured")
+
+    error = validate_outbound_url(url)
+    if error:
+        raise ValueError(f"Webhook URL blocked: {error}")
 
     method = config.get("method", "POST").upper()
     if method not in ("POST", "PUT"):

@@ -172,9 +172,11 @@ _LOGIN_ERRORS = {
 async def login_page(request: Request, error: str = ""):
     error_msg = _LOGIN_ERRORS.get(error, "")
     has_fallback = bool(settings.auth_password)
+    auth_configured = bool(settings.auth_password or settings.emby_api_key)
     return templates.TemplateResponse("login.html", {
         "request": request, "active": "", "error": error_msg,
         "has_fallback": has_fallback,
+        "auth_configured": auth_configured,
     })
 
 
@@ -191,7 +193,7 @@ async def login_submit(
     if not check_origin(request):
         return RedirectResponse("/login?error=rejected", status_code=302)
 
-    if login_limiter.is_limited(client_ip):
+    if login_limiter.is_limited(client_ip, username):
         return RedirectResponse("/login?error=rate_limited", status_code=302)
 
     if not password:
@@ -213,7 +215,7 @@ async def login_submit(
                 role = "admin" if result["is_admin"] else "viewer"
             else:
                 # Bad credentials via Emby
-                login_limiter.record(client_ip)
+                login_limiter.record(client_ip, username)
                 return RedirectResponse("/login?error=invalid", status_code=302)
         except (httpx.TimeoutException, httpx.ConnectError):
             logger.warning("Emby unavailable for auth, trying fallback")
@@ -230,18 +232,18 @@ async def login_submit(
             role = "admin"
         elif not emby_down:
             # Password didn't match fallback, and Emby wasn't tried / didn't error
-            login_limiter.record(client_ip)
+            login_limiter.record(client_ip, username)
             return RedirectResponse("/login?error=invalid", status_code=302)
 
     # If Emby was down and fallback password didn't match
     if user_id is None and emby_down:
         if settings.auth_password:
-            login_limiter.record(client_ip)
+            login_limiter.record(client_ip, username)
             return RedirectResponse("/login?error=invalid", status_code=302)
         return RedirectResponse("/login?error=emby_down", status_code=302)
 
     if user_id is None:
-        login_limiter.record(client_ip)
+        login_limiter.record(client_ip, username)
         return RedirectResponse("/login?error=invalid", status_code=302)
 
     # Create session token and DB entry
@@ -288,7 +290,7 @@ async def login_submit(
     return response
 
 
-@router.get("/logout")
+@router.post("/logout")
 async def logout(request: Request):
     token = request.cookies.get(COOKIE_NAME)
     if token:

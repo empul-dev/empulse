@@ -80,7 +80,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 function toggleFilter(btn) {
     var group = btn.closest('.filter-buttons');
     group.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });

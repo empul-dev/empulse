@@ -201,7 +201,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 function toggleTypeFields() {
     var type = document.getElementById('ch-type').value;
     document.getElementById('webhook-extra').style.display = type === 'webhook' ? '' : 'none';
@@ -329,19 +329,26 @@ function deleteChannel(id) {
         .then(function(r) { if (r.ok) location.reload(); });
 }
 
+function _chSetResult(el, cls, text) {
+    var p = document.createElement('p');
+    p.className = cls;
+    p.textContent = text;
+    el.replaceChildren(p);
+}
+
 function testChannel(id) {
     var el = document.getElementById('channel-test-result');
-    el.innerHTML = '<p>Sending test...</p>';
+    _chSetResult(el, '', 'Sending test...');
     fetch('/api/notification-channels/' + id + '/test', { method: 'POST' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.success) {
-                el.innerHTML = '<p class="success">Test notification sent!</p>';
+                _chSetResult(el, 'success', 'Test notification sent!');
             } else {
-                el.innerHTML = '<p class="error">Failed: ' + (data.message || 'Unknown error') + '</p>';
+                _chSetResult(el, 'error', 'Failed: ' + (data.message || 'Unknown error'));
             }
         })
-        .catch(function() { el.innerHTML = '<p class="error">Request failed</p>'; });
+        .catch(function() { _chSetResult(el, 'error', 'Request failed'); });
 }
 </script>
 {% endblock %}

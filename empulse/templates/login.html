@@ -20,6 +20,12 @@
             <div class="login-card">
                 <h2>Empulse</h2>
                 <p class="login-subtitle">Sign in to your media server</p>
+                {% if not auth_configured %}
+                <div class="error-msg">
+                    No authentication method configured. Set <code>AUTH_PASSWORD</code>
+                    or <code>EMBY_API_KEY</code> in your <code>.env</code> file, then restart Empulse.
+                </div>
+                {% else %}
                 {% if error %}
                 <div class="error-msg">{{ error }}</div>
                 {% endif %}
@@ -34,6 +40,7 @@
                 </form>
                 {% if has_fallback %}
                 <small class="login-hint">Or use your local admin password</small>
+                {% endif %}
                 {% endif %}
             </div>
         </div>

@@ -39,9 +39,11 @@ class EmbyWebSocket:
                 await asyncio.sleep(5)
 
     async def _connect(self):
-        from urllib.parse import urlencode
-        url = f"{self.ws_url}?{urlencode(self._ws_params)}"
-        async with websockets.connect(url) as ws:
+        # Pass API key via header instead of URL params to avoid proxy log exposure
+        extra_headers = {"X-Emby-Token": settings.emby_api_key}
+        async with websockets.connect(
+            self.ws_url, additional_headers=extra_headers
+        ) as ws:
             logger.info("Connected to Emby WebSocket")
             async for raw in ws:
                 try:
