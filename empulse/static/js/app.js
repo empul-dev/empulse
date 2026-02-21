@@ -50,11 +50,26 @@ function initStatCards() {
             });
         });
 
+        // Click navigation for stat list items with data-href
+        card.querySelectorAll("li[data-href]").forEach(function(li) {
+            li.addEventListener("click", function() {
+                window.location.href = li.dataset.href;
+            });
+        });
+
         card.addEventListener("mouseleave", function() {
             if (poster) poster.src = defaultSrc;
             if (fallback) fallback.textContent = defaultTitle;
             card.style.setProperty("--hover-bg", "url(" + defaultSrc + ")");
             card.classList.remove("is-hovered");
+        });
+    });
+
+    // Click navigation for cards WITHOUT data-bg (users, libraries, platforms)
+    document.querySelectorAll(".stat-card:not([data-bg]) li[data-href]").forEach(function(li) {
+        li.style.cursor = "pointer";
+        li.addEventListener("click", function() {
+            window.location.href = li.dataset.href;
         });
     });
 

@@ -9,6 +9,16 @@
      hx-get="/api/now-playing"
      hx-trigger="load, every 10s, refresh-now-playing from:body"
      hx-swap="innerHTML">
+    <div class="now-playing-skeleton">
+        <div class="skeleton-card" style="height:72px; display:flex; gap:0.75rem; padding:0.7rem 0.8rem; align-items:center;">
+            <div style="width:48px; height:72px; border-radius:4px; background:var(--bg-secondary); flex-shrink:0;"></div>
+            <div style="flex:1;">
+                <div class="skeleton-line" style="width:40%; margin-bottom:0.4rem;"></div>
+                <div class="skeleton-line" style="width:70%; margin-bottom:0.4rem;"></div>
+                <div class="skeleton-line" style="width:90%; height:5px;"></div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="section-header">
@@ -40,15 +50,15 @@
 <div class="charts-section">
     <div class="charts-grid">
         <div class="chart-card wide">
-            <div class="chart-header">Daily Plays</div>
+            <div class="chart-header"><span class="chart-title">Daily Plays</span><span class="chart-desc">Play activity over the selected period.</span></div>
             <div class="chart-body"><canvas id="chart-daily"></canvas></div>
         </div>
         <div class="chart-card">
-            <div class="chart-header">Plays by Type</div>
+            <div class="chart-header"><span class="chart-title">Plays by Type</span><span class="chart-desc">Movies, TV Shows, and Music breakdown.</span></div>
             <div class="chart-body"><canvas id="chart-type"></canvas></div>
         </div>
         <div class="chart-card">
-            <div class="chart-header">Plays by Platform</div>
+            <div class="chart-header"><span class="chart-title">Plays by Platform</span><span class="chart-desc">Most used player applications.</span></div>
             <div class="chart-body"><canvas id="chart-platform"></canvas></div>
         </div>
     </div>
@@ -65,7 +75,7 @@
     <div class="recently-added-filters">
         <button class="filter-btn active" onclick="loadRecentlyAdded('', this)">All</button>
         <button class="filter-btn" onclick="loadRecentlyAdded('Movie', this)">Movies</button>
-        <button class="filter-btn" onclick="loadRecentlyAdded('Episode', this)">Episodes</button>
+        <button class="filter-btn" onclick="loadRecentlyAdded('Series', this)">TV Shows</button>
         <button class="filter-btn" onclick="loadRecentlyAdded('Audio', this)">Music</button>
     </div>
 </div>

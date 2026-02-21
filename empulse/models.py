@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -205,6 +207,16 @@ class UserInfo(BaseModel):
         if d:
             return f"{d}d {h}h"
         return f"{h}h {m}m"
+
+    @property
+    def last_seen_display(self) -> str:
+        if not self.last_seen:
+            return "Never"
+        try:
+            dt = datetime.fromisoformat(self.last_seen)
+            return dt.strftime("%b %d, %Y %H:%M")
+        except (ValueError, TypeError):
+            return self.last_seen
 
 
 class LibraryInfo(BaseModel):

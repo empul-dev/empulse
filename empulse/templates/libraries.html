@@ -6,22 +6,40 @@
 
 {% set type_map = {"movies": "Movie", "tvshows": "Episode", "music": "Audio"} %}
 {% if libraries %}
-<div class="grid">
+<div class="library-cards-grid">
     {% for lib in libraries %}
     {% set item_type = type_map.get(lib.library_type, "") %}
-    <article>
-        <header>{{ lib.name }}</header>
-        <p>
-            <strong>{{ lib.item_count }}</strong> items<br>
-            <small>{{ lib.library_type }}</small>
-        </p>
+    <div class="library-type-card">
+        <div class="library-type-icon">
+            {% if lib.library_type == 'movies' %}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+            {% elif lib.library_type == 'tvshows' %}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>
+            {% elif lib.library_type == 'music' %}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            {% else %}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>
+            {% endif %}
+        </div>
+        <div class="library-type-info">
+            <div class="library-type-name">{{ lib.name }}</div>
+            <div class="library-type-meta">
+                <span class="library-type-count">{{ lib.item_count }}</span> items
+                <span class="library-type-badge">{{ lib.library_type }}</span>
+            </div>
+        </div>
         {% if item_type %}
-        <footer><a href="/libraries/{{ item_type }}">View Stats</a></footer>
+        <a href="/libraries/{{ item_type }}" class="library-type-link">View Stats →</a>
         {% endif %}
-    </article>
+    </div>
     {% endfor %}
 </div>
 {% else %}
-<p>No libraries found. Connect to Emby to sync libraries.</p>
+<div class="empty-state">
+    <svg class="empty-state-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>
+    <div class="empty-state-title">No libraries found</div>
+    <div class="empty-state-text">Connect to your Emby server to sync your media libraries.</div>
+    <a href="/settings" class="empty-state-action">Go to Settings</a>
+</div>
 {% endif %}
 {% endblock %}

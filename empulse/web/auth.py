@@ -162,7 +162,7 @@ ADMIN_METHODS_ROUTES = [
 class AuthMiddleware(BaseHTTPMiddleware):
     """Multi-user auth middleware with Emby-based RBAC and CSRF origin checking."""
 
-    EXCLUDED_PREFIXES = ("/login", "/logout", "/static", "/ws")
+    EXCLUDED_PREFIXES = ("/login", "/logout", "/static", "/ws", "/api/random-posters", "/api/img/")
 
     def __init__(self, app, secret: str = ""):
         super().__init__(app)

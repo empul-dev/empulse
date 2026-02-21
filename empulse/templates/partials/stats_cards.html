@@ -18,7 +18,7 @@
             </div>
             <ol class="stat-list">
                 {% for m in most_watched_movies %}
-                <li data-img="/api/img/{{ m.item_id }}" data-title="{{ (m.item_name or '?')[:2] }}">
+                <li data-img="/api/img/{{ m.item_id }}" data-title="{{ (m.item_name or '?')[:2] }}" data-href="/item/{{ m.item_id }}">
                     <span class="stat-list-name">{{ m.item_name }}{% if m.year %} ({{ m.year }}){% endif %}</span>
                     <span class="stat-list-value">{{ m.plays if metric == 'plays' else (m.total_duration // 3600) ~ 'h' }}</span>
                 </li>
@@ -43,7 +43,7 @@
             </div>
             <ol class="stat-list">
                 {% for m in most_popular_movies %}
-                <li data-img="/api/img/{{ m.item_id }}" data-title="{{ (m.item_name or '?')[:2] }}">
+                <li data-img="/api/img/{{ m.item_id }}" data-title="{{ (m.item_name or '?')[:2] }}" data-href="/item/{{ m.item_id }}">
                     <span class="stat-list-name">{{ m.item_name }}</span>
                     <span class="stat-list-value">{{ m.users }}</span>
                 </li>
@@ -68,7 +68,7 @@
             </div>
             <ol class="stat-list">
                 {% for s in most_watched_shows %}
-                <li data-img="/api/img/{{ s.poster_id }}" data-title="{{ (s.series_name or '?')[:2] }}">
+                <li data-img="/api/img/{{ s.poster_id }}" data-title="{{ (s.series_name or '?')[:2] }}" data-href="/item/{{ s.poster_id }}?type=series&name={{ s.series_name | urlencode }}">
                     <span class="stat-list-name">{{ s.series_name }}</span>
                     <span class="stat-list-value">{{ s.plays if metric == 'plays' else (s.total_duration // 3600) ~ 'h' }}</span>
                 </li>
@@ -93,7 +93,7 @@
             </div>
             <ol class="stat-list">
                 {% for s in most_popular_shows %}
-                <li data-img="/api/img/{{ s.poster_id }}" data-title="{{ (s.series_name or '?')[:2] }}">
+                <li data-img="/api/img/{{ s.poster_id }}" data-title="{{ (s.series_name or '?')[:2] }}" data-href="/item/{{ s.poster_id }}?type=series&name={{ s.series_name | urlencode }}">
                     <span class="stat-list-name">{{ s.series_name }}</span>
                     <span class="stat-list-value">{{ s.users }}</span>
                 </li>
@@ -118,7 +118,7 @@
             </div>
             <ol class="stat-list">
                 {% for r in recently_watched %}
-                <li data-img="/api/img/{{ rw_poster(r) | trim }}" data-title="{{ (r.display_title or '?')[:2] }}">
+                <li data-img="/api/img/{{ rw_poster(r) | trim }}" data-title="{{ (r.display_title or '?')[:2] }}" data-href="/item/{{ r.item_id }}">
                     <span class="stat-list-name">{{ r.display_title }}</span>
                     <span class="stat-list-value-small">{{ r.user_name }}</span>
                 </li>
@@ -169,7 +169,7 @@
             </div>
             <ol class="stat-list">
                 {% for u in most_active_users %}
-                <li>
+                <li data-href="/users/{{ u.user_id }}">
                     <span class="stat-list-name">{{ u.user_name or 'Unknown' }}</span>
                     <span class="stat-list-value">{{ u.plays if metric == 'plays' else (u.total_duration // 3600) ~ 'h' }}</span>
                 </li>

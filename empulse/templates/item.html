@@ -3,7 +3,10 @@
 
 {% block content %}
 <!-- Backdrop hero -->
-<div class="item-hero" {% if item.get('BackdropImageTags') %}style="background-image: linear-gradient(to bottom, rgba(26,26,46,0.4), rgba(26,26,46,0.95)), url('/api/img/backdrop/{{ item_id }}')"{% endif %}>
+<div class="item-hero">
+    {% if item.get('BackdropImageTags') %}
+    <div class="item-hero-backdrop" style="background-image: url('/api/img/backdrop/{{ item_id }}')"></div>
+    {% endif %}
     <div class="item-hero-inner">
         <div class="item-poster">
             <img src="/api/img/{{ item_id }}" alt="" loading="lazy">
@@ -16,7 +19,7 @@
                 <span class="badge">{{ video_stream.get('Height') }}p</span>
                 {% endif %}
                 {% if audio_stream.get('Channels') %}
-                <span class="badge">{{ audio_stream.get('Channels') }}.1</span>
+                <span class="badge">{% if audio_stream.get('Channels') >= 6 %}{{ audio_stream.get('Channels') - 1 }}.1{% elif audio_stream.get('Channels') == 2 %}Stereo{% else %}{{ audio_stream.get('Channels') }}ch{% endif %}</span>
                 {% endif %}
             </div>
             {% endif %}
@@ -29,10 +32,38 @@
             {% endif %}
             {% else %}
             <h1 class="item-title accent">{{ item.get('Name', 'Unknown') }}</h1>
+            {% if original_title and original_title != item.get('Name', '') %}
+            <div class="item-original-title">{{ original_title }}</div>
+            {% endif %}
+            {% endif %}
+
+            {% if tagline %}
+            <div class="item-tagline">{{ tagline }}</div>
             {% endif %}
 
             {% if item.get('ParentIndexNumber') is not none and item.get('IndexNumber') is not none %}
             <span class="item-episode-badge">S{{ item.get('ParentIndexNumber') }} · E{{ item.get('IndexNumber') }}</span>
+            {% endif %}
+
+            {# Ratings row #}
+            {% if community_rating or critic_rating or official_rating %}
+            <div class="item-ratings">
+                {% if community_rating %}
+                <span class="item-rating" title="TMDB Rating">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    {{ "%.1f" | format(community_rating) }}
+                </span>
+                {% endif %}
+                {% if critic_rating %}
+                <span class="item-rating item-rating--critic" title="Critic Rating">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+                    {{ critic_rating }}%
+                </span>
+                {% endif %}
+                {% if official_rating %}
+                <span class="item-rating item-rating--age">{{ official_rating }}</span>
+                {% endif %}
+            </div>
             {% endif %}
 
             <div class="item-meta-row">
@@ -44,12 +75,11 @@
                 {% endif %}
                 {% if aired %}
                 <span>Aired <strong>{{ aired }}</strong></span>
+                {% elif year %}
+                <span>Year <strong>{{ year }}</strong></span>
                 {% endif %}
                 {% if runtime_mins %}
                 <span>Runtime <strong>{{ runtime_mins }} mins</strong></span>
-                {% endif %}
-                {% if item.get('OfficialRating') %}
-                <span>Rated <strong>{{ item.get('OfficialRating') }}</strong></span>
                 {% endif %}
             </div>
 
@@ -77,6 +107,29 @@
                 </div>
                 {% endif %}
             </div>
+
+            {# External links #}
+            {% if imdb_id or tmdb_id or external_urls %}
+            <div class="item-external-links">
+                {% if imdb_id %}
+                <a href="https://www.imdb.com/title/{{ imdb_id }}" target="_blank" rel="noopener" class="external-link" title="IMDb">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h5v7h7v9H6z"/></svg>
+                    IMDb
+                </a>
+                {% endif %}
+                {% if tmdb_id %}
+                <a href="https://www.themoviedb.org/movie/{{ tmdb_id }}" target="_blank" rel="noopener" class="external-link" title="TMDB">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h5v7h7v9H6z"/></svg>
+                    TMDB
+                </a>
+                {% endif %}
+                {% for link in external_urls if link.get('Name') not in ('IMDb', 'TheMovieDb') %}
+                <a href="{{ link.Url }}" target="_blank" rel="noopener" class="external-link" title="{{ link.Name }}">
+                    {{ link.Name }}
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

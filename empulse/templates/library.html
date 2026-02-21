@@ -18,9 +18,19 @@
     {% endfor %}
 </div>
 
+<div class="section-header">
+    <h2>Charts</h2>
+    <div class="stat-controls">
+        <div class="toggle-group" id="lib-metric-toggle">
+            <button class="toggle-btn active" data-value="plays" onclick="setLibToggle(this)">Play Count</button>
+            <button class="toggle-btn" data-value="duration" onclick="setLibToggle(this)">Play Duration</button>
+        </div>
+    </div>
+</div>
+
 <div class="charts-section">
     <div class="chart-card wide" style="margin-bottom:1rem">
-        <div class="chart-header">Daily Plays</div>
+        <div class="chart-header" id="lib-daily-header">Daily Plays</div>
         <div class="chart-body"><canvas id="lib-chart-daily"></canvas></div>
     </div>
 </div>
@@ -64,31 +74,62 @@
     if (!C) return;
     C.setupDefaults();
     var accent = C.getCSS("--accent") || "#52b54b";
+    var itemType = {{ item_type | tojson }};
+    var chartDaily = null;
 
-    fetch("/api/charts/library/" + encodeURIComponent({{ item_type | tojson }}) + "/daily-plays?days=30")
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            new Chart(document.getElementById("lib-chart-daily"), {
-                type: "line",
-                data: {
-                    labels: data.map(function(d) { return d.date.slice(5); }),
-                    datasets: [{
-                        label: "Plays",
-                        data: data.map(function(d) { return d.plays; }),
-                        borderColor: accent,
-                        backgroundColor: accent + "33",
-                        fill: true,
-                        tension: 0.3,
-                        pointRadius: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
-                }
+    function getLibMetric() {
+        var active = document.querySelector("#lib-metric-toggle .toggle-btn.active");
+        return active ? (active.dataset.value || "plays") : "plays";
+    }
+
+    function isLibDuration() { return getLibMetric() === "duration"; }
+
+    function loadLibCharts() {
+        var dur = isLibDuration();
+        var label = dur ? "Hours" : "Plays";
+        document.getElementById("lib-daily-header").textContent = dur ? "Daily Play Duration" : "Daily Plays";
+
+        fetch("/api/charts/library/" + encodeURIComponent(itemType) + "/daily-plays?days=30")
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                chartDaily = C.destroyChart(chartDaily);
+                var el = document.getElementById("lib-chart-daily");
+                var ctx = el.getContext("2d");
+                var grad = ctx.createLinearGradient(0, 0, 0, el.parentElement.clientHeight || 200);
+                grad.addColorStop(0, "rgba(82, 181, 75, 0.7)");
+                grad.addColorStop(1, "rgba(82, 181, 75, 0.05)");
+                chartDaily = new Chart(el, {
+                    type: "line",
+                    data: {
+                        labels: data.map(function(d) { return d.date.slice(5); }),
+                        datasets: [{
+                            label: label,
+                            data: data.map(function(d) { return dur ? d.total_duration / 3600 : d.plays; }),
+                            borderColor: accent,
+                            backgroundColor: grad,
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { y: { beginAtZero: true, ticks: { precision: dur ? 1 : 0 } } }
+                    }
+                });
             });
+    }
+
+    window.setLibToggle = function(btn) {
+        document.querySelectorAll("#lib-metric-toggle .toggle-btn").forEach(function(b) {
+            b.classList.remove("active");
         });
+        btn.classList.add("active");
+        loadLibCharts();
+    };
+
+    loadLibCharts();
 })();
 </script>
 {% endblock %}

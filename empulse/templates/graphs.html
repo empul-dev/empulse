@@ -5,6 +5,10 @@
 <div class="section-header">
     <h2>Graphs</h2>
     <div class="stat-controls">
+        <div class="toggle-group" id="graph-metric-toggle">
+            <button class="toggle-btn active" data-value="plays" onclick="setGraphToggle(this)">Play Count</button>
+            <button class="toggle-btn" data-value="duration" onclick="setGraphToggle(this)">Play Duration</button>
+        </div>
         <span class="stat-controls-label">Last</span>
         <input type="number" id="graph-days" value="30" min="1" max="365"
                class="days-input" onchange="loadGraphs()">
@@ -13,44 +17,143 @@
 </div>
 
 <div class="charts-section">
+
+    <!-- ===== Activity Overview ===== -->
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Activity Overview</span>
+    </div>
     <div class="charts-grid">
+        <!-- Daily plays by media type (stacked) — hero chart -->
         <div class="chart-card wide">
-            <div class="chart-header">Plays by Date (Stacked)</div>
-            <div class="chart-body chart-body-tall"><canvas id="g-daily-stacked"></canvas></div>
+            <div class="chart-header">
+                <span class="chart-title">Daily Play Activity</span>
+                <span class="chart-desc">Plays broken down by media type (Movies, TV, Music) per day.</span>
+            </div>
+            <div class="chart-body chart-body-xl"><canvas id="g-daily-stacked"></canvas></div>
         </div>
+
+        <!-- Day of week + Hour of day side by side -->
         <div class="chart-card">
-            <div class="chart-header">Plays by Day of Week</div>
+            <div class="chart-header">
+                <span class="chart-title">Plays by Day of Week</span>
+                <span class="chart-desc">Which days see the most viewing activity.</span>
+            </div>
             <div class="chart-body"><canvas id="g-dow"></canvas></div>
         </div>
         <div class="chart-card">
-            <div class="chart-header">Plays by Hour of Day</div>
+            <div class="chart-header">
+                <span class="chart-title">Plays by Hour of Day</span>
+                <span class="chart-desc">Peak viewing hours throughout the day.</span>
+            </div>
             <div class="chart-body"><canvas id="g-hour"></canvas></div>
         </div>
+    </div>
+
+    <!-- ===== Monthly Trends ===== -->
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Monthly Trends</span>
+    </div>
+    <div class="charts-grid">
         <div class="chart-card wide">
-            <div class="chart-header">Plays per Month</div>
-            <div class="chart-body"><canvas id="g-monthly"></canvas></div>
+            <div class="chart-header">
+                <span class="chart-title">Plays per Month</span>
+                <span class="chart-desc">Monthly play totals over the past 12 months.</span>
+            </div>
+            <div class="chart-body chart-body-tall"><canvas id="g-monthly"></canvas></div>
         </div>
+    </div>
+
+    <!-- ===== Stream Analysis ===== -->
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <span>Stream Analysis</span>
+    </div>
+    <div class="charts-grid">
+        <!-- Stream type over time — full width -->
         <div class="chart-card wide">
-            <div class="chart-header">Stream Type over Time</div>
+            <div class="chart-header">
+                <span class="chart-title">Stream Type by Date</span>
+                <span class="chart-desc">Direct Play vs Direct Stream vs Transcode over time.</span>
+            </div>
             <div class="chart-body chart-body-tall"><canvas id="g-stream-time"></canvas></div>
         </div>
+    </div>
+
+    <!-- 3 doughnuts in a row -->
+    <div class="charts-grid-3">
         <div class="chart-card">
-            <div class="chart-header">Source Resolution</div>
+            <div class="chart-header">
+                <span class="chart-title">Source Resolution</span>
+                <span class="chart-desc">Distribution of video source quality.</span>
+            </div>
             <div class="chart-body"><canvas id="g-resolution"></canvas></div>
         </div>
         <div class="chart-card">
-            <div class="chart-header">Transcode vs Direct Play</div>
+            <div class="chart-header">
+                <span class="chart-title">Play Method</span>
+                <span class="chart-desc">How streams are delivered to clients.</span>
+            </div>
             <div class="chart-body"><canvas id="g-transcode"></canvas></div>
         </div>
-        <div class="chart-card wide">
-            <div class="chart-header">Top Platforms by Stream Type</div>
-            <div class="chart-body chart-body-tall"><canvas id="g-platform-stream"></canvas></div>
-        </div>
-        <div class="chart-card wide">
-            <div class="chart-header">Top Users by Stream Type</div>
-            <div class="chart-body chart-body-tall"><canvas id="g-user-stream"></canvas></div>
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Content Type</span>
+                <span class="chart-desc">Split between Movies, TV, and Music.</span>
+            </div>
+            <div class="chart-body"><canvas id="g-content-type"></canvas></div>
         </div>
     </div>
+
+    <!-- ===== Content & Platforms ===== -->
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span>Content & Platforms</span>
+    </div>
+    <div class="charts-grid">
+        <!-- Top Platforms — side by side with Platform Stream Decisions -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Top Platforms</span>
+                <span class="chart-desc">Most used player applications.</span>
+            </div>
+            <div class="chart-body"><canvas id="g-platforms"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Platform Stream Decisions</span>
+                <span class="chart-desc">How each platform plays media — direct play, direct stream, or transcode.</span>
+            </div>
+            <div class="chart-body chart-body-med"><canvas id="g-platform-stream"></canvas></div>
+        </div>
+    </div>
+
+    <!-- ===== User Activity ===== -->
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>User Activity</span>
+    </div>
+    <div class="charts-grid">
+        <!-- User Stream Decisions — full width -->
+        <div class="chart-card wide">
+            <div class="chart-header">
+                <span class="chart-title">User Stream Decisions</span>
+                <span class="chart-desc">Play method breakdown per user.</span>
+            </div>
+            <div class="chart-body chart-body-med"><canvas id="g-user-stream"></canvas></div>
+        </div>
+
+        <!-- Most Active Users — full width -->
+        <div class="chart-card wide">
+            <div class="chart-header">
+                <span class="chart-title">Most Active Users</span>
+                <span class="chart-desc">Users ranked by total plays or watch time.</span>
+            </div>
+            <div class="chart-body chart-body-tall"><canvas id="g-top-users"></canvas></div>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
@@ -59,155 +162,565 @@
 var gCharts = {};
 var C = window.empulseCharts;
 var DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-var TYPE_COLORS = { Movie: '#52b54b', Episode: '#06b6d4', Audio: '#a855f7' };
-var STREAM_COLORS = { DirectPlay: '#22c55e', DirectStream: '#eab308', Transcode: '#ef4444' };
+
+// Unified palette — built around Emby green
+var TYPE_COLORS = {
+    Movie:   '#52b54b',   // Emby green
+    Episode: '#4db6ac',   // Teal
+    Audio:   '#7e57c2',   // Purple
+    Other:   '#78909c'    // Slate
+};
+
+var STREAM_COLORS = {
+    DirectPlay:   '#52b54b',   // Green  — no processing
+    DirectStream: '#d4a76a',   // Muted gold — partial
+    Transcode:    '#e57373'    // Muted red — heavy
+};
+
+var RES_COLORS = {
+    '4K':      '#52b54b',
+    '1080p':   '#4db6ac',
+    '720p':    '#d4a76a',
+    '480p':    '#e57373',
+    'Other':   '#78909c',
+    'Unknown': '#546e7a'
+};
+
+// Sequential palette for generic multi-item charts
+var PALETTE = [
+    '#52b54b', '#4db6ac', '#7e57c2', '#d4a76a',
+    '#26a69a', '#e57373', '#5c6bc0', '#8bc34a',
+    '#e57373', '#78909c', '#ab47bc', '#29b6f6'
+];
+
+// Soften hex color to ~70% opacity for bar fills (matches gradient feel)
+function soften(hex) {
+    var r = parseInt(hex.slice(1,3), 16);
+    var g = parseInt(hex.slice(3,5), 16);
+    var b = parseInt(hex.slice(5,7), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',0.7)';
+}
 
 function getDays() { return parseInt(document.getElementById('graph-days').value) || 30; }
 function destroy(key) { if (gCharts[key]) { gCharts[key].destroy(); gCharts[key] = null; } }
 
+function getGraphMetric() {
+    var active = document.querySelector('#graph-metric-toggle .toggle-btn.active');
+    return active ? (active.dataset.value || 'plays') : 'plays';
+}
+function isDuration() { return getGraphMetric() === 'duration'; }
+function toHours(s) { return Math.round((s || 0) / 360) / 10; }
+function pickVal(row) { return isDuration() ? toHours(row.total_duration) : row.plays; }
+function metricLabel() { return isDuration() ? 'Hours' : 'Plays'; }
+function metricUnit() { return isDuration() ? 'h' : ''; }
+
+function setGraphToggle(btn) {
+    btn.parentElement.querySelectorAll('.toggle-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    loadGraphs();
+}
+
+// Shared tooltip config for consistent look
+function tooltipConfig() {
+    return {
+        backgroundColor: 'rgba(28, 28, 30, 0.95)',
+        titleColor: '#e0e0e0',
+        bodyColor: '#ccc',
+        borderColor: 'rgba(82, 181, 75, 0.3)',
+        borderWidth: 1,
+        cornerRadius: 6,
+        padding: 10,
+        titleFont: { family: "'DM Sans', sans-serif", weight: '600', size: 12 },
+        bodyFont: { family: "'Source Sans 3', sans-serif", size: 12 },
+        displayColors: true,
+        boxPadding: 4
+    };
+}
+
+// Common chart options
+function baseOpts(extra) {
+    var opts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400, easing: 'easeOutQuart' },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+            tooltip: tooltipConfig(),
+            legend: { display: false }
+        }
+    };
+    if (extra) {
+        for (var k in extra) {
+            if (k === 'plugins') {
+                for (var pk in extra.plugins) opts.plugins[pk] = extra.plugins[pk];
+            } else if (k === 'scales') {
+                opts.scales = extra.scales;
+            } else {
+                opts[k] = extra[k];
+            }
+        }
+    }
+    return opts;
+}
+
+function barScales(stacked) {
+    var s = {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxRotation: 45 } },
+        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { precision: isDuration() ? 1 : 0 } }
+    };
+    if (stacked) { s.x.stacked = true; s.y.stacked = true; }
+    return s;
+}
+
+function horizScales(stacked) {
+    var s = {
+        x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { precision: isDuration() ? 1 : 0 } },
+        y: { grid: { display: false } }
+    };
+    if (stacked) { s.x.stacked = true; s.y.stacked = true; }
+    return s;
+}
+
+function legendOpts(pos) {
+    return { display: true, position: pos || 'top', labels: { boxWidth: 12, padding: 12, font: { family: "'Source Sans 3', sans-serif", size: 11 } } };
+}
+
+// Gradient fill helper — always uses Emby green for consistency
+function gradient(ctx, height) {
+    var g = ctx.createLinearGradient(0, 0, 0, height || 300);
+    g.addColorStop(0, 'rgba(82, 181, 75, 0.7)');
+    g.addColorStop(1, 'rgba(82, 181, 75, 0.05)');
+    return g;
+}
+
 function loadGraphs() {
     C.setupDefaults();
     var d = getDays();
+    var label = metricLabel();
+    var unit = metricUnit();
 
-    // 1. Daily stacked by type
-    fetch('/api/charts/plays-by-date-stacked?days=' + d).then(r => r.json()).then(data => {
+    // --- 1. Daily stacked by type ---
+    fetch('/api/charts/plays-by-date-stacked?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
         destroy('dailyStacked');
-        var dates = [...new Set(data.map(r => r.date))].sort();
-        var types = [...new Set(data.map(r => r.item_type))];
+        var dates = []; var dateSet = {};
+        data.forEach(function(r) { if (!dateSet[r.date]) { dateSet[r.date] = 1; dates.push(r.date); } });
+        dates.sort();
+        var types = []; var typeSet = {};
+        data.forEach(function(r) { if (!typeSet[r.item_type]) { typeSet[r.item_type] = 1; types.push(r.item_type); } });
         var map = {};
-        data.forEach(r => { map[r.date + '|' + r.item_type] = r.plays; });
+        data.forEach(function(r) { map[r.date + '|' + r.item_type] = r; });
+
         gCharts.dailyStacked = new Chart(document.getElementById('g-daily-stacked'), {
             type: 'bar',
             data: {
-                labels: dates.map(d => d.slice(5)),
-                datasets: types.map(t => ({
-                    label: t, data: dates.map(d => map[d + '|' + t] || 0),
-                    backgroundColor: TYPE_COLORS[t] || C.COLORS[0]
-                }))
+                labels: dates.map(function(dd) { return dd.slice(5); }),
+                datasets: types.map(function(t) {
+                    return {
+                        label: t,
+                        data: dates.map(function(dd) {
+                            var row = map[dd + '|' + t];
+                            return row ? pickVal(row) : 0;
+                        }),
+                        backgroundColor: soften(TYPE_COLORS[t] || PALETTE[0]),
+                        borderRadius: 2
+                    };
+                })
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12 } } } }
+            options: baseOpts({
+                scales: barScales(true),
+                plugins: {
+                    legend: legendOpts('top'),
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: {
+                            label: function(ctx) {
+                                return ctx.dataset.label + ': ' + ctx.parsed.y + (unit ? ' ' + unit : '');
+                            }
+                        }
+                    })
+                }
+            })
         });
     });
 
-    // 2. Day of week
-    fetch('/api/charts/plays-by-dow?days=' + d).then(r => r.json()).then(data => {
+    // --- 2. Day of week ---
+    fetch('/api/charts/plays-by-dow?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
         destroy('dow');
-        var map = {}; data.forEach(r => { map[r.dow] = r.plays; });
-        gCharts.dow = new Chart(document.getElementById('g-dow'), {
-            type: 'bar',
-            data: { labels: DOW_LABELS, datasets: [{ label: 'Plays', data: DOW_LABELS.map((_, i) => map[i] || 0), backgroundColor: C.COLORS }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
-        });
-    });
-
-    // 3. Hour of day
-    fetch('/api/charts/plays-by-hour?days=' + d).then(r => r.json()).then(data => {
-        destroy('hour');
-        var map = {}; data.forEach(r => { map[r.hour] = r.plays; });
-        var hours = Array.from({length: 24}, (_, i) => i);
-        gCharts.hour = new Chart(document.getElementById('g-hour'), {
-            type: 'bar',
-            data: { labels: hours.map(h => h + ':00'), datasets: [{ label: 'Plays', data: hours.map(h => map[h] || 0), backgroundColor: C.COLORS[0] }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
-        });
-    });
-
-    // 4. Monthly
-    fetch('/api/charts/plays-per-month?months=12').then(r => r.json()).then(data => {
-        destroy('monthly');
-        gCharts.monthly = new Chart(document.getElementById('g-monthly'), {
-            type: 'bar',
-            data: { labels: data.map(r => r.month), datasets: [{ label: 'Plays', data: data.map(r => r.plays), backgroundColor: C.COLORS[0] }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
-        });
-    });
-
-    // 5. Stream type over time
-    fetch('/api/charts/plays-by-stream-type?days=' + d).then(r => r.json()).then(data => {
-        destroy('streamTime');
-        var dates = [...new Set(data.map(r => r.date))].sort();
-        var methods = [...new Set(data.map(r => r.play_method))];
         var map = {};
-        data.forEach(r => { map[r.date + '|' + r.play_method] = r.plays; });
+        data.forEach(function(r) { map[r.dow] = r; });
+        var values = DOW_LABELS.map(function(_, i) {
+            var row = map[i];
+            return row ? pickVal(row) : 0;
+        });
+        var canvas = document.getElementById('g-dow');
+        var ctx = canvas.getContext('2d');
+
+        gCharts.dow = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: DOW_LABELS,
+                datasets: [{
+                    label: label,
+                    data: values,
+                    backgroundColor: gradient(ctx, 200),
+                    borderRadius: 4,
+                    borderSkipped: false
+                }]
+            },
+            options: baseOpts({
+                scales: barScales(false),
+                plugins: {
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: { label: function(ctx) { return label + ': ' + ctx.parsed.y + (unit ? ' ' + unit : ''); } }
+                    })
+                }
+            })
+        });
+    });
+
+    // --- 3. Hour of day ---
+    fetch('/api/charts/plays-by-hour?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
+        destroy('hour');
+        var map = {};
+        data.forEach(function(r) { map[r.hour] = r; });
+        var hours = [];
+        for (var i = 0; i < 24; i++) hours.push(i);
+        var values = hours.map(function(h) {
+            var row = map[h];
+            return row ? pickVal(row) : 0;
+        });
+        var maxVal = Math.max.apply(null, values);
+        var canvas = document.getElementById('g-hour');
+        var ctx = canvas.getContext('2d');
+
+        gCharts.hour = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: hours.map(function(h) {
+                    var ampm = h >= 12 ? 'PM' : 'AM';
+                    var hr = h % 12 || 12;
+                    return hr + ampm;
+                }),
+                datasets: [{
+                    label: label,
+                    data: values,
+                    backgroundColor: gradient(ctx, 200),
+                    borderRadius: 3,
+                    borderSkipped: false
+                }]
+            },
+            options: baseOpts({
+                scales: barScales(false),
+                plugins: {
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: { label: function(ctx) { return label + ': ' + ctx.parsed.y + (unit ? ' ' + unit : ''); } }
+                    })
+                }
+            })
+        });
+    });
+
+    // --- 4. Monthly ---
+    fetch('/api/charts/plays-per-month?months=12').then(function(r) { return r.json(); }).then(function(data) {
+        destroy('monthly');
+        var canvas = document.getElementById('g-monthly');
+        var ctx = canvas.getContext('2d');
+
+        gCharts.monthly = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: data.map(function(r) {
+                    var parts = r.month.split('-');
+                    var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    return monthNames[parseInt(parts[1]) - 1] + ' ' + parts[0].slice(2);
+                }),
+                datasets: [{
+                    label: label,
+                    data: data.map(pickVal),
+                    backgroundColor: gradient(ctx, 200),
+                    borderRadius: 4,
+                    borderSkipped: false
+                }]
+            },
+            options: baseOpts({
+                scales: barScales(false),
+                plugins: {
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: { label: function(ctx) { return label + ': ' + ctx.parsed.y + (unit ? ' ' + unit : ''); } }
+                    })
+                }
+            })
+        });
+    });
+
+    // --- 5. Stream type over time ---
+    fetch('/api/charts/plays-by-stream-type?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
+        destroy('streamTime');
+        var dates = []; var dateSet = {};
+        data.forEach(function(r) { if (!dateSet[r.date]) { dateSet[r.date] = 1; dates.push(r.date); } });
+        dates.sort();
+        var methods = []; var methodSet = {};
+        data.forEach(function(r) { if (!methodSet[r.play_method]) { methodSet[r.play_method] = 1; methods.push(r.play_method); } });
+        var map = {};
+        data.forEach(function(r) { map[r.date + '|' + r.play_method] = r.plays; });
+
         gCharts.streamTime = new Chart(document.getElementById('g-stream-time'), {
             type: 'bar',
             data: {
-                labels: dates.map(d => d.slice(5)),
-                datasets: methods.map(m => ({
-                    label: m, data: dates.map(d => map[d + '|' + m] || 0),
-                    backgroundColor: STREAM_COLORS[m] || '#999'
-                }))
+                labels: dates.map(function(dd) { return dd.slice(5); }),
+                datasets: methods.map(function(m) {
+                    return {
+                        label: m,
+                        data: dates.map(function(dd) { return map[dd + '|' + m] || 0; }),
+                        backgroundColor: soften(STREAM_COLORS[m] || '#78909c'),
+                        borderRadius: 1
+                    };
+                })
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12 } } } }
+            options: baseOpts({
+                scales: barScales(true),
+                plugins: {
+                    legend: legendOpts('top'),
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y; } }
+                    })
+                }
+            })
         });
     });
 
-    // 6. Source resolution
-    fetch('/api/charts/source-resolution?days=' + d).then(r => r.json()).then(data => {
+    // --- 6. Source resolution ---
+    fetch('/api/charts/source-resolution?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
         destroy('resolution');
+
         gCharts.resolution = new Chart(document.getElementById('g-resolution'), {
             type: 'doughnut',
-            data: { labels: data.map(r => r.resolution), datasets: [{ data: data.map(r => r.plays), backgroundColor: C.COLORS }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } } }
+            data: {
+                labels: data.map(function(r) { return r.resolution; }),
+                datasets: [{
+                    data: data.map(function(r) { return r.plays; }),
+                    backgroundColor: data.map(function(r) { return RES_COLORS[r.resolution] || PALETTE[0]; }),
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }]
+            },
+            options: baseOpts({
+                plugins: {
+                    legend: legendOpts('right'),
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: {
+                            label: function(ctx) {
+                                var total = ctx.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                                var pct = total > 0 ? Math.round(ctx.parsed * 100 / total) : 0;
+                                return ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
+                            }
+                        }
+                    })
+                }
+            })
         });
     });
 
-    // 7. Transcode ratio
-    fetch('/api/charts/transcode-ratio?days=' + d).then(r => r.json()).then(data => {
+    // --- 7. Play method (transcode ratio) ---
+    fetch('/api/charts/transcode-ratio?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
         destroy('transcode');
+
         gCharts.transcode = new Chart(document.getElementById('g-transcode'), {
             type: 'doughnut',
-            data: { labels: data.map(r => r.play_method), datasets: [{ data: data.map(r => r.plays), backgroundColor: data.map(r => STREAM_COLORS[r.play_method] || '#999') }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } } }
+            data: {
+                labels: data.map(function(r) { return r.play_method; }),
+                datasets: [{
+                    data: data.map(function(r) { return r.plays; }),
+                    backgroundColor: data.map(function(r) { return STREAM_COLORS[r.play_method] || '#78909c'; }),
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }]
+            },
+            options: baseOpts({
+                plugins: {
+                    legend: legendOpts('right'),
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: {
+                            label: function(ctx) {
+                                var total = ctx.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                                var pct = total > 0 ? Math.round(ctx.parsed * 100 / total) : 0;
+                                return ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
+                            }
+                        }
+                    })
+                }
+            })
         });
     });
 
-    // 8. Top platforms by stream type
-    fetch('/api/charts/top-platforms-stream-type?days=' + d).then(r => r.json()).then(data => {
+    // --- 8. Content type (plays by type doughnut) ---
+    fetch('/api/charts/plays-by-type?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
+        destroy('contentType');
+
+        gCharts.contentType = new Chart(document.getElementById('g-content-type'), {
+            type: 'doughnut',
+            data: {
+                labels: data.map(function(r) { return r.item_type; }),
+                datasets: [{
+                    data: data.map(pickVal),
+                    backgroundColor: data.map(function(r) { return TYPE_COLORS[r.item_type] || PALETTE[3]; }),
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }]
+            },
+            options: baseOpts({
+                plugins: {
+                    legend: legendOpts('right'),
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: {
+                            label: function(ctx) {
+                                var total = ctx.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                                var pct = total > 0 ? Math.round(ctx.parsed * 100 / total) : 0;
+                                return ctx.label + ': ' + ctx.parsed + (unit ? ' ' + unit : '') + ' (' + pct + '%)';
+                            }
+                        }
+                    })
+                }
+            })
+        });
+    });
+
+    // --- 9. Top platforms (simple bar) ---
+    fetch('/api/charts/plays-by-platform?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
+        destroy('platforms');
+
+        gCharts.platforms = new Chart(document.getElementById('g-platforms'), {
+            type: 'bar',
+            data: {
+                labels: data.map(function(r) { return r.client; }),
+                datasets: [{
+                    label: label,
+                    data: data.map(pickVal),
+                    backgroundColor: PALETTE.slice(0, data.length).map(soften),
+                    borderRadius: 4,
+                    borderSkipped: false
+                }]
+            },
+            options: baseOpts({
+                indexAxis: 'y',
+                scales: horizScales(false),
+                plugins: {
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: { label: function(ctx) { return label + ': ' + ctx.parsed.x + (unit ? ' ' + unit : ''); } }
+                    })
+                }
+            })
+        });
+    });
+
+    // --- 10. Top platforms by stream type ---
+    fetch('/api/charts/top-platforms-stream-type?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
         destroy('platformStream');
-        var clients = [...new Set(data.map(r => r.client))];
-        // Sort by total plays, take top 10
-        var totals = {};
-        data.forEach(r => { totals[r.client] = (totals[r.client] || 0) + r.plays; });
-        clients.sort((a, b) => totals[b] - totals[a]);
-        clients = clients.slice(0, 10);
-        var methods = [...new Set(data.map(r => r.play_method))];
+        var clients = []; var clientTotals = {};
+        data.forEach(function(r) {
+            clientTotals[r.client] = (clientTotals[r.client] || 0) + r.plays;
+        });
+        var allClients = Object.keys(clientTotals);
+        allClients.sort(function(a, b) { return clientTotals[b] - clientTotals[a]; });
+        clients = allClients.slice(0, 10);
+        var methods = []; var methodSet = {};
+        data.forEach(function(r) { if (!methodSet[r.play_method]) { methodSet[r.play_method] = 1; methods.push(r.play_method); } });
         var map = {};
-        data.forEach(r => { map[r.client + '|' + r.play_method] = r.plays; });
+        data.forEach(function(r) { map[r.client + '|' + r.play_method] = r.plays; });
+
         gCharts.platformStream = new Chart(document.getElementById('g-platform-stream'), {
             type: 'bar',
             data: {
                 labels: clients,
-                datasets: methods.map(m => ({
-                    label: m, data: clients.map(c => map[c + '|' + m] || 0),
-                    backgroundColor: STREAM_COLORS[m] || '#999'
-                }))
+                datasets: methods.map(function(m) {
+                    return {
+                        label: m,
+                        data: clients.map(function(c) { return map[c + '|' + m] || 0; }),
+                        backgroundColor: soften(STREAM_COLORS[m] || '#78909c'),
+                        borderRadius: 2
+                    };
+                })
             },
-            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, y: { stacked: true } }, plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12 } } } }
+            options: baseOpts({
+                indexAxis: 'y',
+                scales: horizScales(true),
+                plugins: {
+                    legend: legendOpts('top'),
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.x; } }
+                    })
+                }
+            })
         });
     });
 
-    // 9. Top users by stream type
-    fetch('/api/charts/top-users-stream-type?days=' + d).then(r => r.json()).then(data => {
+    // --- 11. Top users by stream type ---
+    fetch('/api/charts/top-users-stream-type?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
         destroy('userStream');
-        var users = [...new Set(data.map(r => r.user_name))];
-        var totals = {};
-        data.forEach(r => { totals[r.user_name] = (totals[r.user_name] || 0) + r.plays; });
-        users.sort((a, b) => totals[b] - totals[a]);
-        users = users.slice(0, 10);
-        var methods = [...new Set(data.map(r => r.play_method))];
+        var users = []; var userTotals = {};
+        data.forEach(function(r) {
+            userTotals[r.user_name] = (userTotals[r.user_name] || 0) + r.plays;
+        });
+        var allUsers = Object.keys(userTotals);
+        allUsers.sort(function(a, b) { return userTotals[b] - userTotals[a]; });
+        users = allUsers.slice(0, 10);
+        var methods = []; var methodSet = {};
+        data.forEach(function(r) { if (!methodSet[r.play_method]) { methodSet[r.play_method] = 1; methods.push(r.play_method); } });
         var map = {};
-        data.forEach(r => { map[r.user_name + '|' + r.play_method] = r.plays; });
+        data.forEach(function(r) { map[r.user_name + '|' + r.play_method] = r.plays; });
+
         gCharts.userStream = new Chart(document.getElementById('g-user-stream'), {
             type: 'bar',
             data: {
                 labels: users,
-                datasets: methods.map(m => ({
-                    label: m, data: users.map(u => map[u + '|' + m] || 0),
-                    backgroundColor: STREAM_COLORS[m] || '#999'
-                }))
+                datasets: methods.map(function(m) {
+                    return {
+                        label: m,
+                        data: users.map(function(u) { return map[u + '|' + m] || 0; }),
+                        backgroundColor: soften(STREAM_COLORS[m] || '#78909c'),
+                        borderRadius: 2
+                    };
+                })
             },
-            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, y: { stacked: true } }, plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12 } } } }
+            options: baseOpts({
+                indexAxis: 'y',
+                scales: horizScales(true),
+                plugins: {
+                    legend: legendOpts('top'),
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.x; } }
+                    })
+                }
+            })
+        });
+    });
+
+    // --- 12. Most active users (by plays or duration) ---
+    fetch('/api/charts/top-users?days=' + d + '&metric=' + getGraphMetric()).then(function(r) { return r.json(); }).then(function(data) {
+        destroy('topUsers');
+        var canvas = document.getElementById('g-top-users');
+        var ctx = canvas.getContext('2d');
+
+        gCharts.topUsers = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: data.map(function(r) { return r.user_name; }),
+                datasets: [{
+                    label: label,
+                    data: data.map(pickVal),
+                    backgroundColor: gradient(ctx, 300),
+                    borderRadius: 4,
+                    borderSkipped: false
+                }]
+            },
+            options: baseOpts({
+                indexAxis: 'y',
+                scales: horizScales(false),
+                plugins: {
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: { label: function(ctx) { return label + ': ' + ctx.parsed.x + (unit ? ' ' + unit : ''); } }
+                    })
+                }
+            })
         });
     });
 }

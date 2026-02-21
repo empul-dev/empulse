@@ -259,15 +259,16 @@ async def export_history(
 
 
 @router.get("/img/{item_id}")
-async def image_proxy(item_id: str):
+async def image_proxy(item_id: str, w: int = 150):
     """Proxy Emby item images so the API key stays server-side."""
     if not _validate_id(item_id):
         return Response(content=b"", status_code=400)
+    max_width = max(20, min(w, 600))
     import httpx
     url = f"{settings.emby_url.rstrip('/')}/Items/{item_id}/Images/Primary"
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(url, params={"api_key": settings.emby_api_key, "maxWidth": "150"})
+            r = await client.get(url, params={"api_key": settings.emby_api_key, "maxWidth": str(max_width)})
             if r.status_code == 200:
                 return Response(
                     content=r.content,
@@ -487,6 +488,14 @@ async def chart_top_users_stream_type(days: int = 30):
     days = _clamp_days(days)
     db = get_db()
     rows = await stats_db.get_top_users_with_stream_type(db, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/top-users")
+async def chart_top_users(days: int = 30, metric: str = "plays"):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_top_users(db, limit=10, days=days, metric=metric)
     return JSONResponse(rows)
 
 
@@ -737,6 +746,35 @@ async def restore_database(request: Request):
         "status": "restored",
         "message": "Database restored. All sessions invalidated. Restart the application to apply changes.",
     })
+
+
+@router.get("/random-posters")
+async def random_posters(request: Request, limit: int = 24):
+    """Return random item IDs from Emby for the login poster wall."""
+    emby_client = getattr(request.app.state, "emby_client", None)
+    if not emby_client:
+        return JSONResponse([])
+    limit = max(1, min(limit, 48))
+    try:
+        params = {
+            **emby_client._params,
+            "SortBy": "Random",
+            "Recursive": "true",
+            "Limit": str(limit),
+            "IncludeItemTypes": "Movie,Series",
+            "ImageTypes": "Primary",
+            "Fields": "PrimaryImageAspectRatio",
+        }
+        r = await emby_client._client.get(
+            f"{emby_client.base_url}/Items", params=params
+        )
+        r.raise_for_status()
+        items = r.json().get("Items", [])
+        ids = [item["Id"] for item in items if item.get("Id")]
+        return JSONResponse(ids, headers={"Cache-Control": "public, max-age=300"})
+    except Exception as e:
+        logger.warning(f"Random posters fetch failed: {e}")
+        return JSONResponse([])
 
 
 @router.post("/test-connection")
