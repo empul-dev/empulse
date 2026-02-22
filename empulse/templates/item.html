@@ -26,7 +26,7 @@
         </div>
         <div class="item-meta">
             {% if is_series %}
-            <h1 class="item-title accent">{{ series_name }}</h1>
+            <h1 class="item-title accent">{% if item.get('Type') == 'Episode' and item.get('SeriesId') %}<a href="/item/{{ item.get('SeriesId') }}?type=series&name={{ series_name | urlencode }}">{{ series_name }}</a>{% else %}{{ series_name }}{% endif %}</h1>
             {% if item.get('Name') and item.get('Name') != series_name %}
             <h2 class="item-subtitle">{{ item.get('Name', '') }}</h2>
             {% endif %}

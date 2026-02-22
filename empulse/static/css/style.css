@@ -1609,6 +1609,13 @@ table a {
 .item-title.accent {
     color: var(--accent);
 }
+.item-title.accent a {
+    color: inherit;
+    text-decoration: none;
+}
+.item-title.accent a:hover {
+    text-decoration: underline;
+}
 
 .item-original-title {
     font-size: 0.82em;
