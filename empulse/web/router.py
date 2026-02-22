@@ -119,17 +119,6 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
             except (_json.JSONDecodeError, TypeError):
                 pass
 
-    # Redirect bare episode URLs to the series-based URL for richer metadata
-    if type != "series" and item_data.get("Type") == "Episode":
-        ep_series_id = item_data.get("SeriesId")
-        ep_series_name = item_data.get("SeriesName", "")
-        if ep_series_id:
-            from urllib.parse import quote
-            return RedirectResponse(
-                f"/item/{ep_series_id}?type=series&name={quote(ep_series_name)}",
-                status_code=302,
-            )
-
     # For series/episodes, use series name for stats
     is_series = type == "series" or item_data.get("Type") in ("Series", "Episode")
     series_name = name or item_data.get("SeriesName") or item_data.get("Name", "")
