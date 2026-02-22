@@ -27,25 +27,25 @@
                 <div class="timeline-pct">{{ record.percent_complete }}%</div>
             </div>
             <div class="timeline-stats">
-                <div class="timeline-stat">
+                <div class="timeline-stat" data-tip="When playback started">
                     <span class="ts-label">Started</span>
                     <span class="ts-value">{{ record.started_at_full }}</span>
                 </div>
-                <div class="timeline-stat">
+                <div class="timeline-stat" data-tip="When playback stopped">
                     <span class="ts-label">Stopped</span>
                     <span class="ts-value">{{ record.stopped_at_full }}</span>
                 </div>
-                <div class="timeline-stat">
+                <div class="timeline-stat" data-tip="Content watched / total runtime">
                     <span class="ts-label">Watched</span>
                     <span class="ts-value">{{ record.duration_display }}{% if record.runtime_display %} / {{ record.runtime_display }}{% endif %}</span>
                 </div>
                 {% if record.paused_seconds > 0 %}
-                <div class="timeline-stat">
+                <div class="timeline-stat" data-tip="Total time paused during this session">
                     <span class="ts-label">Paused</span>
                     <span class="ts-value">{{ record.paused_display }}{% if record.parsed_pause_events | length > 0 %} ({{ record.parsed_pause_events | length }}x){% endif %}</span>
                 </div>
                 {% endif %}
-                <div class="timeline-stat">
+                <div class="timeline-stat" data-tip="Wall-clock time from start to stop (includes pauses)">
                     <span class="ts-label">Session</span>
                     <span class="ts-value">{{ record.session_time_display }}</span>
                 </div>

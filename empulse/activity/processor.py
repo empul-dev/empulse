@@ -85,22 +85,28 @@ class ActivityProcessor:
         ps = s.play_state
         tc = s.transcoding_info
 
-        # Determine video/audio decision
+        # Determine video/audio decision from TranscodingInfo flags.
+        # Emby sends a TranscodingInfo block even for direct-stream sessions,
+        # so we must check is_video_direct / is_audio_direct rather than
+        # just the presence of a codec string.
         video_decision = "Direct Play"
         audio_decision = "Direct Play"
         if tc:
-            if tc.video_codec:
+            if tc.is_video_direct is False:
                 video_decision = "Transcode"
-            if tc.audio_codec:
+            elif tc.is_video_direct is True:
+                video_decision = "Direct Stream"
+            if tc.is_audio_direct is False:
                 audio_decision = "Transcode"
+            elif tc.is_audio_direct is True:
+                audio_decision = "Direct Stream"
 
         play_method = ps.play_method if ps else None
-        if play_method == "DirectPlay":
-            play_method = "DirectPlay"
-        elif play_method == "Transcode":
-            play_method = "Transcode"
-        elif play_method == "DirectStream":
-            play_method = "DirectStream"
+        # Correct play_method when Emby reports Transcode but both streams
+        # are actually direct (container remux only).
+        if play_method == "Transcode" and tc:
+            if tc.is_video_direct and tc.is_audio_direct:
+                play_method = "DirectStream"
 
         return {
             "session_key": f"{s.user_id}_{s.device_id}_{item.id}" if item else s.id,
