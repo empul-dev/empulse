@@ -1079,7 +1079,7 @@ table a {
 .timeline-bar {
     flex: 1;
     height: 10px;
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--border);
     border-radius: 5px;
     position: relative;
     overflow: visible;
@@ -1129,9 +1129,9 @@ table a {
     background: var(--bg-card, #1c1c1e);
     color: var(--text-primary);
     border: 1px solid var(--border);
-    padding: 0.25rem 0.5rem;
+    padding: 4px 8px;
     border-radius: 4px;
-    font-size: 0.7em;
+    font-size: 12px;
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
@@ -1176,9 +1176,9 @@ table a {
     background: var(--bg-card, #1c1c1e);
     color: var(--text-primary);
     border: 1px solid var(--border);
-    padding: 0.25rem 0.5rem;
+    padding: 4px 8px;
     border-radius: 4px;
-    font-size: 0.7em;
+    font-size: 12px;
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
