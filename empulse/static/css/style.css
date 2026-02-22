@@ -420,6 +420,14 @@ input.days-input {
     opacity: 0.5;
 }
 
+.stat-card-poster.stat-card-icon img {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    position: static;
+}
+
 .avatar-fallback {
     width: 60px;
     height: 60px;

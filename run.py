@@ -7,6 +7,6 @@ if __name__ == "__main__":
         "empulse.app:create_app",
         factory=True,
         host=settings.empulse_host,
-        port=settings.empulse_port,
+        port=int(os.getenv("PORT", settings.empulse_port)),
         reload=os.getenv("EMPULSE_DEV", "").lower() in ("1", "true"),
     )
