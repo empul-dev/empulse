@@ -1097,33 +1097,33 @@ table a {
     transition: width 0.3s ease;
 }
 
-/* Pause markers — thin vertical tick on the bar */
+/* Pause markers — amber dot on the bar */
 .tl-marker {
     position: absolute;
-    top: 0;
-    width: 3px;
-    height: 100%;
-    margin-left: -1.5px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    margin-top: -4px;
     cursor: pointer;
     z-index: 5;
-    background: rgba(255, 255, 255, 0.45);
-    border-radius: 1px;
-    transition: background 0.15s ease;
+    border-radius: 50%;
+    background: rgba(234, 179, 8, 0.7);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4);
+    transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .tl-marker:hover {
-    background: rgba(255, 255, 255, 0.85);
+    transform: scale(1.5);
+    background: rgba(234, 179, 8, 1);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 6px rgba(234, 179, 8, 0.4);
 }
 
-.tl-pause-icon {
-    display: none;
-}
-
-/* Tooltip — above the bar to avoid overlapping stats */
-.tl-marker[data-tooltip]::after {
-    content: attr(data-tooltip);
+/* Tooltip — above the bar (uses data-tip to avoid Pico CSS conflict) */
+.tl-marker[data-tip]::after {
+    content: attr(data-tip);
     position: absolute;
-    bottom: calc(100% + 8px);
+    bottom: calc(100% + 10px);
     left: 50%;
     transform: translateX(-50%) translateY(2px);
     background: var(--bg-card, #1c1c1e);
@@ -1140,7 +1140,7 @@ table a {
     z-index: 100;
 }
 
-.tl-marker[data-tooltip]:hover::after {
+.tl-marker[data-tip]:hover::after {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }

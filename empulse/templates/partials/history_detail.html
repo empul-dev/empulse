@@ -21,9 +21,7 @@
                 <div class="timeline-bar">
                     <div class="tl-fill" style="width: {{ [record.percent_complete, 100] | min }}%"></div>
                     {% for m in markers %}
-                    <div class="tl-marker" style="left: {{ m.pct }}%" data-tooltip="{{ m.label }}">
-                        <svg class="tl-pause-icon" viewBox="0 0 10 12"><rect x="1" y="0" width="3" height="12" rx="0.5"/><rect x="6" y="0" width="3" height="12" rx="0.5"/></svg>
-                    </div>
+                    <div class="tl-marker" style="left: {{ m.pct }}%" data-tip="{{ m.label }}"></div>
                     {% endfor %}
                 </div>
                 <div class="timeline-pct">{{ record.percent_complete }}%</div>
