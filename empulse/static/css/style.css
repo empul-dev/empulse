@@ -1119,11 +1119,11 @@ table a {
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 6px rgba(234, 179, 8, 0.4);
 }
 
-/* Tooltip — above the bar (uses data-tip to avoid Pico CSS conflict) */
-.tl-marker[data-tip]::after {
+/* Shared tooltip style (uses data-tip to avoid Pico CSS conflict) */
+.detail-timeline [data-tip]::after {
     content: attr(data-tip);
     position: absolute;
-    bottom: calc(100% + 10px);
+    bottom: calc(100% + 8px);
     left: 50%;
     transform: translateX(-50%) translateY(2px);
     background: var(--bg-card, #1c1c1e);
@@ -1131,7 +1131,7 @@ table a {
     border: 1px solid var(--border);
     padding: 4px 8px;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 11px;
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
@@ -1140,7 +1140,7 @@ table a {
     z-index: 100;
 }
 
-.tl-marker[data-tip]:hover::after {
+.detail-timeline [data-tip]:hover::after {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }
@@ -1167,30 +1167,6 @@ table a {
     cursor: default;
 }
 
-.timeline-stat[data-tip]::after {
-    content: attr(data-tip);
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%) translateY(2px);
-    background: var(--bg-card, #1c1c1e);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    white-space: nowrap;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s ease, transform 0.15s ease;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    z-index: 100;
-}
-
-.timeline-stat[data-tip]:hover::after {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-}
 
 .ts-label {
     font-size: 0.7em;
