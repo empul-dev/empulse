@@ -118,7 +118,7 @@
             </div>
             <ol class="stat-list">
                 {% for r in recently_watched %}
-                <li data-img="/api/img/{{ rw_poster(r) | trim }}" data-title="{{ (r.display_title or '?')[:2] }}" data-href="{{ r.item_link }}">
+                <li data-img="/api/img/{{ rw_poster(r) | trim }}" data-title="{{ (r.display_title or '?')[:2] }}" data-href="{% if r.item_type == 'Episode' and r.series_id %}/item/{{ r.series_id }}?type=series&name={{ r.series_name | urlencode }}{% else %}/item/{{ r.item_id }}{% endif %}">
                     <span class="stat-list-name">{{ r.display_title }}</span>
                     <span class="stat-list-value-small">{{ r.user_name }}</span>
                 </li>
