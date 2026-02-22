@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS history (
     stopped_at TEXT NOT NULL,
     duration_seconds INTEGER DEFAULT 0,
     paused_seconds INTEGER DEFAULT 0,
+    pause_events TEXT DEFAULT '[]',
     percent_complete REAL DEFAULT 0,
     watched INTEGER DEFAULT 0
 );
@@ -192,6 +193,10 @@ async def _migrate(db: aiosqlite.Connection):
         # Auto-enable existing admins
         await db.execute("UPDATE users SET enabled = 1 WHERE is_admin = 1")
         logger.info("Migration: added enabled column to users")
+
+    if "pause_events" not in cols:
+        await db.execute("ALTER TABLE history ADD COLUMN pause_events TEXT DEFAULT '[]'")
+        logger.info("Migration: added pause_events column to history")
 
     # Ensure login_sessions table exists (for pre-existing DBs)
     await db.execute("""

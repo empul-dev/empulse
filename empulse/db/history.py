@@ -9,7 +9,7 @@ HISTORY_COLUMNS = frozenset({
     "transcode_video_codec", "transcode_audio_codec",
     "video_decision", "audio_decision", "stream_info",
     "started_at", "stopped_at", "duration_seconds", "paused_seconds",
-    "percent_complete", "watched",
+    "pause_events", "percent_complete", "watched",
 })
 
 
@@ -41,11 +41,12 @@ async def update_active_history(db: aiosqlite.Connection, history_id: int, data:
     """Update an in-progress history record with current progress/duration."""
     await db.execute(
         "UPDATE history SET stopped_at = ?, duration_seconds = ?, paused_seconds = ?, "
-        "percent_complete = ?, watched = ?, progress_ticks = ?, stream_info = ? WHERE id = ?",
+        "pause_events = ?, percent_complete = ?, watched = ?, progress_ticks = ?, stream_info = ? WHERE id = ?",
         [
             data["stopped_at"],
             data["duration_seconds"],
             data["paused_seconds"],
+            data.get("pause_events", "[]"),
             data["percent_complete"],
             data["watched"],
             data.get("progress_ticks", 0),

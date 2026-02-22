@@ -221,6 +221,7 @@ class ActivityProcessor:
             "stopped_at": now_iso,
             "duration_seconds": total_duration,
             "paused_seconds": total_paused,
+            "pause_events": json.dumps(session.get("pause_events", [])),
             "percent_complete": percent,
             "watched": 1 if watched else 0,
             "progress_ticks": progress,
@@ -244,9 +245,18 @@ class ActivityProcessor:
             history_id = existing["id"]
             base_duration = existing.get("duration_seconds", 0)
             base_paused = existing.get("paused_seconds", 0)
+            # Load existing pause events so they're not lost on merge
+            base_pause_events = []
+            try:
+                raw = existing.get("pause_events", "[]")
+                parsed = json.loads(raw) if isinstance(raw, str) else raw
+                if isinstance(parsed, list):
+                    base_pause_events = parsed
+            except (ValueError, TypeError):
+                pass
             # Store base values so future updates accumulate correctly.
             # Don't update DB here — the next poll cycle will do it with correct totals.
-            self.state.set_history_id(session_key, history_id, base_duration, base_paused)
+            self.state.set_history_id(session_key, history_id, base_duration, base_paused, base_pause_events)
             logger.info(
                 f"History resumed (id={history_id}): {session.get('user_name')} - "
                 f"{session.get('item_name')}"
@@ -336,11 +346,12 @@ class ActivityProcessor:
                 stats = self._calc_progress(session)
                 await db.execute(
                     "UPDATE history SET stopped_at = ?, duration_seconds = ?, paused_seconds = ?, "
-                    "percent_complete = ?, watched = ?, progress_ticks = ?, stream_info = ? WHERE id = ?",
+                    "pause_events = ?, percent_complete = ?, watched = ?, progress_ticks = ?, stream_info = ? WHERE id = ?",
                     [
                         stats["stopped_at"],
                         stats["duration_seconds"],
                         stats["paused_seconds"],
+                        stats.get("pause_events", "[]"),
                         stats["percent_complete"],
                         stats["watched"],
                         stats.get("progress_ticks", 0),

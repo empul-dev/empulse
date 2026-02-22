@@ -1058,6 +1058,127 @@ table a {
     margin-left: 0.5rem;
 }
 
+/* === Playback Timeline === */
+.detail-timeline {
+    margin-bottom: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.timeline-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding-top: 1.75rem;
+    position: relative;
+}
+
+.timeline-bar {
+    flex: 1;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 5px;
+    position: relative;
+    overflow: visible;
+}
+
+/* Progress fill — green bar showing how far content was watched */
+.tl-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    border-radius: 5px;
+    background: linear-gradient(90deg, var(--accent), #34d399);
+    opacity: 0.85;
+    transition: width 0.3s ease;
+}
+
+/* Pause markers — thin vertical tick on the bar */
+.tl-marker {
+    position: absolute;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    margin-left: -1.5px;
+    cursor: pointer;
+    z-index: 5;
+    background: rgba(255, 255, 255, 0.45);
+    border-radius: 1px;
+    transition: background 0.15s ease;
+}
+
+.tl-marker:hover {
+    background: rgba(255, 255, 255, 0.85);
+}
+
+.tl-pause-icon {
+    display: none;
+}
+
+/* Tooltip — above the bar to avoid overlapping stats */
+.tl-marker[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(2px);
+    background: var(--bg-card, #1c1c1e);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7em;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: 100;
+}
+
+.tl-marker[data-tooltip]:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.timeline-pct {
+    font-size: 0.78em;
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 3em;
+    text-align: right;
+}
+
+.timeline-stats {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.timeline-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.ts-label {
+    font-size: 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.ts-value {
+    font-size: 0.8em;
+    color: var(--text-primary);
+    font-family: var(--font-mono, monospace);
+}
+
 .detail-streams {
     margin-bottom: 0.5rem;
 }

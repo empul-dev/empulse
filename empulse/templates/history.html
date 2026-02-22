@@ -140,11 +140,14 @@ function toggleDetail(historyId, rowEl) {
         chevron.classList.add('expanded');
         rowEl.classList.add('expanded');
 
-        // Lazy-load content if not yet loaded
+        // Lazy-load content if not yet loaded (from our own trusted API)
         if (contentEl.querySelector('.detail-loading')) {
-            fetch('/api/history-detail/' + historyId)
+            fetch('/api/history-detail/' + encodeURIComponent(historyId))
                 .then(function(r) { return r.text(); })
-                .then(function(html) { contentEl.innerHTML = html; });
+                .then(function(html) {
+                    contentEl.innerHTML = html;  // safe: own API response
+                    htmx.process(contentEl);
+                });
         }
     } else {
         detailRow.style.display = 'none';

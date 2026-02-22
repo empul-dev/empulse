@@ -14,6 +14,47 @@
             <span class="detail-user">{{ record.user_name }}</span>
         </div>
 
+        {# === Playback Timeline === #}
+        {% set markers = record.pause_markers %}
+        <div class="detail-timeline">
+            <div class="timeline-bar-wrap">
+                <div class="timeline-bar">
+                    <div class="tl-fill" style="width: {{ [record.percent_complete, 100] | min }}%"></div>
+                    {% for m in markers %}
+                    <div class="tl-marker" style="left: {{ m.pct }}%" data-tooltip="{{ m.label }}">
+                        <svg class="tl-pause-icon" viewBox="0 0 10 12"><rect x="1" y="0" width="3" height="12" rx="0.5"/><rect x="6" y="0" width="3" height="12" rx="0.5"/></svg>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="timeline-pct">{{ record.percent_complete }}%</div>
+            </div>
+            <div class="timeline-stats">
+                <div class="timeline-stat">
+                    <span class="ts-label">Started</span>
+                    <span class="ts-value">{{ record.started_at_full }}</span>
+                </div>
+                <div class="timeline-stat">
+                    <span class="ts-label">Stopped</span>
+                    <span class="ts-value">{{ record.stopped_at_full }}</span>
+                </div>
+                <div class="timeline-stat">
+                    <span class="ts-label">Watched</span>
+                    <span class="ts-value">{{ record.duration_display }}{% if record.runtime_display %} / {{ record.runtime_display }}{% endif %}</span>
+                </div>
+                {% if record.paused_seconds > 0 %}
+                <div class="timeline-stat">
+                    <span class="ts-label">Paused</span>
+                    <span class="ts-value">{{ record.paused_display }}{% if record.parsed_pause_events | length > 0 %} ({{ record.parsed_pause_events | length }}x){% endif %}</span>
+                </div>
+                {% endif %}
+                <div class="timeline-stat">
+                    <span class="ts-label">Session</span>
+                    <span class="ts-value">{{ record.session_time_display }}</span>
+                </div>
+            </div>
+        </div>
+
+        {# === Stream Details === #}
         {% if has_detail %}
         <div class="detail-streams">
             <div class="detail-stream-section">
@@ -33,7 +74,7 @@
                     <tr class="ds-section-row"><td colspan="4">Video <span class="ds-decision">{{ record.video_decision or 'direct play' }}</span></td></tr>
                     <tr>
                         <td class="ds-label">Codec</td>
-                        <td class="ds-src">{{ video.get('codec', '') }}</td>
+                        <td class="ds-src">{{ video.get('codec', '') }}{% if video.get('profile') %} ({{ video.get('profile') }}){% endif %}</td>
                         <td class="ds-arrow">&rarr;</td>
                         <td class="ds-dst">{{ tc.get('video_codec') or video.get('codec', '') }}</td>
                     </tr>
@@ -51,6 +92,22 @@
                         <td class="ds-src">{{ '%d' % ((video.get('bitrate', 0) or 0) / 1000) }} kbps</td>
                         <td class="ds-arrow">&rarr;</td>
                         <td class="ds-dst">{{ '%d' % ((tc.get('video_bitrate', 0) or video.get('bitrate', 0) or 0) / 1000) }} kbps</td>
+                    </tr>
+                    {% endif %}
+                    {% if video.get('framerate') %}
+                    <tr>
+                        <td class="ds-label">Framerate</td>
+                        <td class="ds-src">{{ video.get('framerate') }} fps</td>
+                        <td class="ds-arrow">&rarr;</td>
+                        <td class="ds-dst">{% if tc.get('framerate') %}{{ tc.get('framerate') }} fps{% else %}{{ video.get('framerate') }} fps{% endif %}</td>
+                    </tr>
+                    {% endif %}
+                    {% if video.get('bit_depth') %}
+                    <tr>
+                        <td class="ds-label">Bit Depth</td>
+                        <td class="ds-src">{{ video.get('bit_depth') }}-bit</td>
+                        <td class="ds-arrow">&rarr;</td>
+                        <td class="ds-dst">{{ video.get('bit_depth') }}-bit</td>
                     </tr>
                     {% endif %}
                     {% if video.get('video_range') %}
@@ -73,9 +130,25 @@
                     {% if audio.get('channels') %}
                     <tr>
                         <td class="ds-label">Channels</td>
-                        <td class="ds-src">{{ audio.get('channels', '') }}</td>
+                        <td class="ds-src">{{ audio.get('channels', '') }}{% if audio.get('channels', 0) == 6 %} (5.1){% elif audio.get('channels', 0) == 8 %} (7.1){% elif audio.get('channels', 0) == 2 %} (Stereo){% elif audio.get('channels', 0) == 1 %} (Mono){% endif %}</td>
                         <td class="ds-arrow">&rarr;</td>
-                        <td class="ds-dst">{{ tc.get('audio_channels') or audio.get('channels', '') }}</td>
+                        <td class="ds-dst">{{ tc.get('audio_channels') or audio.get('channels', '') }}{% set dst_ch = tc.get('audio_channels') or audio.get('channels', 0) %}{% if dst_ch == 6 %} (5.1){% elif dst_ch == 8 %} (7.1){% elif dst_ch == 2 %} (Stereo){% elif dst_ch == 1 %} (Mono){% endif %}</td>
+                    </tr>
+                    {% endif %}
+                    {% if audio.get('bitrate') %}
+                    <tr>
+                        <td class="ds-label">Bitrate</td>
+                        <td class="ds-src">{{ '%d' % ((audio.get('bitrate', 0) or 0) / 1000) }} kbps</td>
+                        <td class="ds-arrow">&rarr;</td>
+                        <td class="ds-dst">{{ '%d' % ((tc.get('audio_bitrate', 0) or audio.get('bitrate', 0) or 0) / 1000) }} kbps</td>
+                    </tr>
+                    {% endif %}
+                    {% if audio.get('sample_rate') %}
+                    <tr>
+                        <td class="ds-label">Sample Rate</td>
+                        <td class="ds-src">{{ '%.1f' % ((audio.get('sample_rate', 0) or 0) / 1000) }} kHz</td>
+                        <td class="ds-arrow">&rarr;</td>
+                        <td class="ds-dst">{{ '%.1f' % ((audio.get('sample_rate', 0) or 0) / 1000) }} kHz</td>
                     </tr>
                     {% endif %}
                     {% if audio.get('language') %}

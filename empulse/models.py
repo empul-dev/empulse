@@ -75,6 +75,7 @@ class HistoryRecord(BaseModel):
     episode_number: int | None = None
     year: int | None = None
     runtime_ticks: int = 0
+    progress_ticks: int = 0
     play_method: str | None = None
     video_decision: str | None = None
     audio_decision: str | None = None
@@ -85,6 +86,7 @@ class HistoryRecord(BaseModel):
     stopped_at: str = ""
     duration_seconds: int = 0
     paused_seconds: int = 0
+    pause_events: str = "[]"
     percent_complete: float = 0
     watched: bool = False
 
@@ -183,11 +185,102 @@ class HistoryRecord(BaseModel):
 
     @property
     def duration_display(self) -> str:
-        m, s = divmod(self.duration_seconds, 60)
+        """How much content was watched (from progress_ticks position)."""
+        if self.progress_ticks:
+            total = int(self.progress_ticks / 10_000_000)
+        else:
+            total = self.duration_seconds
+        m, s = divmod(total, 60)
         h, m = divmod(m, 60)
         if h:
             return f"{h}h {m}m"
         return f"{m}m {s}s"
+
+    @property
+    def session_time_display(self) -> str:
+        """Total wall-clock session time from started_at to stopped_at."""
+        try:
+            start = datetime.fromisoformat(self.started_at)
+            stop = datetime.fromisoformat(self.stopped_at)
+            total = max(0, int((stop - start).total_seconds()))
+        except (ValueError, TypeError):
+            total = self.duration_seconds
+        m, s = divmod(total, 60)
+        h, m = divmod(m, 60)
+        if h:
+            return f"{h}h {m}m"
+        return f"{m}m {s}s"
+
+    @property
+    def runtime_display(self) -> str:
+        if not self.runtime_ticks:
+            return ""
+        total = int(self.runtime_ticks / 10_000_000)
+        m, s = divmod(total, 60)
+        h, m = divmod(m, 60)
+        if h:
+            return f"{h}h {m}m"
+        return f"{m}m {s}s"
+
+    @property
+    def progress_display(self) -> str:
+        if not self.progress_ticks:
+            return ""
+        total = int(self.progress_ticks / 10_000_000)
+        m, s = divmod(total, 60)
+        h, m = divmod(m, 60)
+        if h:
+            return f"{h}h {m}m {s}s"
+        return f"{m}m {s}s"
+
+    @property
+    def started_at_full(self) -> str:
+        if len(self.started_at) >= 19:
+            return self.started_at[:10] + " " + self.started_at[11:19]
+        return self.started_at
+
+    @property
+    def stopped_at_full(self) -> str:
+        if len(self.stopped_at) >= 19:
+            return self.stopped_at[:10] + " " + self.stopped_at[11:19]
+        return self.stopped_at
+
+    @property
+    def parsed_pause_events(self) -> list[dict]:
+        import json as _json
+        try:
+            events = _json.loads(self.pause_events) if self.pause_events else []
+            return events if isinstance(events, list) else []
+        except (ValueError, TypeError):
+            return []
+
+    @property
+    def pause_markers(self) -> list[dict]:
+        """Build pause markers positioned on the content timeline (0-100% of runtime).
+
+        Each marker has {pct, label} where pct is the position within the
+        content based on position_ticks at the time of the pause.
+        """
+        runtime = self.runtime_ticks
+        if not runtime:
+            return []
+
+        markers = []
+        for ev in self.parsed_pause_events:
+            ticks = ev.get("position_ticks", 0)
+            pct = round(ticks / runtime * 100, 1)
+            dur_s = ev.get("duration_s", 0)
+            m, s = divmod(dur_s, 60)
+            dur_label = f"{m}m {s}s" if m else f"{s}s"
+            time_str = ""
+            start = ev.get("start", "")
+            if len(start) >= 19:
+                time_str = start[11:19]
+            markers.append({
+                "pct": min(pct, 100),
+                "label": f"Paused {dur_label} at {time_str}" if time_str else f"Paused {dur_label}",
+            })
+        return markers
 
 
 class UserInfo(BaseModel):
