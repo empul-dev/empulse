@@ -1119,6 +1119,11 @@ table a {
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 6px rgba(234, 179, 8, 0.4);
 }
 
+/* Counter the parent scale(1.5) so the tooltip stays the same size as stat tooltips */
+.tl-marker[data-tip]:hover::after {
+    transform: translateX(-50%) translateY(0) scale(0.667);
+}
+
 /* Shared tooltip style (uses data-tip to avoid Pico CSS conflict) */
 .detail-timeline [data-tip]::after {
     content: attr(data-tip);
