@@ -49,30 +49,37 @@
     (function() {
         var wall = document.getElementById('poster-wall');
         var POSTERS_PER_ROW = 14;
-        var NUM_ROWS = 6;
+        var NUM_ROWS = 8;
+
+        function buildImg(id) {
+            var img = document.createElement('img');
+            img.src = '/api/img/' + id + '?w=120';
+            img.alt = '';
+            img.onload = function() { img.classList.add('loaded'); };
+            img.onerror = function() { img.style.visibility = 'hidden'; };
+            return img;
+        }
 
         fetch('/api/random-posters?limit=36')
             .then(function(r) { return r.json(); })
             .then(function(ids) {
                 if (!ids.length) return;
-                // Duplicate to fill all rows
-                var all = [];
-                while (all.length < POSTERS_PER_ROW * NUM_ROWS) {
-                    all = all.concat(ids);
-                }
-                all = all.slice(0, POSTERS_PER_ROW * NUM_ROWS);
 
-                // Build row strips
                 for (var row = 0; row < NUM_ROWS; row++) {
                     var strip = document.createElement('div');
                     strip.className = 'poster-row ' + (row % 2 === 0 ? 'poster-row-left' : 'poster-row-right');
-                    var imgs = '';
-                    for (var col = 0; col < POSTERS_PER_ROW; col++) {
-                        var id = all[row * POSTERS_PER_ROW + col];
-                            imgs += '<img src="/api/img/' + id + '?w=120" alt="" loading="lazy" onload="this.classList.add(\'loaded\')" onerror="this.style.display=\'none\'">';
+                    // Shuffle uniquely per row so no two rows share the same sequence
+                    var shuffled = ids.slice();
+                    for (var i = shuffled.length - 1; i > 0; i--) {
+                        var j = (i * 7 + row * 13 + 3) % (i + 1);
+                        var tmp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = tmp;
                     }
-                    // Duplicate images for seamless loop
-                    strip.innerHTML = imgs + imgs;
+                    // Build two identical sets for seamless infinite scroll
+                    for (var set = 0; set < 2; set++) {
+                        for (var col = 0; col < POSTERS_PER_ROW; col++) {
+                            strip.appendChild(buildImg(shuffled[col % shuffled.length]));
+                        }
+                    }
                     wall.appendChild(strip);
                 }
                 setTimeout(function() { wall.classList.add('loaded'); }, 200);
