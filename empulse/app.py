@@ -43,6 +43,7 @@ async def lifespan(app: FastAPI):
 
     # Invalidate all login sessions on startup so restarts force re-login
     from empulse.database import get_db
+
     db = get_db()
     await db.execute("DELETE FROM login_sessions")
     await db.commit()
@@ -50,6 +51,7 @@ async def lifespan(app: FastAPI):
 
     # Create EmbyClient for auth even without api_key (needs emby_url)
     from empulse.emby.client import EmbyClient
+
     auth_emby_client = EmbyClient()
     app.state.emby_client = auth_emby_client
 
@@ -62,8 +64,10 @@ async def lifespan(app: FastAPI):
     poller_task = None
     ws_task = None
     newsletter_task = None
+    poster_cache_task = None
 
     from empulse.notifications.engine import NotificationEngine
+
     notification_engine = NotificationEngine(get_db)
     app.state.notification_engine = notification_engine
 
@@ -88,15 +92,24 @@ async def lifespan(app: FastAPI):
         logger.info("Session poller started")
 
         from empulse.newsletter import NewsletterScheduler
+
         newsletter_scheduler = NewsletterScheduler(get_db, emby_client)
         newsletter_task = asyncio.create_task(newsletter_scheduler.run())
         logger.info("Newsletter scheduler started")
 
         from empulse.emby.websocket import EmbyWebSocket
+
         emby_ws = EmbyWebSocket(poller)
         ws_task = asyncio.create_task(emby_ws.run())
         app.state.emby_ws = emby_ws
         logger.info("Emby WebSocket listener started")
+
+        from empulse.web.poster_cache import PosterWallCache
+
+        poster_cache = PosterWallCache(emby_client)
+        poster_cache_task = asyncio.create_task(poster_cache.run())
+        app.state.poster_cache = poster_cache
+        logger.info("Poster wall cache started")
     else:
         logger.warning("No EMBY_API_KEY configured - polling disabled")
 
@@ -118,6 +131,12 @@ async def lifespan(app: FastAPI):
         newsletter_task.cancel()
         try:
             await newsletter_task
+        except asyncio.CancelledError:
+            pass
+    if poster_cache_task:
+        poster_cache_task.cancel()
+        try:
+            await poster_cache_task
         except asyncio.CancelledError:
             pass
     logger.info("Shutdown complete")
@@ -144,6 +163,7 @@ def create_app() -> FastAPI:
     # If no AUTH_PASSWORD or EMBY_API_KEY is configured, the login page
     # will show a setup message prompting the admin to configure auth.
     from empulse.web.auth import AuthMiddleware
+
     app.add_middleware(
         AuthMiddleware,
         secret=settings.secret_key,

@@ -13,6 +13,7 @@ from empulse.config import settings
 from empulse.database import get_db
 from empulse.db import history as history_db, stats as stats_db, users as users_db
 from empulse.models import SessionInfo, HistoryRecord
+from empulse.web.poster_cache import POSTER_WIDTH
 
 # SVG placeholder for missing images (film icon on dark background)
 _PLACEHOLDER_SVG = (
@@ -21,8 +22,8 @@ _PLACEHOLDER_SVG = (
     b'<g transform="translate(110,175)" fill="none" stroke="#444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">'
     b'<rect x="4" y="4" width="72" height="72" rx="8"/>'
     b'<path d="M24 4v72M56 4v72M4 28h72M4 52h72"/>'
-    b'</g>'
-    b'</svg>'
+    b"</g>"
+    b"</svg>"
 )
 
 
@@ -34,10 +35,11 @@ def _placeholder_response() -> Response:
         headers={"Cache-Control": "public, max-age=300"},
     )
 
+
 logger = logging.getLogger("empulse.api")
 router = APIRouter()
 
-VALID_ID = re.compile(r'^[a-zA-Z0-9_-]+$')
+VALID_ID = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 
 def _validate_id(value: str) -> bool:
@@ -50,9 +52,13 @@ async def now_playing(request: Request):
     state_tracker = getattr(request.app.state, "state_tracker", None)
     if state_tracker:
         sessions = [SessionInfo(**s) for s in state_tracker.get_all_sessions()]
-    return templates.TemplateResponse("partials/now_playing.html", {
-        "request": request, "sessions": sessions,
-    })
+    return templates.TemplateResponse(
+        "partials/now_playing.html",
+        {
+            "request": request,
+            "sessions": sessions,
+        },
+    )
 
 
 def _clamp_days(days: int) -> int:
@@ -75,19 +81,35 @@ async def _stats_cards(request: Request, days: int, metric: str):
     state_tracker = getattr(request.app.state, "state_tracker", None)
     active_streams = len(state_tracker.get_all_sessions()) if state_tracker else 0
 
-    most_watched_movies = await stats_db.get_most_watched_movies(db, limit=5, days=days, metric=metric)
+    most_watched_movies = await stats_db.get_most_watched_movies(
+        db, limit=5, days=days, metric=metric
+    )
     most_popular_movies = await stats_db.get_most_popular_movies(db, limit=5, days=days)
-    most_watched_shows = await stats_db.get_most_watched_shows(db, limit=5, days=days, metric=metric)
+    most_watched_shows = await stats_db.get_most_watched_shows(
+        db, limit=5, days=days, metric=metric
+    )
     most_popular_shows = await stats_db.get_most_popular_shows(db, limit=5, days=days)
     recently_watched = await stats_db.get_recently_watched(db, limit=5)
-    most_active_users = await stats_db.get_top_users(db, limit=5, days=days, metric=metric)
-    most_active_platforms = await stats_db.get_most_active_platforms(db, limit=5, days=days)
-    most_active_libraries = await stats_db.get_most_active_libraries(db, limit=5, days=days)
+    most_active_users = await stats_db.get_top_users(
+        db, limit=5, days=days, metric=metric
+    )
+    most_active_platforms = await stats_db.get_most_active_platforms(
+        db, limit=5, days=days
+    )
+    most_active_libraries = await stats_db.get_most_active_libraries(
+        db, limit=5, days=days
+    )
 
     # Format recently watched display titles
     for item in recently_watched:
-        if item.get("series_name") and item.get("season_number") is not None and item.get("episode_number") is not None:
-            item["display_title"] = f"{item['series_name']} - S{item['season_number']:02d}E{item['episode_number']:02d}"
+        if (
+            item.get("series_name")
+            and item.get("season_number") is not None
+            and item.get("episode_number") is not None
+        ):
+            item["display_title"] = (
+                f"{item['series_name']} - S{item['season_number']:02d}E{item['episode_number']:02d}"
+            )
         elif item.get("item_name") and item.get("year"):
             item["display_title"] = f"{item['item_name']} ({item['year']})"
         else:
@@ -96,22 +118,27 @@ async def _stats_cards(request: Request, days: int, metric: str):
     # Map library types to readable names
     type_labels = {"Movie": "Movies", "Episode": "TV Shows", "Audio": "Music"}
     for lib in most_active_libraries:
-        lib["label"] = type_labels.get(lib.get("item_type"), lib.get("item_type", "Other"))
+        lib["label"] = type_labels.get(
+            lib.get("item_type"), lib.get("item_type", "Other")
+        )
 
-    return templates.TemplateResponse("partials/stats_cards.html", {
-        "request": request,
-        "active_streams": active_streams,
-        "most_watched_movies": most_watched_movies,
-        "most_popular_movies": most_popular_movies,
-        "most_watched_shows": most_watched_shows,
-        "most_popular_shows": most_popular_shows,
-        "recently_watched": recently_watched,
-        "most_active_users": most_active_users,
-        "most_active_platforms": most_active_platforms,
-        "most_active_libraries": most_active_libraries,
-        "days": days,
-        "metric": metric,
-    })
+    return templates.TemplateResponse(
+        "partials/stats_cards.html",
+        {
+            "request": request,
+            "active_streams": active_streams,
+            "most_watched_movies": most_watched_movies,
+            "most_popular_movies": most_popular_movies,
+            "most_watched_shows": most_watched_shows,
+            "most_popular_shows": most_popular_shows,
+            "recently_watched": recently_watched,
+            "most_active_users": most_active_users,
+            "most_active_platforms": most_active_platforms,
+            "most_active_libraries": most_active_libraries,
+            "days": days,
+            "metric": metric,
+        },
+    )
 
 
 @router.get("/recent-history")
@@ -119,10 +146,18 @@ async def recent_history(request: Request):
     db = get_db()
     rows = await history_db.get_history(db, limit=10)
     records = [HistoryRecord(**r) for r in rows]
-    return templates.TemplateResponse("partials/history_table.html", {
-        "request": request, "records": records, "page": 1, "total_pages": 1,
-        "filter_params": "", "sort_by": "date", "sort_order": "desc",
-    })
+    return templates.TemplateResponse(
+        "partials/history_table.html",
+        {
+            "request": request,
+            "records": records,
+            "page": 1,
+            "total_pages": 1,
+            "filter_params": "",
+            "sort_by": "date",
+            "sort_order": "desc",
+        },
+    )
 
 
 @router.get("/history-table")
@@ -141,7 +176,9 @@ async def history_table(
     offset = (page - 1) * per_page
 
     rows = await history_db.get_history(
-        db, limit=per_page, offset=offset,
+        db,
+        limit=per_page,
+        offset=offset,
         user_id=user_id or None,
         item_type=item_type or None,
         play_method=play_method or None,
@@ -150,7 +187,8 @@ async def history_table(
         sort_order=sort_order,
     )
     total = await history_db.get_history_count(
-        db, user_id=user_id or None,
+        db,
+        user_id=user_id or None,
         item_type=item_type or None,
         play_method=play_method or None,
         search=search or None,
@@ -173,12 +211,18 @@ async def history_table(
     if sort_order != "desc":
         filter_params += f"&sort_order={quote(sort_order)}"
 
-    return templates.TemplateResponse("partials/history_table.html", {
-        "request": request, "records": records,
-        "page": page, "total_pages": total_pages,
-        "filter_params": filter_params,
-        "sort_by": sort_by, "sort_order": sort_order,
-    })
+    return templates.TemplateResponse(
+        "partials/history_table.html",
+        {
+            "request": request,
+            "records": records,
+            "page": page,
+            "total_pages": total_pages,
+            "filter_params": filter_params,
+            "sort_by": sort_by,
+            "sort_order": sort_order,
+        },
+    )
 
 
 @router.get("/stream-info/{history_id}")
@@ -194,11 +238,14 @@ async def stream_info(request: Request, history_id: int):
     except (json.JSONDecodeError, TypeError):
         info = {}
 
-    return templates.TemplateResponse("partials/stream_info.html", {
-        "request": request,
-        "record": record,
-        "info": info,
-    })
+    return templates.TemplateResponse(
+        "partials/stream_info.html",
+        {
+            "request": request,
+            "record": record,
+            "info": info,
+        },
+    )
 
 
 @router.get("/history-detail/{history_id}")
@@ -214,11 +261,14 @@ async def history_detail(request: Request, history_id: int):
     except (json.JSONDecodeError, TypeError):
         info = {}
 
-    return templates.TemplateResponse("partials/history_detail.html", {
-        "request": request,
-        "record": record,
-        "info": info,
-    })
+    return templates.TemplateResponse(
+        "partials/history_detail.html",
+        {
+            "request": request,
+            "record": record,
+            "info": info,
+        },
+    )
 
 
 @router.delete("/history/{history_id}")
@@ -231,9 +281,18 @@ async def delete_history(history_id: int):
 
 
 EXPORT_FIELDS = [
-    "started_at", "stopped_at", "user_name", "item_name", "series_name",
-    "item_type", "duration_seconds", "percent_complete", "play_method",
-    "client", "device_name", "ip_address",
+    "started_at",
+    "stopped_at",
+    "user_name",
+    "item_name",
+    "series_name",
+    "item_type",
+    "duration_seconds",
+    "percent_complete",
+    "play_method",
+    "client",
+    "device_name",
+    "ip_address",
 ]
 EXPORT_MAX_ROWS = 10_000
 
@@ -248,12 +307,15 @@ async def export_history(
 ):
     db = get_db()
     rows = await history_db.get_history(
-        db, limit=EXPORT_MAX_ROWS, offset=0,
+        db,
+        limit=EXPORT_MAX_ROWS,
+        offset=0,
         user_id=user_id or None,
         item_type=item_type or None,
         play_method=play_method or None,
         search=search or None,
-        sort_by="date", sort_order="desc",
+        sort_by="date",
+        sort_order="desc",
     )
 
     if format == "json":
@@ -262,7 +324,9 @@ async def export_history(
         return Response(
             content=content,
             media_type="application/json",
-            headers={"Content-Disposition": "attachment; filename=empulse_history.json"},
+            headers={
+                "Content-Disposition": "attachment; filename=empulse_history.json"
+            },
         )
 
     # CSV (default)
@@ -279,9 +343,12 @@ async def export_history(
     )
 
 
-async def _fetch_emby_image(url: str, params: dict, retries: int = 1) -> tuple[bytes, str] | None:
+async def _fetch_emby_image(
+    url: str, params: dict, retries: int = 1
+) -> tuple[bytes, str] | None:
     """Fetch an image from Emby with retry. Returns (content, content_type) or None."""
     import httpx
+
     for attempt in range(1 + retries):
         try:
             async with httpx.AsyncClient(timeout=10) as client:
@@ -296,16 +363,36 @@ async def _fetch_emby_image(url: str, params: dict, retries: int = 1) -> tuple[b
 
 
 @router.get("/img/{item_id}")
-async def image_proxy(item_id: str, w: int = 150):
+async def image_proxy(request: Request, item_id: str, w: int = 150):
     """Proxy Emby item images so the API key stays server-side."""
     if not _validate_id(item_id):
         return Response(content=b"", status_code=400)
     max_width = max(20, min(w, 600))
+
+    # Serve from poster cache for poster-wall-sized requests
+    if max_width <= POSTER_WIDTH:
+        poster_cache = getattr(request.app.state, "poster_cache", None)
+        if poster_cache:
+            cached = poster_cache.get_image(item_id)
+            if cached:
+                content, content_type = cached
+                return Response(
+                    content=content,
+                    media_type=content_type,
+                    headers={"Cache-Control": "public, max-age=86400"},
+                )
+
     url = f"{settings.emby_url.rstrip('/')}/Items/{item_id}/Images/Primary"
-    result = await _fetch_emby_image(url, {"api_key": settings.emby_api_key, "maxWidth": str(max_width)})
+    result = await _fetch_emby_image(
+        url, {"api_key": settings.emby_api_key, "maxWidth": str(max_width)}
+    )
     if result:
         content, content_type = result
-        return Response(content=content, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
     return _placeholder_response()
 
 
@@ -315,10 +402,16 @@ async def backdrop_proxy(item_id: str):
     if not _validate_id(item_id):
         return Response(content=b"", status_code=400)
     url = f"{settings.emby_url.rstrip('/')}/Items/{item_id}/Images/Backdrop"
-    result = await _fetch_emby_image(url, {"api_key": settings.emby_api_key, "maxWidth": "1280"})
+    result = await _fetch_emby_image(
+        url, {"api_key": settings.emby_api_key, "maxWidth": "1280"}
+    )
     if result:
         content, content_type = result
-        return Response(content=content, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
     return _placeholder_response()
 
 
@@ -328,10 +421,16 @@ async def user_image_proxy(user_id: str):
     if not _validate_id(user_id):
         return Response(content=b"", status_code=400)
     url = f"{settings.emby_url.rstrip('/')}/Users/{user_id}/Images/Primary"
-    result = await _fetch_emby_image(url, {"api_key": settings.emby_api_key, "maxWidth": "80"})
+    result = await _fetch_emby_image(
+        url, {"api_key": settings.emby_api_key, "maxWidth": "80"}
+    )
     if result:
         content, content_type = result
-        return Response(content=content, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
     return _placeholder_response()
 
 
@@ -405,18 +504,26 @@ async def chart_library_daily_plays(item_type: str, days: int = 30):
 async def recently_added(request: Request, limit: int = 10, item_type: str = ""):
     emby_client = getattr(request.app.state, "emby_client", None)
     if not emby_client:
-        return templates.TemplateResponse("partials/recently_added.html", {
-            "request": request, "items": [],
-        })
+        return templates.TemplateResponse(
+            "partials/recently_added.html",
+            {
+                "request": request,
+                "items": [],
+            },
+        )
     limit = max(1, min(limit, 20))
     try:
         items = await emby_client.get_recently_added(limit=limit, item_type=item_type)
     except Exception as e:
         logger.error(f"Recently added fetch failed: {e}")
         items = []
-    return templates.TemplateResponse("partials/recently_added.html", {
-        "request": request, "items": items,
-    })
+    return templates.TemplateResponse(
+        "partials/recently_added.html",
+        {
+            "request": request,
+            "items": items,
+        },
+    )
 
 
 @router.get("/charts/plays-by-date-stacked")
@@ -502,7 +609,9 @@ async def chart_top_users(days: int = 30, metric: str = "plays"):
 @router.get("/notification-channels")
 async def list_notification_channels():
     db = get_db()
-    cursor = await db.execute("SELECT * FROM notification_channels ORDER BY created_at DESC")
+    cursor = await db.execute(
+        "SELECT * FROM notification_channels ORDER BY created_at DESC"
+    )
     rows = await cursor.fetchall()
     return JSONResponse([dict(r) for r in rows])
 
@@ -517,7 +626,9 @@ async def create_notification_channel(request: Request):
     channel_type = data.get("channel_type", "")
     if channel_type not in VALID_CHANNEL_TYPES:
         return JSONResponse(
-            {"error": f"Invalid channel type. Must be one of: {', '.join(sorted(VALID_CHANNEL_TYPES))}"},
+            {
+                "error": f"Invalid channel type. Must be one of: {', '.join(sorted(VALID_CHANNEL_TYPES))}"
+            },
             status_code=400,
         )
     name = str(data.get("name", ""))[:100]
@@ -526,6 +637,7 @@ async def create_notification_channel(request: Request):
 
     db = get_db()
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         "INSERT INTO notification_channels (name, channel_type, config, triggers, conditions, enabled, created_at) "
@@ -554,12 +666,16 @@ async def update_notification_channel(request: Request, channel_id: int):
     channel_type = data.get("channel_type", "")
     if channel_type not in VALID_CHANNEL_TYPES:
         return JSONResponse(
-            {"error": f"Invalid channel type. Must be one of: {', '.join(sorted(VALID_CHANNEL_TYPES))}"},
+            {
+                "error": f"Invalid channel type. Must be one of: {', '.join(sorted(VALID_CHANNEL_TYPES))}"
+            },
             status_code=400,
         )
 
     db = get_db()
-    cursor = await db.execute("SELECT id FROM notification_channels WHERE id = ?", [channel_id])
+    cursor = await db.execute(
+        "SELECT id FROM notification_channels WHERE id = ?", [channel_id]
+    )
     if not await cursor.fetchone():
         return Response(status_code=404)
     await db.execute(
@@ -584,7 +700,9 @@ async def update_notification_channel(request: Request, channel_id: int):
 @router.delete("/notification-channels/{channel_id}")
 async def delete_notification_channel(request: Request, channel_id: int):
     db = get_db()
-    cursor = await db.execute("DELETE FROM notification_channels WHERE id = ?", [channel_id])
+    cursor = await db.execute(
+        "DELETE FROM notification_channels WHERE id = ?", [channel_id]
+    )
     await db.commit()
     if cursor.rowcount == 0:
         return Response(status_code=404)
@@ -597,13 +715,17 @@ async def delete_notification_channel(request: Request, channel_id: int):
 @router.post("/notification-channels/{channel_id}/test")
 async def test_notification_channel(request: Request, channel_id: int):
     db = get_db()
-    cursor = await db.execute("SELECT * FROM notification_channels WHERE id = ?", [channel_id])
+    cursor = await db.execute(
+        "SELECT * FROM notification_channels WHERE id = ?", [channel_id]
+    )
     row = await cursor.fetchone()
     if not row:
         return Response(status_code=404)
     engine = getattr(request.app.state, "notification_engine", None)
     if not engine:
-        return JSONResponse({"success": False, "message": "Notification engine not initialized"})
+        return JSONResponse(
+            {"success": False, "message": "Notification engine not initialized"}
+        )
     success, message = await engine.send_test(dict(row))
     return JSONResponse({"success": success, "message": message})
 
@@ -622,6 +744,7 @@ async def notification_log():
 async def get_newsletter_config_api():
     db = get_db()
     from empulse.newsletter import get_newsletter_config
+
     config = await get_newsletter_config(db)
     return JSONResponse(config or {})
 
@@ -631,6 +754,7 @@ async def save_newsletter_config_api(request: Request):
     data = await request.json()
     db = get_db()
     from empulse.newsletter import save_newsletter_config
+
     await save_newsletter_config(db, data)
     return JSONResponse({"status": "saved"})
 
@@ -639,9 +763,14 @@ async def save_newsletter_config_api(request: Request):
 async def newsletter_preview(request: Request):
     db = get_db()
     from empulse.newsletter import get_newsletter_config, build_newsletter_html
+
     config = await get_newsletter_config(db)
     if not config:
-        config = {"recently_added_days": 7, "recently_added_limit": 20, "include_stats": 1}
+        config = {
+            "recently_added_days": 7,
+            "recently_added_limit": 20,
+            "include_stats": 1,
+        }
     emby_client = getattr(request.app.state, "emby_client", None)
     html = await build_newsletter_html(db, config, emby_client)
     return Response(content=html, media_type="text/html")
@@ -651,9 +780,12 @@ async def newsletter_preview(request: Request):
 async def send_newsletter_now(request: Request):
     db = get_db()
     from empulse.newsletter import get_newsletter_config, send_newsletter
+
     config = await get_newsletter_config(db)
     if not config:
-        return JSONResponse({"success": False, "message": "Newsletter not configured"}, status_code=400)
+        return JSONResponse(
+            {"success": False, "message": "Newsletter not configured"}, status_code=400
+        )
     emby_client = getattr(request.app.state, "emby_client", None)
     success, message = await send_newsletter(db, config, emby_client)
     return JSONResponse({"success": success, "message": message})
@@ -662,6 +794,7 @@ async def send_newsletter_now(request: Request):
 @router.get("/backup")
 async def backup_database():
     from pathlib import Path
+
     db_path = Path(settings.db_path)
     if not db_path.exists() or str(db_path) == ":memory:":
         return Response(content="Database not available for backup", status_code=400)
@@ -680,7 +813,9 @@ async def restore_database(request: Request):
 
     db_path = Path(settings.db_path)
     if str(db_path) == ":memory:":
-        return JSONResponse({"error": "Cannot restore to in-memory database"}, status_code=400)
+        return JSONResponse(
+            {"error": "Cannot restore to in-memory database"}, status_code=400
+        )
 
     content_type = request.headers.get("content-type", "")
     if "multipart/form-data" not in content_type:
@@ -704,6 +839,7 @@ async def restore_database(request: Request):
     import aiosqlite
     import tempfile
     import os
+
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         tmp.write(data)
         tmp_path = tmp.name
@@ -718,11 +854,15 @@ async def restore_database(request: Request):
             missing = required - tables
             if missing:
                 return JSONResponse(
-                    {"error": f"Invalid database: missing tables {', '.join(sorted(missing))}"},
+                    {
+                        "error": f"Invalid database: missing tables {', '.join(sorted(missing))}"
+                    },
                     status_code=400,
                 )
     except Exception:
-        return JSONResponse({"error": "Uploaded file is not a valid database"}, status_code=400)
+        return JSONResponse(
+            {"error": "Uploaded file is not a valid database"}, status_code=400
+        )
     finally:
         os.unlink(tmp_path)
 
@@ -742,19 +882,31 @@ async def restore_database(request: Request):
     except Exception:
         pass  # Table may not exist in older backups; migration will handle it
 
-    return JSONResponse({
-        "status": "restored",
-        "message": "Database restored. All sessions invalidated. Restart the application to apply changes.",
-    })
+    return JSONResponse(
+        {
+            "status": "restored",
+            "message": "Database restored. All sessions invalidated. Restart the application to apply changes.",
+        }
+    )
 
 
 @router.get("/random-posters")
 async def random_posters(request: Request, limit: int = 24):
     """Return random item IDs from Emby for the login poster wall."""
+    limit = max(1, min(limit, 48))
+
+    # Serve from poster cache if available
+    poster_cache = getattr(request.app.state, "poster_cache", None)
+    if poster_cache and poster_cache.item_ids:
+        return JSONResponse(
+            poster_cache.item_ids[:limit],
+            headers={"Cache-Control": "public, max-age=300"},
+        )
+
+    # Fallback: live query
     emby_client = getattr(request.app.state, "emby_client", None)
     if not emby_client:
         return JSONResponse([])
-    limit = max(1, min(limit, 48))
     try:
         params = {
             **emby_client._params,
@@ -782,20 +934,26 @@ async def test_connection(request: Request):
     emby_client = getattr(request.app.state, "emby_client", None)
     if not emby_client:
         from empulse.emby.client import EmbyClient
+
         emby_client = EmbyClient()
 
     try:
         info = await emby_client.get_server_info()
         db = get_db()
         from empulse.db.libraries import upsert_server_info
-        await upsert_server_info(db, {
-            "server_name": info.get("ServerName", ""),
-            "version": info.get("Version", ""),
-            "local_address": info.get("LocalAddress", ""),
-            "wan_address": info.get("WanAddress", ""),
-            "os": info.get("OperatingSystem", ""),
-        })
+
+        await upsert_server_info(
+            db,
+            {
+                "server_name": info.get("ServerName", ""),
+                "version": info.get("Version", ""),
+                "local_address": info.get("LocalAddress", ""),
+                "wan_address": info.get("WanAddress", ""),
+                "os": info.get("OperatingSystem", ""),
+            },
+        )
         from markupsafe import escape
+
         return f'<p class="success">Connected to {escape(info.get("ServerName", "Emby"))} v{escape(info.get("Version", "?"))}</p>'
     except Exception as e:
         logger.error(f"Connection test failed: {e}")
