@@ -1614,7 +1614,8 @@ table a {
     text-decoration: none;
 }
 .item-title.accent a:hover {
-    text-decoration: underline;
+    text-decoration: none;
+    opacity: 0.8;
 }
 
 .item-original-title {
