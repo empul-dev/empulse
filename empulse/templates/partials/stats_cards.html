@@ -152,11 +152,9 @@
 
     <!-- Most Active Users -->
     <div class="stat-card">
-        <div class="stat-card-poster stat-card-icon">
+        <div class="stat-card-poster{% if not most_active_users %} stat-card-icon{% endif %}">
             {% if most_active_users %}
-            <img src="/api/img/user/{{ most_active_users[0].user_id }}?name={{ most_active_users[0].user_name | urlencode }}" alt="" loading="lazy"
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-            <div class="avatar-fallback" style="display:none">{{ (most_active_users[0].user_name or '?')[0] | upper }}</div>
+            <img src="/api/img/user/{{ most_active_users[0].user_id }}?name={{ most_active_users[0].user_name | urlencode }}" alt="" loading="lazy">
             {% else %}
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
             {% endif %}
