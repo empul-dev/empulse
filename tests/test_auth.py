@@ -392,7 +392,7 @@ class TestMiddleware:
                  patch("empulse.database.get_db", return_value=db):
                 transport = ASGITransport(app=app)
                 async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
-                    r = await ac.post("/login", data={"username": "RegularUser", "password": "pass"})
+                    r = await ac.post("/login", data={"username": "RegularUser", "password": "pass"}, headers={"Origin": "http://test"})
                     assert r.status_code == 302
                     assert "/login?error=disabled" in r.headers["location"]
 
@@ -434,7 +434,7 @@ class TestMiddleware:
                  patch("empulse.database.get_db", return_value=db):
                 transport = ASGITransport(app=app)
                 async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as ac:
-                    r = await ac.post("/login", data={"username": "AdminUser", "password": "pass"})
+                    r = await ac.post("/login", data={"username": "AdminUser", "password": "pass"}, headers={"Origin": "http://test"})
                     assert r.status_code == 302
                     assert r.headers.get("location") == "/"
                     assert "empulse_session" in r.headers.get("set-cookie", "")
@@ -492,7 +492,8 @@ class TestMiddleware:
 
                     # Enable the user
                     r = await ac.put("/api/users/user-1/enabled",
-                                     json={"enabled": True})
+                                     json={"enabled": True},
+                                     headers={"Origin": "http://test"})
                     assert r.status_code == 200
                     data = r.json()
                     assert data["enabled"] is True
@@ -505,7 +506,8 @@ class TestMiddleware:
 
                     # Disable the user
                     r = await ac.put("/api/users/user-1/enabled",
-                                     json={"enabled": False})
+                                     json={"enabled": False},
+                                     headers={"Origin": "http://test"})
                     assert r.status_code == 200
 
                     cursor = await db.execute(
