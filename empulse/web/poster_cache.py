@@ -3,7 +3,7 @@ import logging
 
 logger = logging.getLogger("empulse.poster_cache")
 
-POSTER_WIDTH = 40
+POSTER_WIDTH = 120
 REFRESH_INTERVAL = 300  # 5 minutes
 POSTER_COUNT = 36
 

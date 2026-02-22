@@ -48,7 +48,7 @@
     <script nonce="{{ csp_nonce }}">
     (function() {
         var wall = document.getElementById('poster-wall');
-        var POSTERS_PER_ROW = 10;
+        var POSTERS_PER_ROW = 14;
         var NUM_ROWS = 6;
 
         fetch('/api/random-posters?limit=36')
@@ -69,7 +69,7 @@
                     var imgs = '';
                     for (var col = 0; col < POSTERS_PER_ROW; col++) {
                         var id = all[row * POSTERS_PER_ROW + col];
-                            imgs += '<img src="/api/img/' + id + '?w=40" alt="" loading="lazy" onload="this.classList.add(\'loaded\')" onerror="this.style.display=\'none\'">';
+                            imgs += '<img src="/api/img/' + id + '?w=120" alt="" loading="lazy" onload="this.classList.add(\'loaded\')" onerror="this.style.display=\'none\'">';
                     }
                     // Duplicate images for seamless loop
                     strip.innerHTML = imgs + imgs;

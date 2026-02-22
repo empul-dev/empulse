@@ -2646,7 +2646,7 @@ html[data-theme="light"] .login-overlay {
 }
 
 html[data-theme="light"] .login-poster-wall {
-    filter: brightness(0.6) saturate(1.2);
+    filter: brightness(0.85) saturate(1.1);
 }
 
 .login-wrap {
