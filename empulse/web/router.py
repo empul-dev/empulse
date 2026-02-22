@@ -124,6 +124,7 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
     series_name = name or item_data.get("SeriesName") or item_data.get("Name", "")
     series_id = item_data.get("SeriesId", "")
     poster_id = series_id if is_series and series_id else item_id
+    backdrop_id = series_id if is_series and series_id else item_id
 
     if is_series and series_name:
         global_stats = await stats_db.get_series_stats(db, series_name)
@@ -180,6 +181,7 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
         "item": item_data,
         "item_id": item_id,
         "poster_id": poster_id,
+        "backdrop_id": backdrop_id,
         "is_series": is_series,
         "series_name": series_name,
         "directors": directors,

@@ -4,8 +4,8 @@
 {% block content %}
 <!-- Backdrop hero -->
 <div class="item-hero">
-    {% if item.get('BackdropImageTags') %}
-    <div class="item-hero-backdrop" style="background-image: url('/api/img/backdrop/{{ item_id }}')"></div>
+    {% if item.get('BackdropImageTags') or (is_series and backdrop_id != item_id) %}
+    <div class="item-hero-backdrop" style="background-image: url('/api/img/backdrop/{{ backdrop_id }}')"></div>
     {% endif %}
     <div class="item-hero-inner">
         <div class="item-poster">
