@@ -1176,9 +1176,9 @@ table a {
     background: var(--bg-card, #1c1c1e);
     color: var(--text-primary);
     border: 1px solid var(--border);
-    padding: 0.2rem 0.45rem;
+    padding: 0.25rem 0.5rem;
     border-radius: 4px;
-    font-size: 0.65em;
+    font-size: 0.7em;
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
