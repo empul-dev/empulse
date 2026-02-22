@@ -2793,6 +2793,20 @@ html[data-theme="light"] .login-poster-wall {
     aspect-ratio: 2/3;
     background: var(--bg-card-poster);
     overflow: hidden;
+    position: relative;
+}
+
+.recently-added-ago {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1.2rem 0.4rem 0.3rem;
+    background: linear-gradient(transparent, rgba(0,0,0,.85));
+    font-size: 0.65em;
+    color: #ddd;
+    text-align: center;
+    pointer-events: none;
 }
 
 .recently-added-poster img {

@@ -321,3 +321,27 @@ function toggleTheme() {
     var theme = saved || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
     document.documentElement.setAttribute('data-theme', theme);
 })();
+
+// "Added X ago" overlay for recently-added posters
+(function() {
+    function timeAgo(iso) {
+        var diff = (Date.now() - new Date(iso).getTime()) / 1000;
+        if (diff < 60) return 'Added just now';
+        var m = Math.floor(diff / 60);
+        if (m < 60) return 'Added ' + m + (m === 1 ? ' minute' : ' minutes') + ' ago';
+        var h = Math.floor(m / 60);
+        if (h < 24) return 'Added ' + h + (h === 1 ? ' hour' : ' hours') + ' ago';
+        var d = Math.floor(h / 24);
+        return 'Added ' + d + (d === 1 ? ' day' : ' days') + ' ago';
+    }
+
+    function updateAll() {
+        document.querySelectorAll('.recently-added-ago[data-added]').forEach(function(el) {
+            el.textContent = timeAgo(el.dataset.added);
+        });
+    }
+
+    updateAll();
+    document.body.addEventListener('htmx:afterSwap', updateAll);
+    setInterval(updateAll, 60000);
+})();
