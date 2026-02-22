@@ -119,9 +119,22 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
             except (_json.JSONDecodeError, TypeError):
                 pass
 
-    # For series, use series name for stats
-    is_series = type == "series" or item_data.get("Type") == "Series"
+    # Redirect bare episode URLs to the series-based URL for richer metadata
+    if type != "series" and item_data.get("Type") == "Episode":
+        ep_series_id = item_data.get("SeriesId")
+        ep_series_name = item_data.get("SeriesName", "")
+        if ep_series_id:
+            from urllib.parse import quote
+            return RedirectResponse(
+                f"/item/{ep_series_id}?type=series&name={quote(ep_series_name)}",
+                status_code=302,
+            )
+
+    # For series/episodes, use series name for stats
+    is_series = type == "series" or item_data.get("Type") in ("Series", "Episode")
     series_name = name or item_data.get("SeriesName") or item_data.get("Name", "")
+    series_id = item_data.get("SeriesId", "")
+    poster_id = series_id if is_series and series_id else item_id
 
     if is_series and series_name:
         global_stats = await stats_db.get_series_stats(db, series_name)
@@ -177,6 +190,7 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
         "active": "",
         "item": item_data,
         "item_id": item_id,
+        "poster_id": poster_id,
         "is_series": is_series,
         "series_name": series_name,
         "directors": directors,
