@@ -164,7 +164,7 @@
     {% for u in user_stats %}
     <div class="item-user-card">
         <div class="item-user-avatar">
-            <img src="/api/img/user/{{ u.user_id }}" alt=""
+            <img src="/api/img/user/{{ u.user_id }}?name={{ u.user_name | urlencode }}" alt=""
                  onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
             <div class="avatar-fallback" style="display:none">{{ (u.user_name or '?')[0] | upper }}</div>
         </div>

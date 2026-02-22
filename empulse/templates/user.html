@@ -4,7 +4,7 @@
 {% block content %}
 <div class="user-hero">
     <div class="user-avatar-large">
-        <img src="/api/img/user/{{ user.emby_user_id }}" alt=""
+        <img src="/api/img/user/{{ user.emby_user_id }}?name={{ user.username | urlencode }}" alt=""
              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
         <div class="avatar-fallback" style="display:none">{{ (user.username or '?')[0]|upper }}</div>
     </div>

@@ -1,12 +1,13 @@
 import asyncio
 import csv
+import hashlib
 import io
 import json
 import logging
 import re
 from datetime import date, timedelta
 from urllib.parse import quote
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from empulse.app import templates
 from empulse.config import settings
@@ -36,6 +37,39 @@ def _placeholder_response() -> Response:
     )
 
 
+# Curated gradient pairs for user avatars (from, to)
+_AVATAR_GRADIENTS = [
+    ("#6366f1", "#8b5cf6"),  # indigo → violet
+    ("#ec4899", "#f43f5e"),  # pink → rose
+    ("#3b82f6", "#06b6d4"),  # blue → cyan
+    ("#10b981", "#14b8a6"),  # emerald → teal
+    ("#f59e0b", "#ef4444"),  # amber → red
+    ("#8b5cf6", "#ec4899"),  # violet → pink
+    ("#06b6d4", "#3b82f6"),  # cyan → blue
+    ("#f97316", "#eab308"),  # orange → yellow
+    ("#14b8a6", "#22c55e"),  # teal → green
+    ("#a855f7", "#6366f1"),  # purple → indigo
+]
+
+
+def _generate_user_avatar(user_id: str, initial: str) -> bytes:
+    """Generate a personalized SVG avatar with gradient background and initial."""
+    idx = int(hashlib.md5(user_id.encode()).hexdigest(), 16) % len(_AVATAR_GRADIENTS)
+    c1, c2 = _AVATAR_GRADIENTS[idx]
+    letter = (initial or "?")[0].upper()
+    grad_id = f"g{idx}"
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">'
+        f'<defs><linearGradient id="{grad_id}" x1="0" y1="0" x2="1" y2="1">'
+        f'<stop offset="0%" stop-color="{c1}"/>'
+        f'<stop offset="100%" stop-color="{c2}"/>'
+        f'</linearGradient></defs>'
+        f'<rect width="200" height="200" fill="url(#{grad_id})"/>'
+        f'<text x="100" y="100" dy=".35em" text-anchor="middle"'
+        f' font-family="system-ui,-apple-system,sans-serif" font-size="90" font-weight="600"'
+        f' fill="rgba(255,255,255,0.9)">{letter}</text>'
+        f'</svg>'
+    ).encode()
 logger = logging.getLogger("empulse.api")
 router = APIRouter()
 
@@ -416,8 +450,8 @@ async def backdrop_proxy(item_id: str):
 
 
 @router.get("/img/user/{user_id}")
-async def user_image_proxy(user_id: str):
-    """Proxy Emby user images."""
+async def user_image_proxy(user_id: str, name: str = Query("")):
+    """Proxy Emby user images, with generated avatar fallback."""
     if not _validate_id(user_id):
         return Response(content=b"", status_code=400)
     url = f"{settings.emby_url.rstrip('/')}/Users/{user_id}/Images/Primary"
@@ -431,7 +465,12 @@ async def user_image_proxy(user_id: str):
             media_type=content_type,
             headers={"Cache-Control": "public, max-age=86400"},
         )
-    return _placeholder_response()
+    initial = name[:1] if name else "?"
+    return Response(
+        content=_generate_user_avatar(user_id, initial),
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 def _fill_date_gaps(rows: list[dict], days: int) -> list[dict]:

@@ -54,7 +54,7 @@
     {% for u in top_users %}
     <div class="item-user-card">
         <div class="item-user-avatar">
-            <img src="/api/img/user/{{ u.user_id }}" alt=""
+            <img src="/api/img/user/{{ u.user_id }}?name={{ u.user_name | urlencode }}" alt=""
                  onerror="this.style.display='none'">
         </div>
         <div>

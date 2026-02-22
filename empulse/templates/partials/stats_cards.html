@@ -154,7 +154,7 @@
     <div class="stat-card">
         <div class="stat-card-poster stat-card-icon">
             {% if most_active_users %}
-            <img src="/api/img/user/{{ most_active_users[0].user_id }}" alt="" loading="lazy"
+            <img src="/api/img/user/{{ most_active_users[0].user_id }}?name={{ most_active_users[0].user_name | urlencode }}" alt="" loading="lazy"
                  onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
                  style="border-radius:50%;object-fit:cover">
             <div class="avatar-fallback" style="display:none">{{ (most_active_users[0].user_name or '?')[0] | upper }}</div>
