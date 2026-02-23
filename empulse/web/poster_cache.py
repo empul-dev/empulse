@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger("empulse.poster_cache")
 
 POSTER_WIDTH = 120
-REFRESH_INTERVAL = 300  # 5 minutes
+REFRESH_INTERVAL = 1800  # 30 minutes
 POSTER_COUNT = 36
 
 
@@ -36,7 +36,7 @@ class PosterWallCache:
             await asyncio.sleep(REFRESH_INTERVAL)
 
     async def _refresh(self):
-        """Fetch random item IDs from Emby, then fetch all images in parallel."""
+        """Fetch random item IDs from Emby, only download images not already cached."""
         params = {
             **self.emby_client._params,
             "SortBy": "Random",
@@ -58,6 +58,9 @@ class PosterWallCache:
             self._ready.set()
             return
 
+        # Only fetch images we don't already have
+        new_ids = [id for id in ids if id not in self._image_map]
+
         async def fetch_one(item_id: str) -> tuple[str, bytes, str] | None:
             url = f"{self.emby_client.base_url}/Items/{item_id}/Images/Primary"
             try:
@@ -75,11 +78,27 @@ class PosterWallCache:
                 pass
             return None
 
-        results = await asyncio.gather(*[fetch_one(id) for id in ids])
-        posters = [r for r in results if r is not None]
+        if new_ids:
+            results = await asyncio.gather(*[fetch_one(id) for id in new_ids])
+            for r in results:
+                if r is not None:
+                    item_id, data, ct = r
+                    self._image_map[item_id] = (data, ct)
 
-        # Atomic swap
+        # Build poster list from new IDs, reusing cached images
+        posters = []
+        for item_id in ids:
+            if item_id in self._image_map:
+                data, ct = self._image_map[item_id]
+                posters.append((item_id, data, ct))
+
+        # Prune image_map: keep only images still in active poster list
+        active_ids = {item_id for item_id, _, _ in posters}
+        self._image_map = {k: v for k, v in self._image_map.items() if k in active_ids}
+
         self._posters = posters
-        self._image_map = {item_id: (data, ct) for item_id, data, ct in posters}
         self._ready.set()
-        logger.info(f"Poster cache refreshed: {len(posters)} images cached")
+        logger.info(
+            f"Poster cache refreshed: {len(posters)} posters "
+            f"({len(new_ids)} fetched, {len(posters) - len(new_ids)} reused)"
+        )

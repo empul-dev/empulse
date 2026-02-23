@@ -95,9 +95,9 @@ async def get_history(
         query += " AND play_method = ?"
         params.append(play_method)
     if search:
-        query += " AND (item_name LIKE ? OR series_name LIKE ? OR user_name LIKE ?)"
+        query += " AND (item_name LIKE ? OR series_name LIKE ? OR user_name LIKE ? OR client LIKE ? OR device_name LIKE ?)"
         term = f"%{search}%"
-        params.extend([term, term, term])
+        params.extend([term, term, term, term, term])
 
     col = SORTABLE_COLUMNS.get(sort_by, "started_at")
     direction = "ASC" if sort_order == "asc" else "DESC"
@@ -129,9 +129,9 @@ async def get_history_count(
         query += " AND play_method = ?"
         params.append(play_method)
     if search:
-        query += " AND (item_name LIKE ? OR series_name LIKE ? OR user_name LIKE ?)"
+        query += " AND (item_name LIKE ? OR series_name LIKE ? OR user_name LIKE ? OR client LIKE ? OR device_name LIKE ?)"
         term = f"%{search}%"
-        params.extend([term, term, term])
+        params.extend([term, term, term, term, term])
 
     cursor = await db.execute(query, params)
     row = await cursor.fetchone()

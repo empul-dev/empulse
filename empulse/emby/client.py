@@ -107,6 +107,19 @@ class EmbyClient:
             "is_admin": bool(user.get("Policy", {}).get("IsAdministrator", False)),
         }
 
+    async def stop_session(self, session_id: str) -> bool:
+        """Send a stop command to an active Emby session. Returns True on success."""
+        try:
+            r = await self._client.post(
+                f"{self.base_url}/Sessions/{session_id}/Playing/Stop",
+                params=self._params,
+            )
+            r.raise_for_status()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to stop session {session_id}: {e}")
+            return False
+
     def get_user_image_url(self, user_id: str) -> str:
         return f"/api/img/user/{user_id}"
 

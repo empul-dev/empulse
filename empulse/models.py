@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class SessionInfo(BaseModel):
     session_key: str
+    emby_session_id: str | None = None
     user_id: str | None = None
     user_name: str | None = None
     client: str | None = None

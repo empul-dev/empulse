@@ -482,6 +482,94 @@ async def get_top_users_with_stream_type(db: aiosqlite.Connection, days: int = 3
     return [dict(r) for r in rows]
 
 
+async def get_completion_breakdown(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
+    """Breakdown of plays by completion percentage range."""
+    cursor = await db.execute(
+        """SELECT
+               CASE
+                   WHEN percent_complete >= 75 THEN '75-100%'
+                   WHEN percent_complete >= 50 THEN '50-75%'
+                   WHEN percent_complete >= 25 THEN '25-50%'
+                   ELSE '0-25%'
+               END as range,
+               COUNT(*) as plays
+           FROM history
+           WHERE started_at >= datetime('now', ?)
+           GROUP BY range
+           ORDER BY
+               CASE range
+                   WHEN '0-25%' THEN 1
+                   WHEN '25-50%' THEN 2
+                   WHEN '50-75%' THEN 3
+                   WHEN '75-100%' THEN 4
+               END""",
+        [f"-{days} days"],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_period_comparison(db: aiosqlite.Connection, days: int = 30) -> dict:
+    """Stats for the current period and the previous same-length period."""
+    cursor = await db.execute(
+        """SELECT COUNT(*) as plays,
+                  COALESCE(SUM(duration_seconds), 0) as total_duration,
+                  COUNT(DISTINCT user_id) as unique_users,
+                  COUNT(DISTINCT item_id) as unique_items
+           FROM history
+           WHERE started_at >= datetime('now', ?)""",
+        [f"-{days} days"],
+    )
+    current = dict(await cursor.fetchone())
+
+    cursor = await db.execute(
+        """SELECT COUNT(*) as plays,
+                  COALESCE(SUM(duration_seconds), 0) as total_duration,
+                  COUNT(DISTINCT user_id) as unique_users,
+                  COUNT(DISTINCT item_id) as unique_items
+           FROM history
+           WHERE started_at >= datetime('now', ?) AND started_at < datetime('now', ?)""",
+        [f"-{days * 2} days", f"-{days} days"],
+    )
+    previous = dict(await cursor.fetchone())
+    return {"current": current, "previous": previous}
+
+
+async def get_bandwidth_stats(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
+    """Average bitrate per day from stream_info JSON."""
+    cursor = await db.execute(
+        """SELECT DATE(started_at) as date,
+                  AVG(json_extract(stream_info, '$.media.bitrate')) as avg_bitrate,
+                  COUNT(*) as plays
+           FROM history
+           WHERE started_at >= datetime('now', ?)
+                 AND json_extract(stream_info, '$.media.bitrate') IS NOT NULL
+                 AND json_extract(stream_info, '$.media.bitrate') > 0
+           GROUP BY date
+           ORDER BY date""",
+        [f"-{days} days"],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_watch_heatmap(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
+    """Play counts grouped by day-of-week and hour for heatmap rendering."""
+    cursor = await db.execute(
+        """SELECT CAST(strftime('%w', started_at) AS INTEGER) as dow,
+                  CAST(strftime('%H', started_at) AS INTEGER) as hour,
+                  COUNT(*) as plays,
+                  SUM(duration_seconds) as total_duration
+           FROM history
+           WHERE started_at >= datetime('now', ?)
+           GROUP BY dow, hour
+           ORDER BY dow, hour""",
+        [f"-{days} days"],
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
 async def get_most_played(db: aiosqlite.Connection, limit: int = 10) -> list[dict]:
     cursor = await db.execute(
         """SELECT item_name, series_name, item_type, year, COUNT(*) as plays,

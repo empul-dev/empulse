@@ -147,6 +147,7 @@ def create_app() -> FastAPI:
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     app = FastAPI(title="Empulse", lifespan=lifespan)
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")

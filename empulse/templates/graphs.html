@@ -13,8 +13,16 @@
         <input type="number" id="graph-days" value="30" min="1" max="365"
                class="days-input" onchange="loadGraphs()">
         <span class="stat-controls-label">days</span>
+        <div class="preset-btns">
+            <button class="preset-btn" onclick="setDaysPreset(7)">7d</button>
+            <button class="preset-btn" onclick="setDaysPreset(30)">30d</button>
+            <button class="preset-btn" onclick="setDaysPreset(90)">90d</button>
+            <button class="preset-btn" onclick="setDaysPreset(365)">1y</button>
+        </div>
     </div>
 </div>
+
+<div id="period-comparison" class="period-comparison-cards" style="display:none;"></div>
 
 <div class="charts-section">
 
@@ -47,6 +55,17 @@
                 <span class="chart-desc">Peak viewing hours throughout the day.</span>
             </div>
             <div class="chart-body"><canvas id="g-hour"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Watch Time Heatmap -->
+    <div class="charts-grid">
+        <div class="chart-card wide">
+            <div class="chart-header">
+                <h3>Watch Time Heatmap</h3>
+                <p>Activity intensity by day of week and hour of day.</p>
+            </div>
+            <div class="chart-body"><canvas id="g-heatmap" height="200"></canvas></div>
         </div>
     </div>
 
@@ -103,6 +122,24 @@
                 <span class="chart-desc">Split between Movies, TV, and Music.</span>
             </div>
             <div class="chart-body"><canvas id="g-content-type"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Completion Rate + Bandwidth -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Completion Rate</h3>
+                <p>How much content is watched before stopping.</p>
+            </div>
+            <div class="chart-body"><canvas id="g-completion"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Average Bitrate</h3>
+                <p>Average stream bitrate over time (Mbps).</p>
+            </div>
+            <div class="chart-body"><canvas id="g-bandwidth"></canvas></div>
         </div>
     </div>
 
@@ -220,6 +257,11 @@ function setGraphToggle(btn) {
     loadGraphs();
 }
 
+function setDaysPreset(days) {
+    document.getElementById('graph-days').value = days;
+    loadGraphs();
+}
+
 // Shared tooltip config for consistent look
 function tooltipConfig() {
     return {
@@ -310,21 +352,41 @@ function loadGraphs() {
         var map = {};
         data.forEach(function(r) { map[r.date + '|' + r.item_type] = r; });
 
+        var stackedDatasets = types.map(function(t) {
+            return {
+                label: t,
+                data: dates.map(function(dd) {
+                    var row = map[dd + '|' + t];
+                    return row ? pickVal(row) : 0;
+                }),
+                backgroundColor: soften(TYPE_COLORS[t] || PALETTE[0]),
+                borderRadius: 2
+            };
+        });
+        // Compute per-date totals for trend line
+        var dailyTotals = dates.map(function(_, i) {
+            var sum = 0;
+            stackedDatasets.forEach(function(ds) { sum += ds.data[i]; });
+            return sum;
+        });
+        var dailyTrend = linearRegression(dailyTotals);
+        stackedDatasets.push({
+            label: 'Trend',
+            type: 'line',
+            data: dailyTrend,
+            borderColor: '#888',
+            borderWidth: 2,
+            borderDash: [6, 3],
+            pointRadius: 0,
+            fill: false,
+            order: 0
+        });
+
         gCharts.dailyStacked = new Chart(document.getElementById('g-daily-stacked'), {
             type: 'bar',
             data: {
                 labels: dates.map(function(dd) { return dd.slice(5); }),
-                datasets: types.map(function(t) {
-                    return {
-                        label: t,
-                        data: dates.map(function(dd) {
-                            var row = map[dd + '|' + t];
-                            return row ? pickVal(row) : 0;
-                        }),
-                        backgroundColor: soften(TYPE_COLORS[t] || PALETTE[0]),
-                        borderRadius: 2
-                    };
-                })
+                datasets: stackedDatasets
             },
             options: baseOpts({
                 scales: barScales(true),
@@ -351,17 +413,15 @@ function loadGraphs() {
             var row = map[i];
             return row ? pickVal(row) : 0;
         });
-        var canvas = document.getElementById('g-dow');
-        var ctx = canvas.getContext('2d');
 
-        gCharts.dow = new Chart(canvas, {
+        gCharts.dow = new Chart(document.getElementById('g-dow'), {
             type: 'bar',
             data: {
                 labels: DOW_LABELS,
                 datasets: [{
                     label: label,
                     data: values,
-                    backgroundColor: gradient(ctx, 200),
+                    backgroundColor: soften(PALETTE[0]),
                     borderRadius: 4,
                     borderSkipped: false
                 }]
@@ -389,10 +449,8 @@ function loadGraphs() {
             return row ? pickVal(row) : 0;
         });
         var maxVal = Math.max.apply(null, values);
-        var canvas = document.getElementById('g-hour');
-        var ctx = canvas.getContext('2d');
 
-        gCharts.hour = new Chart(canvas, {
+        gCharts.hour = new Chart(document.getElementById('g-hour'), {
             type: 'bar',
             data: {
                 labels: hours.map(function(h) {
@@ -403,7 +461,7 @@ function loadGraphs() {
                 datasets: [{
                     label: label,
                     data: values,
-                    backgroundColor: gradient(ctx, 200),
+                    backgroundColor: soften(PALETTE[0]),
                     borderRadius: 3,
                     borderSkipped: false
                 }]
@@ -422,10 +480,9 @@ function loadGraphs() {
     // --- 4. Monthly ---
     fetch('/api/charts/plays-per-month?months=12').then(function(r) { return r.json(); }).then(function(data) {
         destroy('monthly');
-        var canvas = document.getElementById('g-monthly');
-        var ctx = canvas.getContext('2d');
-
-        gCharts.monthly = new Chart(canvas, {
+        var monthlyValues = data.map(pickVal);
+        var monthlyTrend = linearRegression(monthlyValues);
+        gCharts.monthly = new Chart(document.getElementById('g-monthly'), {
             type: 'bar',
             data: {
                 labels: data.map(function(r) {
@@ -435,10 +492,20 @@ function loadGraphs() {
                 }),
                 datasets: [{
                     label: label,
-                    data: data.map(pickVal),
-                    backgroundColor: gradient(ctx, 200),
+                    data: monthlyValues,
+                    backgroundColor: soften(PALETTE[0]),
                     borderRadius: 4,
                     borderSkipped: false
+                }, {
+                    label: 'Trend',
+                    type: 'line',
+                    data: monthlyTrend,
+                    borderColor: '#888',
+                    borderWidth: 2,
+                    borderDash: [6, 3],
+                    pointRadius: 0,
+                    fill: false,
+                    order: 0
                 }]
             },
             options: baseOpts({
@@ -697,17 +764,15 @@ function loadGraphs() {
     // --- 12. Most active users (by plays or duration) ---
     fetch('/api/charts/top-users?days=' + d + '&metric=' + getGraphMetric()).then(function(r) { return r.json(); }).then(function(data) {
         destroy('topUsers');
-        var canvas = document.getElementById('g-top-users');
-        var ctx = canvas.getContext('2d');
 
-        gCharts.topUsers = new Chart(canvas, {
+        gCharts.topUsers = new Chart(document.getElementById('g-top-users'), {
             type: 'bar',
             data: {
                 labels: data.map(function(r) { return r.user_name; }),
                 datasets: [{
                     label: label,
                     data: data.map(pickVal),
-                    backgroundColor: gradient(ctx, 300),
+                    backgroundColor: soften(PALETTE[0]),
                     borderRadius: 4,
                     borderSkipped: false
                 }]
@@ -723,6 +788,220 @@ function loadGraphs() {
             })
         });
     });
+
+    // --- 13. Completion Rate doughnut ---
+    fetch('/api/charts/completion-rate?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
+        destroy('completion');
+        if (!data.length) return;
+        var COMP_COLORS = { '0-25%': '#e57373', '25-50%': '#d4a76a', '50-75%': '#4db6ac', '75-100%': '#52b54b' };
+        gCharts.completion = new Chart(document.getElementById('g-completion'), {
+            type: 'doughnut',
+            data: {
+                labels: data.map(function(r) { return r.range; }),
+                datasets: [{
+                    data: data.map(function(r) { return r.plays; }),
+                    backgroundColor: data.map(function(r) { return COMP_COLORS[r.range] || PALETTE[0]; }),
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }]
+            },
+            options: baseOpts({
+                plugins: {
+                    legend: legendOpts('right'),
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: {
+                            label: function(ctx) {
+                                var total = ctx.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                                var pct = total > 0 ? Math.round(ctx.parsed * 100 / total) : 0;
+                                return ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
+                            }
+                        }
+                    })
+                }
+            })
+        });
+    });
+
+    // --- 14. Average Bitrate bar chart ---
+    fetch('/api/charts/bandwidth?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
+        destroy('bandwidth');
+        if (!data.length) return;
+        gCharts.bandwidth = new Chart(document.getElementById('g-bandwidth'), {
+            type: 'bar',
+            data: {
+                labels: data.map(function(r) { return r.date.slice(5); }),
+                datasets: [{
+                    label: 'Avg Bitrate (Mbps)',
+                    data: data.map(function(r) { return Math.round((r.avg_bitrate || 0) / 100000) / 10; }),
+                    backgroundColor: soften(PALETTE[1]),
+                    borderRadius: 3,
+                    borderSkipped: false
+                }]
+            },
+            options: baseOpts({
+                scales: barScales(false),
+                plugins: {
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: { label: function(ctx) { return 'Avg: ' + ctx.parsed.y + ' Mbps'; } }
+                    })
+                }
+            })
+        });
+    });
+
+    // --- 15. Watch Time Heatmap (custom canvas) ---
+    fetch('/api/charts/watch-heatmap?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
+        var canvas = document.getElementById('g-heatmap');
+        if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+        var dpr = window.devicePixelRatio || 1;
+        var rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = 200 * dpr;
+        canvas.style.width = rect.width + 'px';
+        canvas.style.height = '200px';
+        ctx.scale(dpr, dpr);
+        var W = rect.width, H = 200;
+
+        var matrix = [], maxVal = 0;
+        for (var dow = 0; dow < 7; dow++) { matrix[dow] = []; for (var h = 0; h < 24; h++) matrix[dow][h] = 0; }
+        data.forEach(function(r) {
+            var val = isDuration() ? toHours(r.total_duration) : r.plays;
+            matrix[r.dow][r.hour] = val;
+            if (val > maxVal) maxVal = val;
+        });
+
+        var lblW = 36, lblH = 20;
+        var cellW = (W - lblW) / 24, cellH = (H - lblH) / 7;
+        var DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        var mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#888';
+
+        ctx.clearRect(0, 0, W, H);
+        ctx.font = '10px sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'right';
+
+        for (var d2 = 0; d2 < 7; d2++) {
+            ctx.fillStyle = mutedColor;
+            ctx.fillText(DOW[d2], lblW - 4, d2 * cellH + cellH / 2);
+            for (var h2 = 0; h2 < 24; h2++) {
+                var intensity = maxVal > 0 ? matrix[d2][h2] / maxVal : 0;
+                var alpha = 0.05 + intensity * 0.75;
+                ctx.fillStyle = 'rgba(82, 181, 75, ' + alpha + ')';
+                ctx.fillRect(lblW + h2 * cellW + 1, d2 * cellH + 1, cellW - 2, cellH - 2);
+            }
+        }
+        ctx.fillStyle = mutedColor;
+        ctx.textAlign = 'center';
+        for (var h3 = 0; h3 < 24; h3 += 3) {
+            var ampm = h3 >= 12 ? 'p' : 'a';
+            var hr = h3 % 12 || 12;
+            ctx.fillText(hr + ampm, lblW + h3 * cellW + cellW / 2, 7 * cellH + 12);
+        }
+        gCharts.heatmap = true;
+    });
+
+    // --- 16. Period Comparison Cards ---
+    fetch('/api/charts/period-comparison?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
+        var el = document.getElementById('period-comparison');
+        if (!el || !data.current || !data.previous) { if (el) el.style.display = 'none'; return; }
+        var c = data.current, p = data.previous;
+        function delta(curr, prev) {
+            if (!prev) return curr > 0 ? '+∞' : '0%';
+            var pct = Math.round((curr - prev) / prev * 100);
+            return (pct >= 0 ? '+' : '') + pct + '%';
+        }
+        function cls(curr, prev) { return curr >= prev ? 'trend-up' : 'trend-down'; }
+        var watchHrs = Math.round(c.total_duration / 3600);
+        var prevHrs = Math.round(p.total_duration / 3600);
+        function makeCard(lbl, val, u, curr, prev) {
+            var card = document.createElement('div');
+            card.className = 'comp-card';
+            var label = document.createElement('span');
+            label.className = 'comp-label';
+            label.textContent = lbl;
+            var value = document.createElement('span');
+            value.className = 'comp-value';
+            value.textContent = val + (u || '');
+            var dt = document.createElement('span');
+            dt.className = 'comp-delta ' + cls(curr, prev);
+            dt.textContent = delta(curr, prev);
+            card.appendChild(label);
+            card.appendChild(value);
+            card.appendChild(dt);
+            return card;
+        }
+        el.replaceChildren(
+            makeCard('Total Plays', c.plays, '', c.plays, p.plays),
+            makeCard('Watch Time', watchHrs, 'h', watchHrs, prevHrs),
+            makeCard('Unique Users', c.unique_users, '', c.unique_users, p.unique_users),
+            makeCard('Unique Items', c.unique_items, '', c.unique_items, p.unique_items)
+        );
+        el.style.display = '';
+    });
+
+    addExportButtons();
+}
+
+// --- Linear regression for trend lines ---
+function linearRegression(values) {
+    var n = values.length;
+    if (n < 2) return values.slice();
+    var sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    for (var i = 0; i < n; i++) {
+        sumX += i; sumY += values[i]; sumXY += i * values[i]; sumX2 += i * i;
+    }
+    var denom = n * sumX2 - sumX * sumX;
+    if (denom === 0) return values.slice();
+    var slope = (n * sumXY - sumX * sumY) / denom;
+    var intercept = (sumY - slope * sumX) / n;
+    return values.map(function(_, i) { return Math.max(0, Math.round((slope * i + intercept) * 10) / 10); });
+}
+
+// --- Chart export buttons ---
+function addExportButtons() {
+    setTimeout(function() {
+        document.querySelectorAll('.chart-card').forEach(function(card) {
+            if (card.querySelector('.chart-export-btn')) return;
+            var canvas = card.querySelector('canvas');
+            if (!canvas) return;
+            var header = card.querySelector('.chart-header');
+            if (!header) return;
+            var btn = document.createElement('button');
+            btn.className = 'chart-export-btn';
+            btn.title = 'Save as PNG';
+            var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', '14');
+            svg.setAttribute('height', '14');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            svg.setAttribute('fill', 'none');
+            svg.setAttribute('stroke', 'currentColor');
+            svg.setAttribute('stroke-width', '2');
+            var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4');
+            var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+            poly.setAttribute('points', '7 10 12 15 17 10');
+            var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', '12'); line.setAttribute('y1', '15');
+            line.setAttribute('x2', '12'); line.setAttribute('y2', '3');
+            svg.appendChild(path); svg.appendChild(poly); svg.appendChild(line);
+            btn.appendChild(svg);
+            btn.onclick = function() {
+                var chartKey = Object.keys(gCharts).find(function(k) {
+                    return gCharts[k] && gCharts[k].canvas === canvas;
+                });
+                var link = document.createElement('a');
+                link.download = canvas.id + '.png';
+                if (chartKey && gCharts[chartKey] && gCharts[chartKey].toBase64Image) {
+                    link.href = gCharts[chartKey].toBase64Image();
+                } else {
+                    link.href = canvas.toDataURL('image/png');
+                }
+                link.click();
+            };
+            header.appendChild(btn);
+        });
+    }, 500);
 }
 
 loadGraphs();

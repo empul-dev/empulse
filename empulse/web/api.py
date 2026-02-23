@@ -95,6 +95,42 @@ async def now_playing(request: Request):
     )
 
 
+@router.post("/sessions/{session_key}/stop")
+async def stop_session(session_key: str, request: Request):
+    """Stop an active Emby playback session. Admin only."""
+    user = getattr(request.state, "user", None)
+    if not user or user.role != "admin":
+        return JSONResponse({"error": "Admin access required"}, status_code=403)
+
+    state_tracker = getattr(request.app.state, "state_tracker", None)
+    if not state_tracker:
+        return JSONResponse({"error": "State tracker unavailable"}, status_code=503)
+
+    # Find session and get its Emby session ID
+    sessions = state_tracker.get_all_sessions()
+    target = None
+    for s in sessions:
+        if s.get("session_key") == session_key:
+            target = s
+            break
+
+    if not target:
+        return JSONResponse({"error": "Session not found"}, status_code=404)
+
+    emby_session_id = target.get("emby_session_id")
+    if not emby_session_id:
+        return JSONResponse({"error": "No Emby session ID available"}, status_code=400)
+
+    emby_client = getattr(request.app.state, "emby_client", None)
+    if not emby_client:
+        return JSONResponse({"error": "Emby client unavailable"}, status_code=503)
+
+    success = await emby_client.stop_session(emby_session_id)
+    if success:
+        return JSONResponse({"ok": True, "message": "Stop command sent"})
+    return JSONResponse({"error": "Failed to stop session"}, status_code=502)
+
+
 def _clamp_days(days: int) -> int:
     return max(1, min(days, 365))
 
@@ -642,6 +678,38 @@ async def chart_top_users(days: int = 30, metric: str = "plays"):
     days = _clamp_days(days)
     db = get_db()
     rows = await stats_db.get_top_users(db, limit=10, days=days, metric=metric)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/completion-rate")
+async def chart_completion_rate(days: int = 30):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_completion_breakdown(db, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/period-comparison")
+async def chart_period_comparison(days: int = 30):
+    days = _clamp_days(days)
+    db = get_db()
+    result = await stats_db.get_period_comparison(db, days=days)
+    return JSONResponse(result)
+
+
+@router.get("/charts/bandwidth")
+async def chart_bandwidth(days: int = 30):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_bandwidth_stats(db, days=days)
+    return JSONResponse(rows)
+
+
+@router.get("/charts/watch-heatmap")
+async def chart_watch_heatmap(days: int = 30):
+    days = _clamp_days(days)
+    db = get_db()
+    rows = await stats_db.get_watch_heatmap(db, days=days)
     return JSONResponse(rows)
 
 

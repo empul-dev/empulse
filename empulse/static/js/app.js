@@ -345,3 +345,25 @@ function toggleTheme() {
     document.body.addEventListener('htmx:afterSwap', updateAll);
     setInterval(updateAll, 60000);
 })();
+
+// --- Session kill ---
+function stopSession(sessionKey) {
+    if (!confirm('Stop this stream?')) return;
+    fetch('/api/sessions/' + encodeURIComponent(sessionKey) + '/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    }).then(function(r) {
+        if (r.ok) {
+            // Trigger HTMX refresh of now-playing section
+            document.body.dispatchEvent(new Event('refresh-now-playing'));
+        } else {
+            r.json().then(function(data) {
+                alert(data.error || 'Failed to stop session');
+            }).catch(function() {
+                alert('Failed to stop session');
+            });
+        }
+    }).catch(function() {
+        alert('Network error — could not stop session');
+    });
+}

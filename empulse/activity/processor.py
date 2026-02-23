@@ -102,6 +102,7 @@ class ActivityProcessor:
 
         return {
             "session_key": f"{s.user_id}_{s.device_id}_{item.id}" if item else s.id,
+            "emby_session_id": s.id,
             "user_id": s.user_id,
             "user_name": s.user_name,
             "client": s.client,
@@ -238,6 +239,20 @@ class ActivityProcessor:
         existing = None
         if user_id and item_id:
             existing = await history_db.find_recent_history(db, user_id, item_id)
+
+        if existing:
+            # Detect re-watch: new session starts near beginning, old one was further in
+            start_ticks = session.get("start_progress_ticks", 0)
+            prev_ticks = existing.get("progress_ticks", 0)
+            runtime = session.get("runtime_ticks", 0)
+            rewatch_threshold = runtime * 0.05 if runtime > 0 else 0
+
+            if start_ticks < rewatch_threshold and prev_ticks > rewatch_threshold:
+                logger.info(
+                    f"Re-watch detected (new entry): {session.get('user_name')} - "
+                    f"{session.get('item_name')}"
+                )
+                existing = None
 
         if existing:
             history_id = existing["id"]
