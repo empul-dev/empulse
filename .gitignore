@@ -15,3 +15,5 @@ build/
 .empulse_secret
 .emtulli_secret
 .claude/
+share/
+.DS_Store
