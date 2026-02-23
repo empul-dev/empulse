@@ -59,13 +59,13 @@
     </div>
 
     <!-- Watch Time Heatmap -->
-    <div class="charts-grid">
+    <div class="charts-grid" style="margin-top: 0.75rem;">
         <div class="chart-card wide">
             <div class="chart-header">
-                <h3>Watch Time Heatmap</h3>
-                <p>Activity intensity by day of week and hour of day.</p>
+                <span class="chart-title">Watch Time Heatmap</span>
+                <span class="chart-desc">Activity intensity by day of week and hour of day.</span>
             </div>
-            <div class="chart-body"><canvas id="g-heatmap" height="200"></canvas></div>
+            <div class="chart-body" style="height: 240px;"><canvas id="g-heatmap"></canvas></div>
         </div>
     </div>
 
@@ -129,15 +129,15 @@
     <div class="charts-grid">
         <div class="chart-card">
             <div class="chart-header">
-                <h3>Completion Rate</h3>
-                <p>How much content is watched before stopping.</p>
+                <span class="chart-title">Completion Rate</span>
+                <span class="chart-desc">How much content is watched before stopping.</span>
             </div>
             <div class="chart-body"><canvas id="g-completion"></canvas></div>
         </div>
         <div class="chart-card">
             <div class="chart-header">
-                <h3>Average Bitrate</h3>
-                <p>Average stream bitrate over time (Mbps).</p>
+                <span class="chart-title">Average Bitrate</span>
+                <span class="chart-desc">Average stream bitrate over time (Mbps).</span>
             </div>
             <div class="chart-body"><canvas id="g-bandwidth"></canvas></div>
         </div>
@@ -149,15 +149,7 @@
         <span>Content & Platforms</span>
     </div>
     <div class="charts-grid">
-        <!-- Top Platforms — side by side with Platform Stream Decisions -->
-        <div class="chart-card">
-            <div class="chart-header">
-                <span class="chart-title">Top Platforms</span>
-                <span class="chart-desc">Most used player applications.</span>
-            </div>
-            <div class="chart-body"><canvas id="g-platforms"></canvas></div>
-        </div>
-        <div class="chart-card">
+        <div class="chart-card wide">
             <div class="chart-header">
                 <span class="chart-title">Platform Stream Decisions</span>
                 <span class="chart-desc">How each platform plays media — direct play, direct stream, or transcode.</span>
@@ -391,8 +383,9 @@ function loadGraphs() {
             options: baseOpts({
                 scales: barScales(true),
                 plugins: {
-                    legend: legendOpts('top'),
+                    legend: { display: true, position: 'top', labels: { boxWidth: 12, padding: 12, font: { family: "'Source Sans 3', sans-serif", size: 11 }, filter: function(item) { return item.text !== 'Trend'; } } },
                     tooltip: Object.assign({}, tooltipConfig(), {
+                        filter: function(item) { return item.dataset.label !== 'Trend'; },
                         callbacks: {
                             label: function(ctx) {
                                 return ctx.dataset.label + ': ' + ctx.parsed.y + (unit ? ' ' + unit : '');
@@ -512,6 +505,7 @@ function loadGraphs() {
                 scales: barScales(false),
                 plugins: {
                     tooltip: Object.assign({}, tooltipConfig(), {
+                        filter: function(item) { return item.dataset.label !== 'Trend'; },
                         callbacks: { label: function(ctx) { return label + ': ' + ctx.parsed.y + (unit ? ' ' + unit : ''); } }
                     })
                 }
@@ -645,34 +639,6 @@ function loadGraphs() {
                                 return ctx.label + ': ' + ctx.parsed + (unit ? ' ' + unit : '') + ' (' + pct + '%)';
                             }
                         }
-                    })
-                }
-            })
-        });
-    });
-
-    // --- 9. Top platforms (simple bar) ---
-    fetch('/api/charts/plays-by-platform?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
-        destroy('platforms');
-
-        gCharts.platforms = new Chart(document.getElementById('g-platforms'), {
-            type: 'bar',
-            data: {
-                labels: data.map(function(r) { return r.client; }),
-                datasets: [{
-                    label: label,
-                    data: data.map(pickVal),
-                    backgroundColor: PALETTE.slice(0, data.length).map(soften),
-                    borderRadius: 4,
-                    borderSkipped: false
-                }]
-            },
-            options: baseOpts({
-                indexAxis: 'y',
-                scales: horizScales(false),
-                plugins: {
-                    tooltip: Object.assign({}, tooltipConfig(), {
-                        callbacks: { label: function(ctx) { return label + ': ' + ctx.parsed.x + (unit ? ' ' + unit : ''); } }
                     })
                 }
             })
@@ -849,56 +815,134 @@ function loadGraphs() {
         });
     });
 
-    // --- 15. Watch Time Heatmap (custom canvas) ---
-    fetch('/api/charts/watch-heatmap?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
-        var canvas = document.getElementById('g-heatmap');
-        if (!canvas) return;
-        var ctx = canvas.getContext('2d');
-        var dpr = window.devicePixelRatio || 1;
-        var rect = canvas.parentElement.getBoundingClientRect();
-        canvas.width = rect.width * dpr;
-        canvas.height = 200 * dpr;
-        canvas.style.width = rect.width + 'px';
-        canvas.style.height = '200px';
-        ctx.scale(dpr, dpr);
-        var W = rect.width, H = 200;
+    // --- 15. Watch Time Heatmap (custom canvas, GitHub-style) ---
+    fetch('/api/charts/watch-heatmap?days=' + d).then(function(r) { return r.json(); }).then(function(heatData) {
+        // Defer drawing to next frame so CSS layout is settled
+        requestAnimationFrame(function() {
+            var canvas = document.getElementById('g-heatmap');
+            if (!canvas) return;
 
-        var matrix = [], maxVal = 0;
-        for (var dow = 0; dow < 7; dow++) { matrix[dow] = []; for (var h = 0; h < 24; h++) matrix[dow][h] = 0; }
-        data.forEach(function(r) {
-            var val = isDuration() ? toHours(r.total_duration) : r.plays;
-            matrix[r.dow][r.hour] = val;
-            if (val > maxVal) maxVal = val;
-        });
+            // Force canvas to fill its container via CSS, then read actual size
+            canvas.style.display = 'block';
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+            var W = canvas.clientWidth;
+            var H = canvas.clientHeight;
+            if (W < 100) return; // container not visible
 
-        var lblW = 36, lblH = 20;
-        var cellW = (W - lblW) / 24, cellH = (H - lblH) / 7;
-        var DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        var mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#888';
+            var dpr = window.devicePixelRatio || 1;
+            canvas.width = W * dpr;
+            canvas.height = H * dpr;
+            var ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
 
-        ctx.clearRect(0, 0, W, H);
-        ctx.font = '10px sans-serif';
-        ctx.textBaseline = 'middle';
-        ctx.textAlign = 'right';
+            var matrix = [], maxVal = 0;
+            for (var dow = 0; dow < 7; dow++) { matrix[dow] = []; for (var h = 0; h < 24; h++) matrix[dow][h] = 0; }
+            heatData.forEach(function(r) {
+                var val = isDuration() ? toHours(r.total_duration) : r.plays;
+                matrix[r.dow][r.hour] = val;
+                if (val > maxVal) maxVal = val;
+            });
 
-        for (var d2 = 0; d2 < 7; d2++) {
-            ctx.fillStyle = mutedColor;
-            ctx.fillText(DOW[d2], lblW - 4, d2 * cellH + cellH / 2);
-            for (var h2 = 0; h2 < 24; h2++) {
-                var intensity = maxVal > 0 ? matrix[d2][h2] / maxVal : 0;
-                var alpha = 0.05 + intensity * 0.75;
-                ctx.fillStyle = 'rgba(82, 181, 75, ' + alpha + ')';
-                ctx.fillRect(lblW + h2 * cellW + 1, d2 * cellH + 1, cellW - 2, cellH - 2);
+            var lblW = 40, lblH = 22, gap = 3;
+            var cellW = (W - lblW - 23 * gap) / 24;
+            var cellH = (H - lblH - 6 * gap) / 7;
+            cellW = Math.max(cellW, 4); cellH = Math.max(cellH, 4);
+            var stride = cellW + gap;
+            var strideV = cellH + gap;
+            // Mon–Sun order (API: 0=Sun..6=Sat → display Mon first)
+            var DOW_LABELS = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+            var DOW_ORDER = [1,2,3,4,5,6,0];
+            var mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#888';
+
+            // GitHub-style 5-step color scale (empty → dark green)
+            var HEAT_COLORS = [
+                'rgba(82, 181, 75, 0.06)',
+                'rgba(82, 181, 75, 0.25)',
+                'rgba(82, 181, 75, 0.45)',
+                'rgba(82, 181, 75, 0.65)',
+                'rgba(82, 181, 75, 0.90)'
+            ];
+            function heatColor(val) {
+                if (val === 0 || maxVal === 0) return HEAT_COLORS[0];
+                var idx = Math.min(4, Math.floor(Math.sqrt(val / maxVal) * 4) + 1);
+                return HEAT_COLORS[idx];
             }
-        }
-        ctx.fillStyle = mutedColor;
-        ctx.textAlign = 'center';
-        for (var h3 = 0; h3 < 24; h3 += 3) {
-            var ampm = h3 >= 12 ? 'p' : 'a';
-            var hr = h3 % 12 || 12;
-            ctx.fillText(hr + ampm, lblW + h3 * cellW + cellW / 2, 7 * cellH + 12);
-        }
-        gCharts.heatmap = true;
+
+            // Store cell positions for tooltip hit-testing
+            var cells = [];
+
+            ctx.clearRect(0, 0, W, H);
+            ctx.font = '11px sans-serif';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'right';
+
+            for (var row = 0; row < 7; row++) {
+                var dowIdx = DOW_ORDER[row];
+                ctx.fillStyle = mutedColor;
+                ctx.fillText(DOW_LABELS[row], lblW - 6, row * strideV + cellH / 2);
+                for (var h2 = 0; h2 < 24; h2++) {
+                    var val = matrix[dowIdx][h2];
+                    var cx = lblW + h2 * stride;
+                    var cy = row * strideV;
+                    ctx.fillStyle = heatColor(val);
+                    ctx.beginPath();
+                    ctx.roundRect(cx, cy, cellW, cellH, 3);
+                    ctx.fill();
+                    cells.push({ x: cx, y: cy, w: cellW, h: cellH, dow: DOW_LABELS[row], hour: h2, val: val });
+                }
+            }
+            // 24h labels: 00:00, 03:00, ... 21:00
+            ctx.fillStyle = mutedColor;
+            ctx.textAlign = 'center';
+            for (var h3 = 0; h3 < 24; h3 += 3) {
+                var lbl = (h3 < 10 ? '0' : '') + h3 + ':00';
+                ctx.fillText(lbl, lblW + h3 * stride + cellW / 2, 7 * strideV + 10);
+            }
+            gCharts.heatmap = true;
+
+            // --- Tooltip on hover ---
+            var tip = document.getElementById('heatmap-tooltip');
+            if (!tip) {
+                tip = document.createElement('div');
+                tip.id = 'heatmap-tooltip';
+                tip.style.cssText = 'position:absolute;pointer-events:none;display:none;background:rgba(28,28,30,0.95);color:#e0e0e0;border:1px solid rgba(82,181,75,0.3);border-radius:6px;padding:6px 10px;font-size:12px;font-family:"Source Sans 3",sans-serif;z-index:10;white-space:nowrap;';
+                canvas.parentElement.style.position = 'relative';
+                canvas.parentElement.appendChild(tip);
+            }
+            canvas.onmousemove = function(e) {
+                var rect = canvas.getBoundingClientRect();
+                var mx = e.clientX - rect.left;
+                var my = e.clientY - rect.top;
+                var hit = null;
+                for (var i = 0; i < cells.length; i++) {
+                    var c = cells[i];
+                    if (mx >= c.x && mx <= c.x + c.w && my >= c.y && my <= c.y + c.h) { hit = c; break; }
+                }
+                if (hit) {
+                    var hStr = (hit.hour < 10 ? '0' : '') + hit.hour + ':00';
+                    var valStr = isDuration() ? hit.val + 'h' : hit.val + (hit.val === 1 ? ' play' : ' plays');
+                    // Build tooltip content safely via DOM
+                    var strong = document.createElement('strong');
+                    strong.textContent = hit.dow + ' ' + hStr;
+                    tip.textContent = '';
+                    tip.appendChild(strong);
+                    tip.appendChild(document.createElement('br'));
+                    tip.appendChild(document.createTextNode(valStr));
+                    tip.style.display = 'block';
+                    var tx = hit.x + hit.w / 2 - tip.offsetWidth / 2;
+                    var ty = hit.y - tip.offsetHeight - 6;
+                    if (ty < 0) ty = hit.y + hit.h + 6;
+                    if (tx < 0) tx = 0;
+                    if (tx + tip.offsetWidth > W) tx = W - tip.offsetWidth;
+                    tip.style.left = tx + 'px';
+                    tip.style.top = ty + 'px';
+                } else {
+                    tip.style.display = 'none';
+                }
+            };
+            canvas.onmouseleave = function() { tip.style.display = 'none'; };
+        });
     });
 
     // --- 16. Period Comparison Cards ---
@@ -907,11 +951,14 @@ function loadGraphs() {
         if (!el || !data.current || !data.previous) { if (el) el.style.display = 'none'; return; }
         var c = data.current, p = data.previous;
         function delta(curr, prev) {
-            if (!prev) return curr > 0 ? '+∞' : '0%';
+            if (!prev) return curr > 0 ? 'New' : '—';
             var pct = Math.round((curr - prev) / prev * 100);
             return (pct >= 0 ? '+' : '') + pct + '%';
         }
-        function cls(curr, prev) { return curr >= prev ? 'trend-up' : 'trend-down'; }
+        function cls(curr, prev) {
+            if (!prev) return curr > 0 ? 'trend-up' : 'trend-neutral';
+            return curr >= prev ? 'trend-up' : 'trend-down';
+        }
         var watchHrs = Math.round(c.total_duration / 3600);
         var prevHrs = Math.round(p.total_duration / 3600);
         function makeCard(lbl, val, u, curr, prev) {

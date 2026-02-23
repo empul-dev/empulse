@@ -346,24 +346,38 @@ function toggleTheme() {
     setInterval(updateAll, 60000);
 })();
 
-// --- Session kill ---
-function stopSession(sessionKey) {
+// --- Session kill (event delegation) ---
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.stop-session-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var sessionKey = btn.dataset.sessionKey;
+    if (!sessionKey) return;
     if (!confirm('Stop this stream?')) return;
+    btn.disabled = true;
+    btn.style.opacity = '0.4';
     fetch('/api/sessions/' + encodeURIComponent(sessionKey) + '/stop', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin'
     }).then(function(r) {
         if (r.ok) {
-            // Trigger HTMX refresh of now-playing section
-            document.body.dispatchEvent(new Event('refresh-now-playing'));
+            setTimeout(function() {
+                document.body.dispatchEvent(new Event('refresh-now-playing'));
+            }, 1500);
         } else {
+            btn.disabled = false;
+            btn.style.opacity = '';
             r.json().then(function(data) {
                 alert(data.error || 'Failed to stop session');
             }).catch(function() {
-                alert('Failed to stop session');
+                alert('Failed to stop session (status ' + r.status + ')');
             });
         }
-    }).catch(function() {
+    }).catch(function(err) {
+        btn.disabled = false;
+        btn.style.opacity = '';
         alert('Network error — could not stop session');
     });
-}
+});

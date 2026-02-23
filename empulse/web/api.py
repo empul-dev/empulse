@@ -95,7 +95,7 @@ async def now_playing(request: Request):
     )
 
 
-@router.post("/sessions/{session_key}/stop")
+@router.post("/sessions/{session_key:path}/stop")
 async def stop_session(session_key: str, request: Request):
     """Stop an active Emby playback session. Admin only."""
     user = getattr(request.state, "user", None)
@@ -106,7 +106,6 @@ async def stop_session(session_key: str, request: Request):
     if not state_tracker:
         return JSONResponse({"error": "State tracker unavailable"}, status_code=503)
 
-    # Find session and get its Emby session ID
     sessions = state_tracker.get_all_sessions()
     target = None
     for s in sessions:
@@ -128,7 +127,7 @@ async def stop_session(session_key: str, request: Request):
     success = await emby_client.stop_session(emby_session_id)
     if success:
         return JSONResponse({"ok": True, "message": "Stop command sent"})
-    return JSONResponse({"error": "Failed to stop session"}, status_code=502)
+    return JSONResponse({"error": "Failed to stop session via Emby API"}, status_code=502)
 
 
 def _clamp_days(days: int) -> int:

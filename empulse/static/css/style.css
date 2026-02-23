@@ -2221,6 +2221,7 @@ textarea.settings-input {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem;
+    margin-bottom: 0.75rem;
 }
 
 .chart-card {
@@ -2942,6 +2943,7 @@ html[data-theme="light"] .login-poster-wall {
     grid-template-columns: 1fr 1fr 1fr;
     gap: 0.75rem;
     margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
 }
 
 /* === Extra-Large Chart Body (Hero) === */
