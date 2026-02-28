@@ -6,18 +6,18 @@
     <h2>Graphs</h2>
     <div class="stat-controls">
         <div class="toggle-group" id="graph-metric-toggle">
-            <button class="toggle-btn active" data-value="plays" onclick="setGraphToggle(this)">Play Count</button>
-            <button class="toggle-btn" data-value="duration" onclick="setGraphToggle(this)">Play Duration</button>
+            <button class="toggle-btn active" data-value="plays">Play Count</button>
+            <button class="toggle-btn" data-value="duration">Play Duration</button>
         </div>
         <span class="stat-controls-label">Last</span>
         <input type="number" id="graph-days" value="30" min="1" max="365"
-               class="days-input" onchange="loadGraphs()">
+               class="days-input">
         <span class="stat-controls-label">days</span>
         <div class="preset-btns">
-            <button class="preset-btn" onclick="setDaysPreset(7)">7d</button>
-            <button class="preset-btn" onclick="setDaysPreset(30)">30d</button>
-            <button class="preset-btn" onclick="setDaysPreset(90)">90d</button>
-            <button class="preset-btn" onclick="setDaysPreset(365)">1y</button>
+            <button class="preset-btn" data-days="7">7d</button>
+            <button class="preset-btn" data-days="30">30d</button>
+            <button class="preset-btn" data-days="90">90d</button>
+            <button class="preset-btn" data-days="365">1y</button>
         </div>
     </div>
 </div>
@@ -243,16 +243,22 @@ function pickVal(row) { return isDuration() ? toHours(row.total_duration) : row.
 function metricLabel() { return isDuration() ? 'Hours' : 'Plays'; }
 function metricUnit() { return isDuration() ? 'h' : ''; }
 
-function setGraphToggle(btn) {
-    btn.parentElement.querySelectorAll('.toggle-btn').forEach(function(b) { b.classList.remove('active'); });
+document.getElementById('graph-metric-toggle').addEventListener('click', function(e) {
+    var btn = e.target.closest('.toggle-btn');
+    if (!btn) return;
+    this.querySelectorAll('.toggle-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
     loadGraphs();
-}
+});
 
-function setDaysPreset(days) {
-    document.getElementById('graph-days').value = days;
+document.querySelector('.preset-btns').addEventListener('click', function(e) {
+    var btn = e.target.closest('.preset-btn');
+    if (!btn) return;
+    document.getElementById('graph-days').value = btn.dataset.days;
     loadGraphs();
-}
+});
+
+document.getElementById('graph-days').addEventListener('change', loadGraphs);
 
 // Shared tooltip config for consistent look
 function tooltipConfig() {
@@ -1033,7 +1039,7 @@ function addExportButtons() {
             line.setAttribute('x2', '12'); line.setAttribute('y2', '3');
             svg.appendChild(path); svg.appendChild(poly); svg.appendChild(line);
             btn.appendChild(svg);
-            btn.onclick = function() {
+            btn.addEventListener('click', function() {
                 var chartKey = Object.keys(gCharts).find(function(k) {
                     return gCharts[k] && gCharts[k].canvas === canvas;
                 });
@@ -1045,7 +1051,7 @@ function addExportButtons() {
                     link.href = canvas.toDataURL('image/png');
                 }
                 link.click();
-            };
+            });
             header.appendChild(btn);
         });
     }, 500);

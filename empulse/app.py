@@ -213,7 +213,7 @@ def create_app() -> FastAPI:
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
             "font-src https://fonts.gstatic.com; "
             "img-src 'self' data:; "
-            "connect-src 'self' ws: wss:; "
+            "connect-src 'self' ws: wss: https://cdn.jsdelivr.net; "
             "frame-ancestors 'none'"
         )
         response.headers["Permissions-Policy"] = (

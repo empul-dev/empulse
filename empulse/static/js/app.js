@@ -278,6 +278,13 @@ document.body.addEventListener("htmx:responseError", function(evt) {
     }, 100);
 })();
 
+// Close modal via delegated click (dynamically loaded partials)
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.modal-close') && typeof closeModal === 'function') {
+        closeModal();
+    }
+});
+
 // Close nav user dropdown when clicking outside
 document.addEventListener('click', function(e) {
     var navUser = document.querySelector('.nav-user.open');

@@ -10,7 +10,7 @@
     </a>
 </div>
 
-<form id="newsletter-form" onsubmit="saveNewsletter(event)">
+<form id="newsletter-form">
 
 <!-- ===== Schedule ===== -->
 <div class="settings-section">
@@ -132,11 +132,11 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         Save Settings
     </button>
-    <button type="button" class="settings-btn settings-btn-secondary" onclick="previewNewsletter()">
+    <button type="button" class="settings-btn settings-btn-secondary" id="nl-preview-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         Preview
     </button>
-    <button type="button" class="settings-btn settings-btn-secondary" onclick="sendNewsletter()">
+    <button type="button" class="settings-btn settings-btn-secondary" id="nl-send-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         Send Now
     </button>
@@ -151,6 +151,10 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
+document.getElementById('newsletter-form').addEventListener('submit', function(e) { saveNewsletter(e); });
+document.getElementById('nl-preview-btn').addEventListener('click', previewNewsletter);
+document.getElementById('nl-send-btn').addEventListener('click', sendNewsletter);
+
 function saveNewsletter(e) {
     e.preventDefault();
     var payload = {

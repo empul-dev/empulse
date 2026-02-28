@@ -28,13 +28,11 @@
             <button class="toggle-btn active" data-value="plays"
                     hx-get="/api/stats-cards?metric=plays"
                     hx-target="#stats-cards" hx-swap="innerHTML"
-                    hx-include="#days-input"
-                    onclick="setToggle(this)">Play Count</button>
+                    hx-include="#days-input">Play Count</button>
             <button class="toggle-btn" data-value="duration"
                     hx-get="/api/stats-cards?metric=duration"
                     hx-target="#stats-cards" hx-swap="innerHTML"
-                    hx-include="#days-input"
-                    onclick="setToggle(this)">Play Duration</button>
+                    hx-include="#days-input">Play Duration</button>
         </div>
         <span class="stat-controls-label">Last</span>
         <input type="number" id="days-input" name="days" value="30" min="1" max="365"
@@ -73,10 +71,10 @@
 <div class="section-header">
     <h2>Recently Added</h2>
     <div class="recently-added-filters">
-        <button class="filter-btn active" onclick="loadRecentlyAdded('', this)">All</button>
-        <button class="filter-btn" onclick="loadRecentlyAdded('Movie', this)">Movies</button>
-        <button class="filter-btn" onclick="loadRecentlyAdded('Series', this)">TV Shows</button>
-        <button class="filter-btn" onclick="loadRecentlyAdded('Audio', this)">Music</button>
+        <button class="filter-btn active" data-type="">All</button>
+        <button class="filter-btn" data-type="Movie">Movies</button>
+        <button class="filter-btn" data-type="Series">TV Shows</button>
+        <button class="filter-btn" data-type="Audio">Music</button>
     </div>
 </div>
 <div id="recently-added" aria-live="polite"
@@ -89,16 +87,24 @@
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
 function setToggle(btn) {
-    btn.parentElement.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.parentElement.querySelectorAll('.toggle-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
 }
 
-function loadRecentlyAdded(type, btn) {
-    btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+document.getElementById('metric-toggle').addEventListener('click', function(e) {
+    var btn = e.target.closest('.toggle-btn');
+    if (btn) setToggle(btn);
+});
+
+document.querySelector('.recently-added-filters').addEventListener('click', function(e) {
+    var btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    this.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
     var url = '/api/recently-added?limit=10';
+    var type = btn.dataset.type;
     if (type) url += '&item_type=' + type;
     htmx.ajax('GET', url, '#recently-added');
-}
+});
 </script>
 {% endblock %}

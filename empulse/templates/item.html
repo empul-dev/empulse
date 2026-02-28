@@ -165,7 +165,7 @@
     <div class="item-user-card">
         <div class="item-user-avatar">
             <img src="/api/img/user/{{ u.user_id }}?name={{ u.user_name | urlencode }}" alt="{{ u.user_name }}"
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                 class="avatar-img">
             <div class="avatar-fallback" style="display:none">{{ (u.user_name or '?')[0] | upper }}</div>
         </div>
         <div class="item-user-info">
@@ -176,4 +176,15 @@
     {% endfor %}
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+document.querySelectorAll('.item-user-avatar .avatar-img').forEach(function(img) {
+    img.addEventListener('error', function() {
+        this.style.display = 'none';
+        this.nextElementSibling.style.display = 'flex';
+    });
+});
+</script>
 {% endblock %}

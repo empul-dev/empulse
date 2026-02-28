@@ -34,8 +34,7 @@
                 {% else %}
                     <button class="toggle-enabled {% if user.enabled %}enabled{% else %}disabled{% endif %}"
                             data-user-id="{{ user.emby_user_id }}"
-                            data-enabled="{{ 'true' if user.enabled else 'false' }}"
-                            onclick="toggleUserEnabled(this)">
+                            data-enabled="{{ 'true' if user.enabled else 'false' }}">
                         {{ "Enabled" if user.enabled else "Disabled" }}
                     </button>
                 {% endif %}
@@ -58,25 +57,26 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
-async function toggleUserEnabled(btn) {
-    const userId = btn.dataset.userId;
-    const currentlyEnabled = btn.dataset.enabled === 'true';
-    const newEnabled = !currentlyEnabled;
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.toggle-enabled');
+    if (!btn) return;
+    var userId = btn.dataset.userId;
+    var currentlyEnabled = btn.dataset.enabled === 'true';
+    var newEnabled = !currentlyEnabled;
     btn.disabled = true;
-    try {
-        const r = await fetch(`/api/users/${userId}/enabled`, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({enabled: newEnabled}),
-        });
+    fetch('/api/users/' + userId + '/enabled', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({enabled: newEnabled}),
+    }).then(function(r) {
         if (r.ok) {
             btn.dataset.enabled = newEnabled ? 'true' : 'false';
             btn.textContent = newEnabled ? 'Enabled' : 'Disabled';
             btn.className = 'toggle-enabled ' + (newEnabled ? 'enabled' : 'disabled');
         }
-    } finally {
+    }).finally(function() {
         btn.disabled = false;
-    }
-}
+    });
+});
 </script>
 {% endblock %}

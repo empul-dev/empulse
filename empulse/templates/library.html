@@ -22,8 +22,8 @@
     <h2>Charts</h2>
     <div class="stat-controls">
         <div class="toggle-group" id="lib-metric-toggle">
-            <button class="toggle-btn active" data-value="plays" onclick="setLibToggle(this)">Play Count</button>
-            <button class="toggle-btn" data-value="duration" onclick="setLibToggle(this)">Play Duration</button>
+            <button class="toggle-btn active" data-value="plays">Play Count</button>
+            <button class="toggle-btn" data-value="duration">Play Duration</button>
         </div>
     </div>
 </div>
@@ -55,7 +55,7 @@
     <div class="item-user-card">
         <div class="item-user-avatar">
             <img src="/api/img/user/{{ u.user_id }}?name={{ u.user_name | urlencode }}" alt="{{ u.user_name }}"
-                 onerror="this.style.display='none'">
+                 class="avatar-img">
         </div>
         <div>
             <a href="/users/{{ u.user_id }}" class="item-user-name">{{ u.user_name or "Unknown" }}</a>
@@ -121,13 +121,17 @@
             });
     }
 
-    window.setLibToggle = function(btn) {
-        document.querySelectorAll("#lib-metric-toggle .toggle-btn").forEach(function(b) {
-            b.classList.remove("active");
-        });
+    document.getElementById("lib-metric-toggle").addEventListener("click", function(e) {
+        var btn = e.target.closest(".toggle-btn");
+        if (!btn) return;
+        this.querySelectorAll(".toggle-btn").forEach(function(b) { b.classList.remove("active"); });
         btn.classList.add("active");
         loadLibCharts();
-    };
+    });
+
+    document.querySelectorAll(".item-user-avatar .avatar-img").forEach(function(img) {
+        img.addEventListener("error", function() { this.style.display = "none"; });
+    });
 
     loadLibCharts();
 })();

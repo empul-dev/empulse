@@ -5,7 +5,7 @@
 <div class="user-hero">
     <div class="user-avatar-large">
         <img src="/api/img/user/{{ user.emby_user_id }}?name={{ user.username | urlencode }}" alt="{{ user.username }}"
-             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+             id="user-hero-avatar">
         <div class="avatar-fallback" style="display:none">{{ (user.username or '?')[0]|upper }}</div>
     </div>
     <div>
@@ -31,8 +31,8 @@
     <h2>Charts</h2>
     <div class="stat-controls">
         <div class="toggle-group" id="user-metric-toggle">
-            <button class="toggle-btn active" data-value="plays" onclick="setUserToggle(this)">Play Count</button>
-            <button class="toggle-btn" data-value="duration" onclick="setUserToggle(this)">Play Duration</button>
+            <button class="toggle-btn active" data-value="plays">Play Count</button>
+            <button class="toggle-btn" data-value="duration">Play Duration</button>
         </div>
     </div>
 </div>
@@ -168,13 +168,21 @@
             });
     }
 
-    window.setUserToggle = function(btn) {
-        document.querySelectorAll("#user-metric-toggle .toggle-btn").forEach(function(b) {
-            b.classList.remove("active");
-        });
+    document.getElementById("user-metric-toggle").addEventListener("click", function(e) {
+        var btn = e.target.closest(".toggle-btn");
+        if (!btn) return;
+        this.querySelectorAll(".toggle-btn").forEach(function(b) { b.classList.remove("active"); });
         btn.classList.add("active");
         loadUserCharts();
-    };
+    });
+
+    var heroAvatar = document.getElementById("user-hero-avatar");
+    if (heroAvatar) {
+        heroAvatar.addEventListener("error", function() {
+            this.style.display = "none";
+            this.nextElementSibling.style.display = "flex";
+        });
+    }
 
     loadUserCharts();
 })();

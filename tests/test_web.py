@@ -165,7 +165,7 @@ class TestAPIRoutes:
         assert "detail-row" in r.text
         assert "Test Movie" in r.text
         assert "Alice" in r.text
-        assert "toggleDetail" in r.text
+        assert "history-row" in r.text
 
     @pytest.mark.asyncio
     async def test_history_detail_not_found(self, client):

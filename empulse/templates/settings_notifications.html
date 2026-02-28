@@ -39,9 +39,9 @@
                             <td>{{ ch.triggers }}</td>
                             <td>{{ "Yes" if ch.enabled else "No" }}</td>
                             <td class="channel-actions">
-                                <button class="toolbar-btn" onclick="editChannel({{ ch.id }})" aria-label="Edit channel">Edit</button>
-                                <button class="toolbar-btn" onclick="testChannel({{ ch.id }})" aria-label="Test channel">Test</button>
-                                <button class="btn-delete" onclick="deleteChannel({{ ch.id }})" aria-label="Delete channel">Delete</button>
+                                <button class="toolbar-btn" data-action="edit" data-channel-id="{{ ch.id }}" aria-label="Edit channel">Edit</button>
+                                <button class="toolbar-btn" data-action="test" data-channel-id="{{ ch.id }}" aria-label="Test channel">Test</button>
+                                <button class="btn-delete" data-action="delete" data-channel-id="{{ ch.id }}" aria-label="Delete channel">Delete</button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -67,7 +67,7 @@
 
     <div class="chart-card">
         <div class="settings-card-body">
-            <form id="channel-form" onsubmit="saveChannel(event)">
+            <form id="channel-form">
                 <input type="hidden" id="ch-id" value="">
                 <div class="settings-form-grid">
                     <div class="settings-field">
@@ -76,7 +76,7 @@
                     </div>
                     <div class="settings-field">
                         <label class="settings-label">Type</label>
-                        <select id="ch-type" class="settings-input" onchange="toggleTypeFields()">
+                        <select id="ch-type" class="settings-input">
                             <option value="discord">Discord</option>
                             <option value="webhook">Generic Webhook</option>
                             <option value="email">Email (SMTP)</option>
@@ -207,7 +207,7 @@
 
                 <div class="settings-actions" style="margin-top: 0.75rem;">
                     <button type="submit" class="settings-btn settings-btn-primary">Save Channel</button>
-                    <button type="button" class="settings-btn settings-btn-secondary" onclick="resetForm()">Cancel</button>
+                    <button type="button" class="settings-btn settings-btn-secondary" id="channel-cancel-btn">Cancel</button>
                 </div>
             </form>
         </div>
@@ -258,6 +258,21 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
+// Channel action buttons (edit/test/delete) — delegate on channels-list
+document.getElementById('channels-list').addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var id = parseInt(btn.dataset.channelId);
+    var action = btn.dataset.action;
+    if (action === 'edit') editChannel(id);
+    else if (action === 'test') testChannel(id);
+    else if (action === 'delete') deleteChannel(id);
+});
+
+document.getElementById('channel-form').addEventListener('submit', function(e) { saveChannel(e); });
+document.getElementById('ch-type').addEventListener('change', toggleTypeFields);
+document.getElementById('channel-cancel-btn').addEventListener('click', resetForm);
+
 function toggleTypeFields() {
     var type = document.getElementById('ch-type').value;
     document.getElementById('webhook-extra').style.display = type === 'webhook' ? '' : 'none';

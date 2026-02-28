@@ -2,7 +2,7 @@
 {% set is_active = current_sort == col %}
 {% set next_order = 'asc' if (current_sort == col and current_order == 'desc') else 'desc' %}
 <th class="sortable {% if is_active %}sorted{% endif %}"
-    onclick="sortColumn('{{ col }}', '{{ next_order }}')">
+    data-col="{{ col }}" data-order="{{ next_order }}">
     {{ label }}
     {% if is_active %}
     <span class="sort-arrow">{% if current_order == 'asc' %}&#9650;{% else %}&#9660;{% endif %}</span>
@@ -33,12 +33,12 @@
     </thead>
     <tbody>
         {% for r in records %}
-        <tr class="history-row" data-id="{{ r.id }}" onclick="toggleDetail({{ r.id }}, this)">
+        <tr class="history-row" data-id="{{ r.id }}">
             <td class="col-expand">
                 <span class="expand-chevron" id="chev-{{ r.id }}">&#9656;</span>
             </td>
             <td class="col-date">{{ r.started_date }}</td>
-            <td class="col-user"><a href="/users/{{ r.user_id }}" onclick="event.stopPropagation()">{{ r.user_name or "Unknown" }}</a></td>
+            <td class="col-user"><a href="/users/{{ r.user_id }}">{{ r.user_name or "Unknown" }}</a></td>
             <td class="col-ip">{{ r.ip_address or "" }}</td>
             <td class="col-platform">{{ r.platform_name }}</td>
             <td class="col-product">{{ r.client or "" }}</td>
@@ -47,7 +47,7 @@
                 {{ r.device_name or "" }}
             </td>
             <td class="col-title">
-                <a href="{{ r.item_link }}" class="title-link" onclick="event.stopPropagation()">
+                <a href="{{ r.item_link }}" class="title-link">
                     <span class="title-text">{{ r.title_short }}</span>
                     {% if r.item_name and r.series_name %}
                     <span class="episode-name">{{ r.item_name }}</span>

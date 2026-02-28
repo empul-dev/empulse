@@ -22,36 +22,36 @@
 
     <div class="history-toolbar-group filter-buttons">
         <button class="filter-btn active" data-filter="item_type" data-value=""
-                aria-pressed="true" onclick="toggleFilter(this)">All</button>
+                aria-pressed="true">All</button>
         <button class="filter-btn" data-filter="item_type" data-value="Movie"
-                aria-pressed="false" onclick="toggleFilter(this)">Movies</button>
+                aria-pressed="false">Movies</button>
         <button class="filter-btn" data-filter="item_type" data-value="Episode"
-                aria-pressed="false" onclick="toggleFilter(this)">TV Shows</button>
+                aria-pressed="false">TV Shows</button>
         <button class="filter-btn" data-filter="item_type" data-value="Audio"
-                aria-pressed="false" onclick="toggleFilter(this)">Music</button>
+                aria-pressed="false">Music</button>
     </div>
 
     <div class="history-toolbar-group filter-buttons">
         <button class="filter-btn active" data-filter="play_method" data-value=""
-                aria-pressed="true" onclick="toggleFilter(this)">All</button>
+                aria-pressed="true">All</button>
         <button class="filter-btn direct-play" data-filter="play_method" data-value="DirectPlay"
-                aria-pressed="false" onclick="toggleFilter(this)">Direct Play</button>
+                aria-pressed="false">Direct Play</button>
         <button class="filter-btn direct-stream" data-filter="play_method" data-value="DirectStream"
-                aria-pressed="false" onclick="toggleFilter(this)">Direct Stream</button>
+                aria-pressed="false">Direct Stream</button>
         <button class="filter-btn transcode" data-filter="play_method" data-value="Transcode"
-                aria-pressed="false" onclick="toggleFilter(this)">Transcode</button>
+                aria-pressed="false">Transcode</button>
     </div>
 
     <div class="history-toolbar-group">
-        <button class="toolbar-btn" onclick="refreshHistory()" title="Refresh">
+        <button class="toolbar-btn" data-action="refresh" title="Refresh">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
             Refresh
         </button>
-        <button class="toolbar-btn" onclick="exportHistory('csv')" title="Export CSV">
+        <button class="toolbar-btn" data-action="export-csv" title="Export CSV">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
             CSV
         </button>
-        <button class="toolbar-btn" onclick="exportHistory('json')" title="Export JSON">
+        <button class="toolbar-btn" data-action="export-json" title="Export JSON">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
             JSON
         </button>
@@ -81,23 +81,6 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
-function toggleFilter(btn) {
-    var group = btn.closest('.filter-buttons');
-    group.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
-    btn.classList.add('active');
-    btn.setAttribute('aria-pressed', 'true');
-
-    var name = btn.dataset.filter;
-    var hidden = document.querySelector('#history-filters input[name="' + name + '"]');
-    hidden.value = btn.dataset.value;
-
-    htmx.trigger(document.querySelector('#history-filters .search-input'), 'search');
-}
-
-function refreshHistory() {
-    htmx.trigger(document.querySelector('#history-filters .search-input'), 'search');
-}
-
 function exportHistory(format) {
     var params = new URLSearchParams();
     params.set('format', format);
@@ -112,48 +95,68 @@ function exportHistory(format) {
     window.location.href = '/api/export/history?' + params.toString();
 }
 
-function sortColumn(col, order) {
-    document.querySelector('#history-filters input[name="sort_by"]').value = col;
-    document.querySelector('#history-filters input[name="sort_order"]').value = order;
-    htmx.trigger(document.querySelector('#history-filters .search-input'), 'search');
-}
+// Delegate filter-btn and toolbar-btn clicks
+document.getElementById('history-filters').addEventListener('click', function(e) {
+    var filterBtn = e.target.closest('.filter-btn');
+    if (filterBtn) {
+        var group = filterBtn.closest('.filter-buttons');
+        group.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
+        filterBtn.classList.add('active');
+        filterBtn.setAttribute('aria-pressed', 'true');
+        var name = filterBtn.dataset.filter;
+        document.querySelector('#history-filters input[name="' + name + '"]').value = filterBtn.dataset.value;
+        htmx.trigger(document.querySelector('#history-filters .search-input'), 'search');
+        return;
+    }
+    var toolbarBtn = e.target.closest('.toolbar-btn[data-action]');
+    if (toolbarBtn) {
+        var action = toolbarBtn.dataset.action;
+        if (action === 'refresh') htmx.trigger(document.querySelector('#history-filters .search-input'), 'search');
+        else if (action === 'export-csv') exportHistory('csv');
+        else if (action === 'export-json') exportHistory('json');
+    }
+});
 
-function toggleDetail(historyId, rowEl) {
-    var detailRow = document.getElementById('detail-' + historyId);
-    var chevron = document.getElementById('chev-' + historyId);
-    var contentEl = document.getElementById('detail-content-' + historyId);
-
+// Delegate sort, row expand, and link clicks on htmx-swapped #history-table
+document.getElementById('history-table').addEventListener('click', function(e) {
+    if (e.target.closest('a') && e.target.closest('.history-row')) return;
+    var th = e.target.closest('th.sortable');
+    if (th) {
+        document.querySelector('#history-filters input[name="sort_by"]').value = th.dataset.col;
+        document.querySelector('#history-filters input[name="sort_order"]').value = th.dataset.order;
+        htmx.trigger(document.querySelector('#history-filters .search-input'), 'search');
+        return;
+    }
+    var row = e.target.closest('tr.history-row');
+    if (!row) return;
+    var id = row.dataset.id;
+    var detailRow = document.getElementById('detail-' + id);
+    var chevron = document.getElementById('chev-' + id);
+    var contentEl = document.getElementById('detail-content-' + id);
     if (detailRow.style.display === 'none') {
-        // Close any other open detail rows
         document.querySelectorAll('.detail-row').forEach(function(r) {
-            if (r.id !== 'detail-' + historyId) {
+            if (r.id !== 'detail-' + id) {
                 r.style.display = 'none';
-                var otherId = r.id.replace('detail-', '');
-                var otherChev = document.getElementById('chev-' + otherId);
-                var otherRow = r.previousElementSibling;
-                if (otherChev) otherChev.classList.remove('expanded');
-                if (otherRow) otherRow.classList.remove('expanded');
+                var oid = r.id.replace('detail-', '');
+                var oc = document.getElementById('chev-' + oid);
+                var or2 = r.previousElementSibling;
+                if (oc) oc.classList.remove('expanded');
+                if (or2) or2.classList.remove('expanded');
             }
         });
-
         detailRow.style.display = 'table-row';
         chevron.classList.add('expanded');
-        rowEl.classList.add('expanded');
-
-        // Lazy-load content if not yet loaded (from our own trusted API)
+        row.classList.add('expanded');
         if (contentEl.querySelector('.detail-loading')) {
-            fetch('/api/history-detail/' + encodeURIComponent(historyId))
+            fetch('/api/history-detail/' + encodeURIComponent(id))
                 .then(function(r) { return r.text(); })
-                .then(function(html) {
-                    contentEl.innerHTML = html;  // safe: own API response
-                    htmx.process(contentEl);
-                });
+                .then(function(h) { contentEl.textContent = ''; contentEl.insertAdjacentHTML('afterbegin', h); htmx.process(contentEl); });
         }
     } else {
         detailRow.style.display = 'none';
         chevron.classList.remove('expanded');
-        rowEl.classList.remove('expanded');
+        row.classList.remove('expanded');
     }
-}
+});
 </script>
 {% endblock %}
