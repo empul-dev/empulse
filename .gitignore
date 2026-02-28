@@ -16,4 +16,5 @@ build/
 .emtulli_secret
 .claude/
 share/
+tasks/
 .DS_Store
