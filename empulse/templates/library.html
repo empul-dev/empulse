@@ -101,7 +101,7 @@
                 chartDaily = new Chart(el, {
                     type: "line",
                     data: {
-                        labels: data.map(function(d) { return d.date.slice(5); }),
+                        labels: data.map(function(d) { return window.empulseFormat.formatDateShort(d.date); }),
                         datasets: [{
                             label: label,
                             data: data.map(function(d) { return dur ? d.total_duration / 3600 : d.plays; }),

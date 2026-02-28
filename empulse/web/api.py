@@ -13,6 +13,7 @@ from empulse.app import templates
 from empulse.config import settings
 from empulse.database import get_db
 from empulse.db import history as history_db, stats as stats_db, users as users_db
+from empulse.formatting import DEFAULT_DISPLAY, get_tz_offset_hours
 from empulse.models import SessionInfo, HistoryRecord
 from empulse.web.poster_cache import POSTER_WIDTH
 
@@ -63,17 +64,24 @@ def _generate_user_avatar(user_id: str, initial: str) -> bytes:
         f'<defs><linearGradient id="{grad_id}" x1="0" y1="0" x2="1" y2="1">'
         f'<stop offset="0%" stop-color="{c1}"/>'
         f'<stop offset="100%" stop-color="{c2}"/>'
-        f'</linearGradient></defs>'
+        f"</linearGradient></defs>"
         f'<rect width="200" height="200" fill="url(#{grad_id})"/>'
         f'<text x="100" y="100" dy=".35em" text-anchor="middle"'
         f' font-family="system-ui,-apple-system,sans-serif" font-size="90" font-weight="600"'
         f' fill="rgba(255,255,255,0.9)">{letter}</text>'
-        f'</svg>'
+        f"</svg>"
     ).encode()
+
+
 logger = logging.getLogger("empulse.api")
 router = APIRouter()
 
 VALID_ID = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
+def _get_tz_offset(request: Request) -> float:
+    display = getattr(request.app.state, "display_settings", DEFAULT_DISPLAY)
+    return get_tz_offset_hours(display.get("timezone", "UTC"))
 
 
 def _validate_id(value: str) -> bool:
@@ -127,7 +135,9 @@ async def stop_session(session_key: str, request: Request):
     success = await emby_client.stop_session(emby_session_id)
     if success:
         return JSONResponse({"ok": True, "message": "Stop command sent"})
-    return JSONResponse({"error": "Failed to stop session via Emby API"}, status_code=502)
+    return JSONResponse(
+        {"error": "Failed to stop session via Emby API"}, status_code=502
+    )
 
 
 def _clamp_days(days: int) -> int:
@@ -541,10 +551,12 @@ def _fill_date_gaps(rows: list[dict], days: int) -> list[dict]:
 
 
 @router.get("/charts/daily-plays")
-async def chart_daily_plays(days: int = 30):
+async def chart_daily_plays(request: Request, days: int = 30):
     days = _clamp_days(days)
     db = get_db()
-    rows = await stats_db.get_plays_per_day(db, days=days)
+    rows = await stats_db.get_plays_per_day(
+        db, days=days, tz_offset_hours=_get_tz_offset(request)
+    )
     filled = _fill_date_gaps(rows, days)
     return JSONResponse(filled)
 
@@ -566,10 +578,12 @@ async def chart_plays_by_platform(days: int = 30):
 
 
 @router.get("/charts/user/{user_id}/daily-plays")
-async def chart_user_daily_plays(user_id: str, days: int = 30):
+async def chart_user_daily_plays(request: Request, user_id: str, days: int = 30):
     days = _clamp_days(days)
     db = get_db()
-    rows = await stats_db.get_user_plays_per_day(db, user_id, days=days)
+    rows = await stats_db.get_user_plays_per_day(
+        db, user_id, days=days, tz_offset_hours=_get_tz_offset(request)
+    )
     filled = _fill_date_gaps(rows, days)
     return JSONResponse(filled)
 
@@ -583,10 +597,12 @@ async def chart_user_by_type(user_id: str, days: int = 30):
 
 
 @router.get("/charts/library/{item_type}/daily-plays")
-async def chart_library_daily_plays(item_type: str, days: int = 30):
+async def chart_library_daily_plays(request: Request, item_type: str, days: int = 30):
     days = _clamp_days(days)
     db = get_db()
-    rows = await stats_db.get_library_plays_per_day(db, item_type, days=days)
+    rows = await stats_db.get_library_plays_per_day(
+        db, item_type, days=days, tz_offset_hours=_get_tz_offset(request)
+    )
     filled = _fill_date_gaps(rows, days)
     return JSONResponse(filled)
 
@@ -618,26 +634,32 @@ async def recently_added(request: Request, limit: int = 10, item_type: str = "")
 
 
 @router.get("/charts/plays-by-date-stacked")
-async def chart_plays_by_date_stacked(days: int = 30):
+async def chart_plays_by_date_stacked(request: Request, days: int = 30):
     days = _clamp_days(days)
     db = get_db()
-    rows = await stats_db.get_plays_by_date_stacked(db, days=days)
+    rows = await stats_db.get_plays_by_date_stacked(
+        db, days=days, tz_offset_hours=_get_tz_offset(request)
+    )
     return JSONResponse(rows)
 
 
 @router.get("/charts/plays-by-dow")
-async def chart_plays_by_dow(days: int = 30):
+async def chart_plays_by_dow(request: Request, days: int = 30):
     days = _clamp_days(days)
     db = get_db()
-    rows = await stats_db.get_plays_by_day_of_week(db, days=days)
+    rows = await stats_db.get_plays_by_day_of_week(
+        db, days=days, tz_offset_hours=_get_tz_offset(request)
+    )
     return JSONResponse(rows)
 
 
 @router.get("/charts/plays-by-hour")
-async def chart_plays_by_hour(days: int = 30):
+async def chart_plays_by_hour(request: Request, days: int = 30):
     days = _clamp_days(days)
     db = get_db()
-    rows = await stats_db.get_plays_by_hour(db, days=days)
+    rows = await stats_db.get_plays_by_hour(
+        db, days=days, tz_offset_hours=_get_tz_offset(request)
+    )
     return JSONResponse(rows)
 
 
@@ -650,10 +672,12 @@ async def chart_plays_per_month(months: int = 12):
 
 
 @router.get("/charts/plays-by-stream-type")
-async def chart_plays_by_stream_type(days: int = 30):
+async def chart_plays_by_stream_type(request: Request, days: int = 30):
     days = _clamp_days(days)
     db = get_db()
-    rows = await stats_db.get_plays_by_stream_type(db, days=days)
+    rows = await stats_db.get_plays_by_stream_type(
+        db, days=days, tz_offset_hours=_get_tz_offset(request)
+    )
     return JSONResponse(rows)
 
 
@@ -715,18 +739,22 @@ async def chart_period_comparison(days: int = 30):
 
 
 @router.get("/charts/bandwidth")
-async def chart_bandwidth(days: int = 30):
+async def chart_bandwidth(request: Request, days: int = 30):
     days = _clamp_days(days)
     db = get_db()
-    rows = await stats_db.get_bandwidth_stats(db, days=days)
+    rows = await stats_db.get_bandwidth_stats(
+        db, days=days, tz_offset_hours=_get_tz_offset(request)
+    )
     return JSONResponse(rows)
 
 
 @router.get("/charts/watch-heatmap")
-async def chart_watch_heatmap(days: int = 30):
+async def chart_watch_heatmap(request: Request, days: int = 30):
     days = _clamp_days(days)
     db = get_db()
-    rows = await stats_db.get_watch_heatmap(db, days=days)
+    rows = await stats_db.get_watch_heatmap(
+        db, days=days, tz_offset_hours=_get_tz_offset(request)
+    )
     return JSONResponse(rows)
 
 
@@ -1053,6 +1081,36 @@ async def random_posters(request: Request, limit: int = 24):
     except Exception as e:
         logger.warning(f"Random posters fetch failed: {e}")
         return JSONResponse([])
+
+
+@router.get("/display-settings")
+async def get_display_settings_api(request: Request):
+    from empulse.formatting import DEFAULT_DISPLAY
+
+    display = getattr(request.app.state, "display_settings", DEFAULT_DISPLAY)
+    return JSONResponse(display)
+
+
+@router.post("/display-settings")
+async def save_display_settings_api(request: Request):
+    user = getattr(request.state, "user", None)
+    if not user or user.role != "admin":
+        return JSONResponse({"error": "Admin access required"}, status_code=403)
+
+    data = await request.json()
+    db = get_db()
+    from empulse.db.display import save_display_settings
+
+    saved = await save_display_settings(db, data)
+    request.app.state.display_settings = saved
+    return JSONResponse(saved)
+
+
+@router.get("/timezones")
+async def list_timezones():
+    from empulse.formatting import COMMON_TIMEZONES
+
+    return JSONResponse(COMMON_TIMEZONES)
 
 
 @router.post("/test-connection")

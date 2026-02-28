@@ -237,7 +237,7 @@
                 <tbody>
                     {% for log in logs %}
                     <tr>
-                        <td>{{ log.sent_at[:19] }}</td>
+                        <td>{{ log.sent_at | fmt_datetime(display) }}</td>
                         <td>{{ log.event_type }}</td>
                         <td>{{ log.event_summary or "" }}</td>
                         <td><span class="play-method-badge {% if log.status == 'sent' %}direct-play{% else %}transcode{% endif %}">{{ log.status }}</span></td>

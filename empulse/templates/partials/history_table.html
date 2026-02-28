@@ -37,7 +37,7 @@
             <td class="col-expand">
                 <span class="expand-chevron" id="chev-{{ r.id }}">&#9656;</span>
             </td>
-            <td class="col-date">{{ r.started_date }}</td>
+            <td class="col-date">{{ r.started_at | fmt_date(display) }}</td>
             <td class="col-user"><a href="/users/{{ r.user_id }}">{{ r.user_name or "Unknown" }}</a></td>
             <td class="col-ip">{{ r.ip_address or "" }}</td>
             <td class="col-platform">{{ r.platform_name }}</td>
@@ -54,9 +54,9 @@
                     {% endif %}
                 </a>
             </td>
-            <td class="col-time">{{ r.started_time }}</td>
+            <td class="col-time">{{ r.started_at | fmt_time(display) }}</td>
             <td class="col-time">{{ r.paused_display }}</td>
-            <td class="col-time">{{ r.stopped_time }}</td>
+            <td class="col-time">{{ r.stopped_at | fmt_time(display) }}</td>
             <td class="col-duration">{{ r.duration_display }}</td>
         </tr>
         <tr class="detail-row" id="detail-{{ r.id }}" style="display:none">

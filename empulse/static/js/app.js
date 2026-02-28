@@ -1,3 +1,56 @@
+// === Display format helpers (reads from window.EMPULSE_DISPLAY) ===
+(function() {
+    var D = window.EMPULSE_DISPLAY || {};
+
+    function formatDateShort(isoDate) {
+        // isoDate is "YYYY-MM-DD" — extract month/day and reformat
+        if (!isoDate || isoDate.length < 10) return isoDate || '';
+        var m = isoDate.slice(5, 7);
+        var d = isoDate.slice(8, 10);
+        var fmt = D.date_format || 'YYYY-MM-DD';
+        if (fmt === 'DD/MM/YYYY') return d + '/' + m;
+        if (fmt === 'MM/DD/YYYY') return m + '/' + d;
+        return m + '-' + d;
+    }
+
+    function formatHourLabel(hour) {
+        if (D.time_format === '12h') {
+            if (hour === 0) return '12AM';
+            if (hour < 12) return hour + 'AM';
+            if (hour === 12) return '12PM';
+            return (hour - 12) + 'PM';
+        }
+        return (hour < 10 ? '0' : '') + hour + ':00';
+    }
+
+    function getDowLabels(short) {
+        var monday = (D.week_start || 'monday') === 'monday';
+        if (short) {
+            return monday
+                ? ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+                : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+        }
+        return monday
+            ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+            : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    }
+
+    function getDowOrder() {
+        // SQLite %w: 0=Sun, 1=Mon, ..., 6=Sat
+        if ((D.week_start || 'monday') === 'monday') {
+            return [1, 2, 3, 4, 5, 6, 0];
+        }
+        return [0, 1, 2, 3, 4, 5, 6];
+    }
+
+    window.empulseFormat = {
+        formatDateShort: formatDateShort,
+        formatHourLabel: formatHourLabel,
+        getDowLabels: getDowLabels,
+        getDowOrder: getDowOrder
+    };
+})();
+
 // Browser WebSocket for push updates
 (function() {
     let ws;
@@ -179,7 +232,7 @@ document.body.addEventListener("htmx:responseError", function(evt) {
                 chartDaily = new Chart(dailyEl, {
                     type: "line",
                     data: {
-                        labels: data.map(function(d) { return d.date.slice(5); }),
+                        labels: data.map(function(d) { return window.empulseFormat.formatDateShort(d.date); }),
                         datasets: [{
                             label: label,
                             data: data.map(pickValue),

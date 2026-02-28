@@ -85,6 +85,64 @@
     </div>
 </div>
 
+<!-- ===== Display & Locale ===== -->
+<div class="settings-section">
+    <div class="graphs-section-divider">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span>Display & Locale</span>
+    </div>
+
+    <div class="settings-grid">
+        <div class="chart-card" style="grid-column: 1 / -1;">
+            <div class="chart-header">
+                <span class="chart-title">Date, Time & Timezone</span>
+                <span class="chart-desc">Controls how dates, times, and charts are displayed throughout the app.</span>
+            </div>
+            <div class="settings-card-body">
+                <form id="display-settings-form">
+                    <div class="settings-field-grid">
+                        <div class="settings-field">
+                            <label class="settings-label">Date Format</label>
+                            <select id="ds-date-format" class="settings-input">
+                                <option value="YYYY-MM-DD" {% if display.date_format == 'YYYY-MM-DD' %}selected{% endif %}>2026-02-28 (ISO)</option>
+                                <option value="DD/MM/YYYY" {% if display.date_format == 'DD/MM/YYYY' %}selected{% endif %}>28/02/2026 (EU)</option>
+                                <option value="MM/DD/YYYY" {% if display.date_format == 'MM/DD/YYYY' %}selected{% endif %}>02/28/2026 (US)</option>
+                            </select>
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label">Time Format</label>
+                            <select id="ds-time-format" class="settings-input">
+                                <option value="24h" {% if display.time_format == '24h' %}selected{% endif %}>24-hour (14:30)</option>
+                                <option value="12h" {% if display.time_format == '12h' %}selected{% endif %}>12-hour (2:30 PM)</option>
+                            </select>
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label">Week Starts On</label>
+                            <select id="ds-week-start" class="settings-input">
+                                <option value="monday" {% if display.week_start == 'monday' %}selected{% endif %}>Monday</option>
+                                <option value="sunday" {% if display.week_start == 'sunday' %}selected{% endif %}>Sunday</option>
+                            </select>
+                        </div>
+                        <div class="settings-field">
+                            <label class="settings-label">Timezone</label>
+                            <select id="ds-timezone" class="settings-input">
+                                <option value="">Loading...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="settings-btn settings-btn-primary">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            Save Display Settings
+                        </button>
+                    </div>
+                    <div id="display-settings-result"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ===== Data Management ===== -->
 <div class="settings-section">
     <div class="graphs-section-divider">
@@ -199,6 +257,57 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
+// Display settings
+(function() {
+    var tzSelect = document.getElementById('ds-timezone');
+    var currentTz = {{ display.timezone | tojson }};
+
+    // Populate timezone dropdown
+    fetch('/api/timezones').then(function(r) { return r.json(); }).then(function(zones) {
+        tzSelect.textContent = '';
+        // Detect browser timezone
+        var browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        // Add browser TZ option at top if not in the list
+        var hasIt = zones.indexOf(browserTz) !== -1;
+        if (!hasIt && browserTz) {
+            var opt = document.createElement('option');
+            opt.value = browserTz;
+            opt.textContent = browserTz + ' (detected)';
+            tzSelect.appendChild(opt);
+        }
+        zones.forEach(function(tz) {
+            var opt = document.createElement('option');
+            opt.value = tz;
+            opt.textContent = tz === browserTz ? tz + ' (detected)' : tz;
+            tzSelect.appendChild(opt);
+        });
+        tzSelect.value = currentTz;
+    });
+
+    document.getElementById('display-settings-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var payload = {
+            date_format: document.getElementById('ds-date-format').value,
+            time_format: document.getElementById('ds-time-format').value,
+            week_start: document.getElementById('ds-week-start').value,
+            timezone: document.getElementById('ds-timezone').value,
+        };
+        var el = document.getElementById('display-settings-result');
+        fetch('/api/display-settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.error) {
+                _setResult(el, 'error', data.error);
+            } else {
+                window.EMPULSE_DISPLAY = data;
+                _setResult(el, 'success', 'Display settings saved. Refresh to see changes everywhere.');
+            }
+        }).catch(function() { _setResult(el, 'error', 'Failed to save'); });
+    });
+})();
+
 function _setResult(el, cls, text) {
     var p = document.createElement('p');
     p.className = cls;

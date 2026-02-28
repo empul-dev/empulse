@@ -13,6 +13,13 @@ from starlette.requests import Request
 
 from empulse.config import settings
 from empulse.database import init_db, get_db
+from empulse.formatting import (
+    format_date,
+    format_time,
+    format_datetime,
+    format_date_short,
+    format_last_seen,
+)
 
 logger = logging.getLogger("empulse")
 
@@ -27,7 +34,7 @@ def get_version() -> str:
 
 
 class EmpulseTemplates(Jinja2Templates):
-    """Auto-inject current_user and CSP nonce into all template contexts."""
+    """Auto-inject current_user, CSP nonce, and display settings into all template contexts."""
 
     def TemplateResponse(self, name, context, **kwargs):
         request: Request | None = context.get("request")
@@ -41,6 +48,12 @@ class EmpulseTemplates(Jinja2Templates):
                 context["update_available"] = bool(
                     checker and checker.info.update_available
                 )
+            if "display" not in context:
+                from empulse.formatting import DEFAULT_DISPLAY
+
+                context["display"] = getattr(
+                    request.app.state, "display_settings", DEFAULT_DISPLAY
+                )
         return super().TemplateResponse(name, context, **kwargs)
 
 
@@ -48,15 +61,27 @@ templates = EmpulseTemplates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["cache_v"] = str(int(time.time()))
 templates.env.globals["version"] = get_version()
 
+templates.env.filters["fmt_date"] = format_date
+templates.env.filters["fmt_time"] = format_time
+templates.env.filters["fmt_datetime"] = format_datetime
+templates.env.filters["fmt_date_short"] = format_date_short
+templates.env.filters["fmt_last_seen"] = format_last_seen
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
 
-    # Invalidate all login sessions on startup so restarts force re-login
-
     db = get_db()
+
+    # Load display settings into app state
+    from empulse.db.display import get_display_settings
+
+    app.state.display_settings = await get_display_settings(db)
+    logger.info(f"Display settings: tz={app.state.display_settings['timezone']}")
+
+    # Invalidate all login sessions on startup so restarts force re-login
     await db.execute("DELETE FROM login_sessions")
     await db.commit()
     logger.info("All login sessions cleared on startup")

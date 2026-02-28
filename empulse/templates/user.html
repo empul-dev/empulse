@@ -21,7 +21,7 @@
             </div>
             <div class="stat-item">
                 <span class="stat-label">Last Seen</span>
-                <span class="stat-value" style="font-size:0.85em; color:var(--text-secondary)">{{ (user_stats.last_play or "Never")[:10] }}</span>
+                <span class="stat-value" style="font-size:0.85em; color:var(--text-secondary)">{{ user_stats.last_play | fmt_date(display) if user_stats.last_play else "Never" }}</span>
             </div>
         </div>
     </div>
@@ -81,7 +81,7 @@
             <td class="col-user"><a href="{{ h.item_link }}">{{ h.display_title }}</a></td>
             <td class="col-date">{{ h.item_type or "" }}</td>
             <td class="col-date">{{ h.duration_display }}</td>
-            <td class="col-date">{{ h.started_at[:16] }}</td>
+            <td class="col-date">{{ h.started_at | fmt_datetime(display) }}</td>
         </tr>
         {% endfor %}
     </tbody>
@@ -127,7 +127,7 @@
                 chartDaily = new Chart(el, {
                     type: "line",
                     data: {
-                        labels: data.map(function(d) { return d.date.slice(5); }),
+                        labels: data.map(function(d) { return window.empulseFormat.formatDateShort(d.date); }),
                         datasets: [{
                             label: label,
                             data: data.map(function(d) { return dur ? d.total_duration / 3600 : d.plays; }),

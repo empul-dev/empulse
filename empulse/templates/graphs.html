@@ -190,7 +190,7 @@
 <script nonce="{{ csp_nonce }}">
 var gCharts = {};
 var C = window.empulseCharts;
-var DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+var F = window.empulseFormat;
 
 // Unified palette — built around Emby green
 var TYPE_COLORS = {
@@ -383,7 +383,7 @@ function loadGraphs() {
         gCharts.dailyStacked = new Chart(document.getElementById('g-daily-stacked'), {
             type: 'bar',
             data: {
-                labels: dates.map(function(dd) { return dd.slice(5); }),
+                labels: dates.map(function(dd) { return F.formatDateShort(dd); }),
                 datasets: stackedDatasets
             },
             options: baseOpts({
@@ -408,15 +408,17 @@ function loadGraphs() {
         destroy('dow');
         var map = {};
         data.forEach(function(r) { map[r.dow] = r; });
-        var values = DOW_LABELS.map(function(_, i) {
-            var row = map[i];
+        var dowLabels = F.getDowLabels();
+        var dowOrder = F.getDowOrder();
+        var values = dowOrder.map(function(idx) {
+            var row = map[idx];
             return row ? pickVal(row) : 0;
         });
 
         gCharts.dow = new Chart(document.getElementById('g-dow'), {
             type: 'bar',
             data: {
-                labels: DOW_LABELS,
+                labels: dowLabels,
                 datasets: [{
                     label: label,
                     data: values,
@@ -452,11 +454,7 @@ function loadGraphs() {
         gCharts.hour = new Chart(document.getElementById('g-hour'), {
             type: 'bar',
             data: {
-                labels: hours.map(function(h) {
-                    var ampm = h >= 12 ? 'PM' : 'AM';
-                    var hr = h % 12 || 12;
-                    return hr + ampm;
-                }),
+                labels: hours.map(function(h) { return F.formatHourLabel(h); }),
                 datasets: [{
                     label: label,
                     data: values,
@@ -533,7 +531,7 @@ function loadGraphs() {
         gCharts.streamTime = new Chart(document.getElementById('g-stream-time'), {
             type: 'bar',
             data: {
-                labels: dates.map(function(dd) { return dd.slice(5); }),
+                labels: dates.map(function(dd) { return F.formatDateShort(dd); }),
                 datasets: methods.map(function(m) {
                     return {
                         label: m,
@@ -801,7 +799,7 @@ function loadGraphs() {
         gCharts.bandwidth = new Chart(document.getElementById('g-bandwidth'), {
             type: 'bar',
             data: {
-                labels: data.map(function(r) { return r.date.slice(5); }),
+                labels: data.map(function(r) { return F.formatDateShort(r.date); }),
                 datasets: [{
                     label: 'Avg Bitrate (Mbps)',
                     data: data.map(function(r) { return Math.round((r.avg_bitrate || 0) / 100000) / 10; }),
@@ -856,9 +854,8 @@ function loadGraphs() {
             cellW = Math.max(cellW, 4); cellH = Math.max(cellH, 4);
             var stride = cellW + gap;
             var strideV = cellH + gap;
-            // Mon–Sun order (API: 0=Sun..6=Sat → display Mon first)
-            var DOW_LABELS = ['Mo','Di','Mi','Do','Fr','Sa','So'];
-            var DOW_ORDER = [1,2,3,4,5,6,0];
+            var DOW_LABELS = F.getDowLabels(true);
+            var DOW_ORDER = F.getDowOrder();
             var mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#888';
 
             // GitHub-style 5-step color scale (empty → dark green)
@@ -898,12 +895,11 @@ function loadGraphs() {
                     cells.push({ x: cx, y: cy, w: cellW, h: cellH, dow: DOW_LABELS[row], hour: h2, val: val });
                 }
             }
-            // 24h labels: 00:00, 03:00, ... 21:00
+            // Hour labels along bottom
             ctx.fillStyle = mutedColor;
             ctx.textAlign = 'center';
             for (var h3 = 0; h3 < 24; h3 += 3) {
-                var lbl = (h3 < 10 ? '0' : '') + h3 + ':00';
-                ctx.fillText(lbl, lblW + h3 * stride + cellW / 2, 7 * strideV + 10);
+                ctx.fillText(F.formatHourLabel(h3), lblW + h3 * stride + cellW / 2, 7 * strideV + 10);
             }
             gCharts.heatmap = true;
 
@@ -926,7 +922,7 @@ function loadGraphs() {
                     if (mx >= c.x && mx <= c.x + c.w && my >= c.y && my <= c.y + c.h) { hit = c; break; }
                 }
                 if (hit) {
-                    var hStr = (hit.hour < 10 ? '0' : '') + hit.hour + ':00';
+                    var hStr = F.formatHourLabel(hit.hour);
                     var valStr = isDuration() ? hit.val + 'h' : hit.val + (hit.val === 1 ? ' play' : ' plays');
                     // Build tooltip content safely via DOM
                     var strong = document.createElement('strong');

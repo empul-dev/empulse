@@ -158,6 +158,14 @@ CREATE TABLE IF NOT EXISTS login_sessions (
     revoked INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_login_sessions_token ON login_sessions(token_hash);
+
+CREATE TABLE IF NOT EXISTS display_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    date_format TEXT DEFAULT 'YYYY-MM-DD',
+    time_format TEXT DEFAULT '24h',
+    week_start TEXT DEFAULT 'monday',
+    timezone TEXT DEFAULT 'UTC'
+);
 """
 
 
@@ -195,7 +203,9 @@ async def _migrate(db: aiosqlite.Connection):
         logger.info("Migration: added enabled column to users")
 
     if "pause_events" not in cols:
-        await db.execute("ALTER TABLE history ADD COLUMN pause_events TEXT DEFAULT '[]'")
+        await db.execute(
+            "ALTER TABLE history ADD COLUMN pause_events TEXT DEFAULT '[]'"
+        )
         logger.info("Migration: added pause_events column to history")
 
     # Ensure login_sessions table exists (for pre-existing DBs)
@@ -217,8 +227,20 @@ async def _migrate(db: aiosqlite.Connection):
         "CREATE INDEX IF NOT EXISTS idx_login_sessions_token ON login_sessions(token_hash)"
     )
 
+    # Ensure display_settings table exists (for pre-existing DBs)
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS display_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            date_format TEXT DEFAULT 'YYYY-MM-DD',
+            time_format TEXT DEFAULT '24h',
+            week_start TEXT DEFAULT 'monday',
+            timezone TEXT DEFAULT 'UTC'
+        )
+    """)
+
     # Cleanup expired login sessions
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc).isoformat()
     await db.execute("DELETE FROM login_sessions WHERE expires_at < ?", [now])
 

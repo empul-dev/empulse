@@ -21,7 +21,7 @@
                 <div class="timeline-bar">
                     <div class="tl-fill" style="width: {{ [record.percent_complete, 100] | min }}%"></div>
                     {% for m in markers %}
-                    <div class="tl-marker" style="left: {{ m.pct }}%" data-tip="{{ m.label }}"></div>
+                    <div class="tl-marker" style="left: {{ m.pct }}%" data-tip="{% if m.start_iso %}Paused at {{ m.start_iso | fmt_time(display) }}{% else %}{{ m.label }}{% endif %}"></div>
                     {% endfor %}
                 </div>
                 <div class="timeline-pct">{{ record.percent_complete }}%</div>
@@ -29,11 +29,11 @@
             <div class="timeline-stats">
                 <div class="timeline-stat" data-tip="When playback started">
                     <span class="ts-label">Started</span>
-                    <span class="ts-value">{{ record.started_at_full }}</span>
+                    <span class="ts-value">{{ record.started_at | fmt_datetime(display) }}</span>
                 </div>
                 <div class="timeline-stat" data-tip="When playback stopped">
                     <span class="ts-label">Stopped</span>
-                    <span class="ts-value">{{ record.stopped_at_full }}</span>
+                    <span class="ts-value">{{ record.stopped_at | fmt_datetime(display) }}</span>
                 </div>
                 <div class="timeline-stat" data-tip="Content watched / total runtime">
                     <span class="ts-label">Watched</span>

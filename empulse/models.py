@@ -52,7 +52,11 @@ class SessionInfo(BaseModel):
 
     @property
     def display_title(self) -> str:
-        if self.series_name and self.season_number is not None and self.episode_number is not None:
+        if (
+            self.series_name
+            and self.season_number is not None
+            and self.episode_number is not None
+        ):
             return f"{self.series_name} - S{self.season_number:02d}E{self.episode_number:02d} - {self.item_name}"
         if self.item_name and self.year:
             return f"{self.item_name} ({self.year})"
@@ -106,7 +110,11 @@ class HistoryRecord(BaseModel):
 
     @property
     def display_title(self) -> str:
-        if self.series_name and self.season_number is not None and self.episode_number is not None:
+        if (
+            self.series_name
+            and self.season_number is not None
+            and self.episode_number is not None
+        ):
             return f"{self.series_name} - S{self.season_number:02d}E{self.episode_number:02d} - {self.item_name}"
         if self.item_name and self.year:
             return f"{self.item_name} ({self.year})"
@@ -115,7 +123,11 @@ class HistoryRecord(BaseModel):
     @property
     def title_short(self) -> str:
         """Shorter title for table display."""
-        if self.series_name and self.season_number is not None and self.episode_number is not None:
+        if (
+            self.series_name
+            and self.season_number is not None
+            and self.episode_number is not None
+        ):
             return f"{self.series_name} (S{self.season_number:02d} · E{self.episode_number:02d})"
         if self.item_name and self.year:
             return f"{self.item_name} ({self.year})"
@@ -246,6 +258,7 @@ class HistoryRecord(BaseModel):
     @property
     def parsed_pause_events(self) -> list[dict]:
         import json as _json
+
         try:
             events = _json.loads(self.pause_events) if self.pause_events else []
             return events if isinstance(events, list) else []
@@ -274,10 +287,15 @@ class HistoryRecord(BaseModel):
             start = ev.get("start", "")
             if len(start) >= 19:
                 time_str = start[11:19]
-            markers.append({
-                "pct": min(pct, 100),
-                "label": f"Paused {dur_label} at {time_str}" if time_str else f"Paused {dur_label}",
-            })
+            markers.append(
+                {
+                    "pct": min(pct, 100),
+                    "label": f"Paused {dur_label} at {time_str}"
+                    if time_str
+                    else f"Paused {dur_label}",
+                    "start_iso": start,
+                }
+            )
         return markers
 
 
