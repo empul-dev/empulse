@@ -29,6 +29,18 @@ EMBY_API_KEY=your_api_key_here
 docker compose up -d
 ```
 
+Or pull the image directly:
+
+```bash
+docker run -d \
+  -p 8189:8189 \
+  -v empulse-data:/app/data \
+  -e EMBY_URL=http://your-emby-server:8096 \
+  -e EMBY_API_KEY=your_api_key_here \
+  -e DB_PATH=/app/data/empulse.db \
+  ghcr.io/empul-dev/empulse:latest
+```
+
 Open [http://localhost:8189](http://localhost:8189) in your browser.
 
 Log in with your Emby username and password.
@@ -45,6 +57,7 @@ All settings are via environment variables (in `.env` or `docker-compose.yml`):
 | `EMPULSE_HOST` | `0.0.0.0` | Bind address |
 | `POLL_INTERVAL` | `10` | Seconds between Emby session polls |
 | `AUTH_PASSWORD` | *(optional)* | Fallback admin password (works when Emby is unreachable) |
+| `DISABLE_UPDATE_CHECK` | `false` | Set `true` to disable the automatic update checker |
 
 ## Features
 
@@ -56,6 +69,16 @@ All settings are via environment variables (in `.env` or `docker-compose.yml`):
 - **Re-watch Detection** -- Tracks when content is watched again
 - **Notifications** -- Discord, Telegram, email, ntfy, and webhook alerts
 - **Newsletter** -- Scheduled email digests of recent activity
+
+## Updating
+
+Empulse checks for new releases daily and shows a banner on the Settings page when an update is available.
+
+To update with Docker Compose:
+
+```bash
+docker compose pull && docker compose up -d
+```
 
 ## Architecture
 
