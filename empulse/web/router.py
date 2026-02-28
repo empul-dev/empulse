@@ -401,9 +401,12 @@ async def logout(request: Request):
 async def settings_page(request: Request):
     db = get_db()
     server_info = await libraries_db.get_server_info(db)
+    update_checker = getattr(request.app.state, "update_checker", None)
+    update_info = update_checker.info if update_checker else None
     return templates.TemplateResponse("settings.html", {
         "request": request, "active": "settings",
         "settings": settings, "server_info": server_info,
+        "update_info": update_info,
     })
 
 

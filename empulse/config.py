@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     db_path: str = str(_PROJECT_DIR / "empulse.db")
     auth_password: str = ""
     secret_key: str = ""
+    disable_update_check: bool = False
+    update_check_interval: int = 86400
 
     model_config = {"env_file_encoding": "utf-8"}
 

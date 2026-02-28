@@ -175,10 +175,22 @@
         <span>About</span>
     </div>
 
+    {% if update_info and update_info.update_available %}
+    <div class="chart-card" style="max-width: 480px; border-left: 3px solid var(--accent);">
+        <div class="settings-card-body" style="padding: 1rem 1.5rem;">
+            <div style="font-size: 0.9em; font-weight: 600; margin-bottom: 0.3rem;">Update available: v{{ update_info.latest_version }}</div>
+            <div style="font-size: 0.8em; color: var(--text-muted);">
+                You are running v{{ update_info.current_version }}.
+                <a href="{{ update_info.release_url }}" target="_blank" rel="noopener noreferrer">View release on GitHub</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="chart-card" style="max-width: 480px;">
         <div class="settings-card-body" style="text-align: center; padding: 1.5rem;">
             <div style="font-family: var(--font-display); font-size: 1.2em; font-weight: 700; color: var(--accent); margin-bottom: 0.3rem;">Empulse</div>
-            <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 0.5rem;">v0.1.0</div>
+            <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 0.5rem;">v{{ version }}</div>
             <div style="font-size: 0.78em; color: var(--text-muted);">Activity monitoring for Emby Server</div>
         </div>
     </div>

@@ -11,6 +11,9 @@ RUN uv pip install --system --no-cache .
 # ---- Runtime stage: clean alpine without build tools ----
 FROM python:3.13-alpine
 
+LABEL org.opencontainers.image.source="https://github.com/empul-dev/empulse"
+LABEL org.opencontainers.image.description="Activity monitoring for Emby Server"
+
 WORKDIR /app
 
 # Copy only the installed packages from builder

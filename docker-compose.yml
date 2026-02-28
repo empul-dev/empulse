@@ -1,6 +1,7 @@
 services:
   empulse:
-    build: .
+    image: ghcr.io/empul-dev/empulse:latest
+    # build: .
     ports:
       - "8189:8189"
     volumes:

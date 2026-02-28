@@ -3,6 +3,7 @@ import logging
 import secrets
 import time
 from contextlib import asynccontextmanager
+from importlib.metadata import version as pkg_version, PackageNotFoundError
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +17,13 @@ from empulse.database import init_db, get_db
 logger = logging.getLogger("empulse")
 
 BASE_DIR = Path(__file__).parent
+
+
+def get_version() -> str:
+    try:
+        return pkg_version("empulse")
+    except PackageNotFoundError:
+        return "dev"
 
 
 class EmpulseTemplates(Jinja2Templates):
@@ -33,6 +41,7 @@ class EmpulseTemplates(Jinja2Templates):
 
 templates = EmpulseTemplates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["cache_v"] = str(int(time.time()))
+templates.env.globals["version"] = get_version()
 
 
 @asynccontextmanager
@@ -63,11 +72,20 @@ async def lifespan(app: FastAPI):
     ws_task = None
     newsletter_task = None
     poster_cache_task = None
+    update_checker_task = None
 
     from empulse.notifications.engine import NotificationEngine
 
     notification_engine = NotificationEngine(get_db)
     app.state.notification_engine = notification_engine
+
+    if not settings.disable_update_check:
+        from empulse.update_checker import UpdateChecker
+
+        update_checker = UpdateChecker(get_version(), settings.update_check_interval)
+        app.state.update_checker = update_checker
+        update_checker_task = asyncio.create_task(update_checker.run())
+        logger.info("Update checker started")
 
     if settings.emby_api_key:
         from empulse.activity.poller import SessionPoller
@@ -135,6 +153,12 @@ async def lifespan(app: FastAPI):
         poster_cache_task.cancel()
         try:
             await poster_cache_task
+        except asyncio.CancelledError:
+            pass
+    if update_checker_task:
+        update_checker_task.cancel()
+        try:
+            await update_checker_task
         except asyncio.CancelledError:
             pass
     logger.info("Shutdown complete")
