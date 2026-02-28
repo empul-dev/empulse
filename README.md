@@ -10,26 +10,7 @@ Activity monitoring dashboard for [Emby](https://emby.media) media servers. Trac
 
 In Emby, go to **Settings > API Keys** and create a new key for Empulse.
 
-### 2. Configure
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your Emby server details:
-
-```
-EMBY_URL=http://your-emby-server:8096
-EMBY_API_KEY=your_api_key_here
-```
-
-### 3. Run with Docker
-
-```bash
-docker compose up -d
-```
-
-Or pull the image directly:
+### 2. Run with Docker
 
 ```bash
 docker run -d \
@@ -39,6 +20,12 @@ docker run -d \
   -e EMBY_API_KEY=your_api_key_here \
   -e DB_PATH=/app/data/empulse.db \
   ghcr.io/empul-dev/empulse:latest
+```
+
+Or with Docker Compose (see `docker-compose.yml`):
+
+```bash
+docker compose up -d
 ```
 
 Open [http://localhost:8189](http://localhost:8189) in your browser.
