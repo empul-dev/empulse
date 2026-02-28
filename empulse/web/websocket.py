@@ -1,5 +1,6 @@
 import json
 import logging
+from collections import defaultdict
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 logger = logging.getLogger("empulse.ws")
@@ -8,20 +9,35 @@ router = APIRouter()
 
 class BrowserWSManager:
     MAX_CONNECTIONS = 100
+    MAX_PER_IP = 5
 
     def __init__(self):
         self.connections: list[WebSocket] = []
+        self._ip_counts: dict[str, int] = defaultdict(int)
+
+    def _get_ip(self, ws: WebSocket) -> str:
+        client = ws.client
+        return client.host if client else "unknown"
 
     async def connect(self, ws: WebSocket):
         if len(self.connections) >= self.MAX_CONNECTIONS:
             await ws.close(code=1013)  # Try Again Later
             return
+        ip = self._get_ip(ws)
+        if self._ip_counts[ip] >= self.MAX_PER_IP:
+            await ws.close(code=1013)
+            return
         await ws.accept()
         self.connections.append(ws)
-        logger.debug(f"Browser WS connected ({len(self.connections)} total)")
+        self._ip_counts[ip] += 1
+        logger.debug(f"Browser WS connected ({len(self.connections)} total, {self._ip_counts[ip]} from {ip})")
 
     def disconnect(self, ws: WebSocket):
         self.connections.remove(ws)
+        ip = self._get_ip(ws)
+        self._ip_counts[ip] -= 1
+        if self._ip_counts[ip] <= 0:
+            del self._ip_counts[ip]
         logger.debug(f"Browser WS disconnected ({len(self.connections)} total)")
 
     async def broadcast(self, target: str):
@@ -34,6 +50,10 @@ class BrowserWSManager:
                 dead.append(ws)
         for ws in dead:
             self.connections.remove(ws)
+            ip = self._get_ip(ws)
+            self._ip_counts[ip] -= 1
+            if self._ip_counts[ip] <= 0:
+                del self._ip_counts[ip]
 
 
 manager = BrowserWSManager()

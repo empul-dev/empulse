@@ -10,33 +10,39 @@ class EmbyClient:
     def __init__(self):
         self.base_url = settings.emby_url.rstrip("/")
         self.api_key = settings.emby_api_key
-        self._client = httpx.AsyncClient(timeout=15.0)
-
-    @property
-    def _params(self) -> dict:
-        return {"api_key": self.api_key}
+        self._client = httpx.AsyncClient(
+            timeout=15.0,
+            headers={"X-Emby-Token": self.api_key} if self.api_key else {},
+        )
+        if self.base_url.startswith("http://") and not any(
+            self.base_url.startswith(f"http://{h}")
+            for h in ("localhost", "127.0.0.1", "[::1]")
+        ):
+            logger.warning(
+                "Emby URL uses plain HTTP (%s). API key will be sent unencrypted. "
+                "Consider using HTTPS.",
+                self.base_url,
+            )
 
     async def get_server_info(self) -> dict:
-        r = await self._client.get(f"{self.base_url}/System/Info", params=self._params)
+        r = await self._client.get(f"{self.base_url}/System/Info")
         r.raise_for_status()
         return r.json()
 
     async def get_sessions(self) -> list[EmbySessionInfo]:
-        r = await self._client.get(f"{self.base_url}/Sessions", params=self._params)
+        r = await self._client.get(f"{self.base_url}/Sessions")
         r.raise_for_status()
         data = r.json()
         return [EmbySessionInfo(**s) for s in data]
 
     async def get_users(self) -> list[EmbyUser]:
-        r = await self._client.get(f"{self.base_url}/Users", params=self._params)
+        r = await self._client.get(f"{self.base_url}/Users")
         r.raise_for_status()
         data = r.json()
         return [EmbyUser(**u) for u in data]
 
     async def get_libraries(self) -> list[EmbyLibrary]:
-        r = await self._client.get(
-            f"{self.base_url}/Library/VirtualFolders", params=self._params
-        )
+        r = await self._client.get(f"{self.base_url}/Library/VirtualFolders")
         r.raise_for_status()
         data = r.json()
         return [EmbyLibrary(**lib) for lib in data]
@@ -44,7 +50,7 @@ class EmbyClient:
     async def get_library_item_count(self, library_id: str) -> int:
         r = await self._client.get(
             f"{self.base_url}/Items",
-            params={**self._params, "ParentId": library_id, "Recursive": "true", "Limit": 0},
+            params={"ParentId": library_id, "Recursive": "true", "Limit": 0},
         )
         r.raise_for_status()
         return r.json().get("TotalRecordCount", 0)
@@ -54,7 +60,6 @@ class EmbyClient:
         r = await self._client.get(
             f"{self.base_url}/Items",
             params={
-                **self._params,
                 "Ids": item_id,
                 "Fields": "Overview,People,Genres,Studios,CommunityRating,CriticRating,"
                           "OfficialRating,ProductionYear,PremiereDate,ExternalUrls,"
@@ -69,7 +74,6 @@ class EmbyClient:
 
     async def get_recently_added(self, limit: int = 10, item_type: str = "") -> list[dict]:
         params = {
-            **self._params,
             "SortBy": "DateCreated",
             "SortOrder": "Descending",
             "Recursive": "true",
@@ -112,7 +116,6 @@ class EmbyClient:
         try:
             r = await self._client.post(
                 f"{self.base_url}/Sessions/{session_id}/Playing/Stop",
-                params=self._params,
             )
             r.raise_for_status()
             return True

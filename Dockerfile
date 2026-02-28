@@ -20,6 +20,11 @@ COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
 # Copy app source
 COPY . .
 
+# Run as non-root user
+RUN addgroup -S empulse && adduser -S empulse -G empulse \
+    && mkdir -p /app/data && chown -R empulse:empulse /app
+USER empulse
+
 EXPOSE 8189
 
 CMD ["uvicorn", "empulse.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8189"]

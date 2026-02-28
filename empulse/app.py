@@ -9,7 +9,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from starlette.requests import Request
-from starlette.templating import _TemplateResponse
 
 from empulse.config import settings
 from empulse.database import init_db, get_db
@@ -42,7 +41,6 @@ async def lifespan(app: FastAPI):
     logger.info("Database initialized")
 
     # Invalidate all login sessions on startup so restarts force re-login
-    from empulse.database import get_db
 
     db = get_db()
     await db.execute("DELETE FROM login_sessions")
@@ -182,7 +180,7 @@ def create_app() -> FastAPI:
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+            f"script-src 'self' 'nonce-{nonce}' https://unpkg.com https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
             "font-src https://fonts.gstatic.com; "
             "img-src 'self' data:; "

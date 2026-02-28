@@ -21,7 +21,7 @@ def _build_message(event_type: str, data: dict) -> str:
 
     lines = [
         f"*{label}*",
-        f"",
+        "",
         f"👤 *User:* {_escape(user)}",
         f"🎬 *Title:* {_escape(title)}",
     ]

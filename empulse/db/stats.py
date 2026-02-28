@@ -1,6 +1,11 @@
 import aiosqlite
 
 
+def _safe_order(metric: str) -> str:
+    """Return a safe ORDER BY column name for metric queries."""
+    return "plays" if metric == "plays" else "total_duration"
+
+
 async def get_total_plays(db: aiosqlite.Connection) -> int:
     cursor = await db.execute("SELECT COUNT(*) FROM history")
     row = await cursor.fetchone()
@@ -14,7 +19,7 @@ async def get_total_duration(db: aiosqlite.Connection) -> int:
 
 
 async def get_top_users(db: aiosqlite.Connection, limit: int = 5, days: int = 30, metric: str = "plays") -> list[dict]:
-    order = "plays" if metric == "plays" else "total_duration"
+    order = _safe_order(metric)
     cursor = await db.execute(
         f"""SELECT user_id, user_name, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
@@ -29,7 +34,7 @@ async def get_top_users(db: aiosqlite.Connection, limit: int = 5, days: int = 30
 
 
 async def get_most_watched_movies(db: aiosqlite.Connection, limit: int = 5, days: int = 30, metric: str = "plays") -> list[dict]:
-    order = "plays" if metric == "plays" else "total_duration"
+    order = _safe_order(metric)
     cursor = await db.execute(
         f"""SELECT item_id, item_name, year, COUNT(*) as plays,
                   COUNT(DISTINCT user_id) as users,
@@ -59,7 +64,7 @@ async def get_most_popular_movies(db: aiosqlite.Connection, limit: int = 5, days
 
 
 async def get_most_watched_shows(db: aiosqlite.Connection, limit: int = 5, days: int = 30, metric: str = "plays") -> list[dict]:
-    order = "plays" if metric == "plays" else "total_duration"
+    order = _safe_order(metric)
     cursor = await db.execute(
         f"""SELECT series_name, COUNT(*) as plays,
                   COUNT(DISTINCT user_id) as users,

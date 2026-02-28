@@ -3,7 +3,6 @@ import logging
 import time
 from datetime import datetime, timezone
 
-import aiosqlite
 
 logger = logging.getLogger("empulse.notifications")
 

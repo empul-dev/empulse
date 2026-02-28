@@ -8,7 +8,7 @@ import re
 from datetime import date, timedelta
 from urllib.parse import quote
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response
 from empulse.app import templates
 from empulse.config import settings
 from empulse.database import get_db
@@ -134,12 +134,20 @@ def _clamp_days(days: int) -> int:
     return max(1, min(days, 365))
 
 
+VALID_METRICS = {"plays", "duration"}
+
+
+def _validate_metric(metric: str) -> str:
+    return metric if metric in VALID_METRICS else "plays"
+
+
 @router.get("/stats-cards")
 async def stats_cards(request: Request, days: int = 30, metric: str = "plays"):
     days = _clamp_days(days)
+    metric = _validate_metric(metric)
     try:
         return await _stats_cards(request, days, metric)
-    except Exception as e:
+    except Exception:
         logger.exception("stats-cards error")
         return '<p class="empty-state">An internal error occurred.</p>'
 
@@ -241,6 +249,8 @@ async def history_table(
     sort_order: str = "desc",
 ):
     db = get_db()
+    page = max(1, page)
+    search = search[:256]
     per_page = 50
     offset = (page - 1) * per_page
 
@@ -375,6 +385,7 @@ async def export_history(
     search: str = "",
 ):
     db = get_db()
+    search = search[:256]
     rows = await history_db.get_history(
         db,
         limit=EXPORT_MAX_ROWS,
@@ -413,7 +424,7 @@ async def export_history(
 
 
 async def _fetch_emby_image(
-    url: str, params: dict, retries: int = 1
+    url: str, params: dict | None = None, headers: dict | None = None, retries: int = 1
 ) -> tuple[bytes, str] | None:
     """Fetch an image from Emby with retry. Returns (content, content_type) or None."""
     import httpx
@@ -421,7 +432,7 @@ async def _fetch_emby_image(
     for attempt in range(1 + retries):
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.get(url, params=params)
+                r = await client.get(url, params=params, headers=headers)
                 if r.status_code == 200:
                     return r.content, r.headers.get("content-type", "image/jpeg")
         except Exception:
@@ -453,7 +464,9 @@ async def image_proxy(request: Request, item_id: str, w: int = 150):
 
     url = f"{settings.emby_url.rstrip('/')}/Items/{item_id}/Images/Primary"
     result = await _fetch_emby_image(
-        url, {"api_key": settings.emby_api_key, "maxWidth": str(max_width)}
+        url,
+        params={"maxWidth": str(max_width)},
+        headers={"X-Emby-Token": settings.emby_api_key},
     )
     if result:
         content, content_type = result
@@ -472,7 +485,9 @@ async def backdrop_proxy(item_id: str):
         return Response(content=b"", status_code=400)
     url = f"{settings.emby_url.rstrip('/')}/Items/{item_id}/Images/Backdrop"
     result = await _fetch_emby_image(
-        url, {"api_key": settings.emby_api_key, "maxWidth": "1280"}
+        url,
+        params={"maxWidth": "1280"},
+        headers={"X-Emby-Token": settings.emby_api_key},
     )
     if result:
         content, content_type = result
@@ -491,7 +506,9 @@ async def user_image_proxy(user_id: str, name: str = Query("")):
         return Response(content=b"", status_code=400)
     url = f"{settings.emby_url.rstrip('/')}/Users/{user_id}/Images/Primary"
     result = await _fetch_emby_image(
-        url, {"api_key": settings.emby_api_key, "maxWidth": "80"}
+        url,
+        params={"maxWidth": "80"},
+        headers={"X-Emby-Token": settings.emby_api_key},
     )
     if result:
         content, content_type = result
@@ -675,6 +692,7 @@ async def chart_top_users_stream_type(days: int = 30):
 @router.get("/charts/top-users")
 async def chart_top_users(days: int = 30, metric: str = "plays"):
     days = _clamp_days(days)
+    metric = _validate_metric(metric)
     db = get_db()
     rows = await stats_db.get_top_users(db, limit=10, days=days, metric=metric)
     return JSONResponse(rows)
@@ -852,6 +870,8 @@ async def get_newsletter_config_api():
     from empulse.newsletter import get_newsletter_config
 
     config = await get_newsletter_config(db)
+    if config and config.get("smtp_pass"):
+        config = {**config, "smtp_pass": "***"}
     return JSONResponse(config or {})
 
 
@@ -908,7 +928,7 @@ async def backup_database():
     return Response(
         content=db_path.read_bytes(),
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f"attachment; filename=empulse_backup.db"},
+        headers={"Content-Disposition": "attachment; filename=empulse_backup.db"},
     )
 
 

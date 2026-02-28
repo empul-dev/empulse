@@ -24,6 +24,9 @@ async def get_newsletter_config(db: aiosqlite.Connection) -> dict | None:
 
 async def save_newsletter_config(db: aiosqlite.Connection, data: dict):
     existing = await get_newsletter_config(db)
+    # Preserve existing password if masked placeholder is sent back
+    if data.get("smtp_pass") == "***" and existing:
+        data = {**data, "smtp_pass": existing.get("smtp_pass", "")}
     if existing:
         await db.execute(
             "UPDATE newsletter_config SET enabled=?, schedule=?, day_of_week=?, hour=?, "

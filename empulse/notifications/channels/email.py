@@ -31,7 +31,7 @@ def _build_plain(event_type: str, data: dict) -> str:
     user = data.get("user_name", "Unknown")
     lines = [
         f"{label}",
-        f"",
+        "",
         f"User: {user}",
         f"Title: {title}",
     ]
