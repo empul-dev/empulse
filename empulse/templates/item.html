@@ -9,7 +9,7 @@
     {% endif %}
     <div class="item-hero-inner">
         <div class="item-poster">
-            <img src="/api/img/{{ poster_id }}?w=400" alt="" loading="lazy">
+            <img src="/api/img/{{ poster_id }}?w=400" alt="{{ item.get('Name', '') }}" loading="lazy">
             {% if video_stream %}
             <div class="item-badges">
                 {% if video_stream.get('Codec') %}
@@ -164,7 +164,7 @@
     {% for u in user_stats %}
     <div class="item-user-card">
         <div class="item-user-avatar">
-            <img src="/api/img/user/{{ u.user_id }}?name={{ u.user_name | urlencode }}" alt=""
+            <img src="/api/img/user/{{ u.user_id }}?name={{ u.user_name | urlencode }}" alt="{{ u.user_name }}"
                  onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
             <div class="avatar-fallback" style="display:none">{{ (u.user_name or '?')[0] | upper }}</div>
         </div>

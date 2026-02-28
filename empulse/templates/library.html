@@ -31,7 +31,7 @@
 <div class="charts-section">
     <div class="chart-card wide" style="margin-bottom:1rem">
         <div class="chart-header" id="lib-daily-header">Daily Plays</div>
-        <div class="chart-body"><canvas id="lib-chart-daily"></canvas></div>
+        <div class="chart-body"><canvas id="lib-chart-daily" role="img" aria-label="Daily Plays chart"></canvas></div>
     </div>
 </div>
 
@@ -40,7 +40,7 @@
 <div class="user-most-watched">
     {% for item in top_items %}
     <div class="user-watched-item">
-        <img src="/api/img/{{ item.poster_id }}" alt="" loading="lazy">
+        <img src="/api/img/{{ item.poster_id }}" alt="{{ item.title }}" loading="lazy">
         <div class="watched-title" title="{{ item.title }}">{{ item.title }}</div>
         <div class="watched-plays">{{ item.plays }} plays · {{ item.users }} users</div>
     </div>
@@ -54,7 +54,7 @@
     {% for u in top_users %}
     <div class="item-user-card">
         <div class="item-user-avatar">
-            <img src="/api/img/user/{{ u.user_id }}?name={{ u.user_name | urlencode }}" alt=""
+            <img src="/api/img/user/{{ u.user_id }}?name={{ u.user_name | urlencode }}" alt="{{ u.user_name }}"
                  onerror="this.style.display='none'">
         </div>
         <div>

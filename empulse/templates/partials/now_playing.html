@@ -4,7 +4,7 @@
     <div class="now-playing-card" {% if s.poster_id %}data-bg="/api/img/{{ s.poster_id }}"{% endif %}>
         <div class="now-playing-poster">
             {% if s.poster_id %}
-            <img src="/api/img/{{ s.poster_id }}?w=300" alt="" loading="lazy">
+            <img src="/api/img/{{ s.poster_id }}?w=300" alt="{{ s.display_title }}" loading="lazy">
             {% endif %}
         </div>
         <div class="now-playing-info">
@@ -25,7 +25,7 @@
                 <span class="paused-badge">Paused</span>
                 {% endif %}
                 {% if current_user and current_user.role == 'admin' %}
-                <button class="stop-session-btn" data-session-key="{{ s.session_key }}" title="Stop Stream">
+                <button class="stop-session-btn" data-session-key="{{ s.session_key }}" title="Stop Stream" aria-label="Stop stream">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
                 </button>
                 {% endif %}

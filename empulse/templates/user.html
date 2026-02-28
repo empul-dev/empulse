@@ -4,7 +4,7 @@
 {% block content %}
 <div class="user-hero">
     <div class="user-avatar-large">
-        <img src="/api/img/user/{{ user.emby_user_id }}?name={{ user.username | urlencode }}" alt=""
+        <img src="/api/img/user/{{ user.emby_user_id }}?name={{ user.username | urlencode }}" alt="{{ user.username }}"
              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
         <div class="avatar-fallback" style="display:none">{{ (user.username or '?')[0]|upper }}</div>
     </div>
@@ -41,11 +41,11 @@
     <div class="charts-grid">
         <div class="chart-card wide">
             <div class="chart-header" id="user-daily-header">Daily Plays</div>
-            <div class="chart-body"><canvas id="user-chart-daily"></canvas></div>
+            <div class="chart-body"><canvas id="user-chart-daily" role="img" aria-label="Daily Plays chart"></canvas></div>
         </div>
         <div class="chart-card">
             <div class="chart-header" id="user-type-header">Plays by Type</div>
-            <div class="chart-body"><canvas id="user-chart-type"></canvas></div>
+            <div class="chart-body"><canvas id="user-chart-type" role="img" aria-label="Plays by Type chart"></canvas></div>
         </div>
     </div>
 </div>
@@ -55,7 +55,7 @@
 <div class="user-most-watched">
     {% for item in most_watched %}
     <div class="user-watched-item">
-        <img src="/api/img/{{ item.poster_id }}" alt="" loading="lazy">
+        <img src="/api/img/{{ item.poster_id }}" alt="{{ item.title }}" loading="lazy">
         <div class="watched-title" title="{{ item.title }}">{{ item.title }}</div>
         <div class="watched-plays">{{ item.plays }} plays</div>
     </div>

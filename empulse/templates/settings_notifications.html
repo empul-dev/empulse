@@ -39,9 +39,9 @@
                             <td>{{ ch.triggers }}</td>
                             <td>{{ "Yes" if ch.enabled else "No" }}</td>
                             <td class="channel-actions">
-                                <button class="toolbar-btn" onclick="editChannel({{ ch.id }})">Edit</button>
-                                <button class="toolbar-btn" onclick="testChannel({{ ch.id }})">Test</button>
-                                <button class="btn-delete" onclick="deleteChannel({{ ch.id }})">Delete</button>
+                                <button class="toolbar-btn" onclick="editChannel({{ ch.id }})" aria-label="Edit channel">Edit</button>
+                                <button class="toolbar-btn" onclick="testChannel({{ ch.id }})" aria-label="Test channel">Test</button>
+                                <button class="btn-delete" onclick="deleteChannel({{ ch.id }})" aria-label="Delete channel">Delete</button>
                             </td>
                         </tr>
                         {% endfor %}

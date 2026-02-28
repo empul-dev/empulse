@@ -7,7 +7,7 @@
     <div class="stat-card" {% if most_watched_movies %}data-bg="/api/img/{{ most_watched_movies[0].item_id }}"{% endif %}>
         <div class="stat-card-poster">
             {% if most_watched_movies %}
-            <img src="/api/img/{{ most_watched_movies[0].item_id }}" alt="" loading="lazy">
+            <img src="/api/img/{{ most_watched_movies[0].item_id }}" alt="{{ most_watched_movies[0].item_name }}" loading="lazy">
             <div class="poster-fallback">{{ (most_watched_movies[0].item_name or '?')[:2] }}</div>
             {% endif %}
         </div>
@@ -32,7 +32,7 @@
     <div class="stat-card" {% if most_popular_movies %}data-bg="/api/img/{{ most_popular_movies[0].item_id }}"{% endif %}>
         <div class="stat-card-poster">
             {% if most_popular_movies %}
-            <img src="/api/img/{{ most_popular_movies[0].item_id }}" alt="" loading="lazy">
+            <img src="/api/img/{{ most_popular_movies[0].item_id }}" alt="{{ most_popular_movies[0].item_name }}" loading="lazy">
             <div class="poster-fallback">{{ (most_popular_movies[0].item_name or '?')[:2] }}</div>
             {% endif %}
         </div>
@@ -57,7 +57,7 @@
     <div class="stat-card" {% if most_watched_shows %}data-bg="/api/img/{{ most_watched_shows[0].poster_id }}"{% endif %}>
         <div class="stat-card-poster">
             {% if most_watched_shows %}
-            <img src="/api/img/{{ most_watched_shows[0].poster_id }}" alt="" loading="lazy">
+            <img src="/api/img/{{ most_watched_shows[0].poster_id }}" alt="{{ most_watched_shows[0].series_name }}" loading="lazy">
             <div class="poster-fallback">{{ (most_watched_shows[0].series_name or '?')[:2] }}</div>
             {% endif %}
         </div>
@@ -82,7 +82,7 @@
     <div class="stat-card" {% if most_popular_shows %}data-bg="/api/img/{{ most_popular_shows[0].poster_id }}"{% endif %}>
         <div class="stat-card-poster">
             {% if most_popular_shows %}
-            <img src="/api/img/{{ most_popular_shows[0].poster_id }}" alt="" loading="lazy">
+            <img src="/api/img/{{ most_popular_shows[0].poster_id }}" alt="{{ most_popular_shows[0].series_name }}" loading="lazy">
             <div class="poster-fallback">{{ (most_popular_shows[0].series_name or '?')[:2] }}</div>
             {% endif %}
         </div>
@@ -107,7 +107,7 @@
     <div class="stat-card" {% if recently_watched %}data-bg="/api/img/{{ rw_poster(recently_watched[0]) | trim }}"{% endif %}>
         <div class="stat-card-poster">
             {% if recently_watched %}
-            <img src="/api/img/{{ rw_poster(recently_watched[0]) | trim }}" alt="" loading="lazy">
+            <img src="/api/img/{{ rw_poster(recently_watched[0]) | trim }}" alt="{{ recently_watched[0].display_title }}" loading="lazy">
             <div class="poster-fallback">{{ (recently_watched[0].display_title or '?')[:2] }}</div>
             {% endif %}
         </div>
@@ -154,7 +154,7 @@
     <div class="stat-card">
         <div class="stat-card-poster{% if not most_active_users %} stat-card-icon{% endif %}">
             {% if most_active_users %}
-            <img src="/api/img/user/{{ most_active_users[0].user_id }}?name={{ most_active_users[0].user_name | urlencode }}" alt="" loading="lazy">
+            <img src="/api/img/user/{{ most_active_users[0].user_id }}?name={{ most_active_users[0].user_name | urlencode }}" alt="{{ most_active_users[0].user_name }}" loading="lazy">
             {% else %}
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
             {% endif %}

@@ -3,7 +3,7 @@
     {% for item in items %}
     <a href="/item/{{ item.Id }}" class="recently-added-item">
         <div class="recently-added-poster">
-            <img src="/api/img/{{ item.Id }}" alt="" loading="lazy">
+            <img src="/api/img/{{ item.Id }}" alt="{{ item.Name }}" loading="lazy">
             {% if item.DateCreated %}<span class="recently-added-ago" data-added="{{ item.DateCreated }}"></span>{% endif %}
         </div>
         <div class="recently-added-title">{{ item.Name or "Unknown" }}</div>
