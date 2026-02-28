@@ -18,3 +18,5 @@ build/
 share/
 tasks/
 .DS_Store
+CLAUDE.md
+SPECS.md
