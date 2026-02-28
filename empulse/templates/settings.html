@@ -6,6 +6,18 @@
     <h2>Settings</h2>
 </div>
 
+{% if update_info and update_info.update_available %}
+<div class="chart-card" style="border-left: 3px solid var(--accent); margin-bottom: 1.5rem;">
+    <div class="settings-card-body" style="padding: 1rem 1.5rem;">
+        <div style="font-size: 0.9em; font-weight: 600; margin-bottom: 0.3rem;">Update available: v{{ update_info.latest_version }}</div>
+        <div style="font-size: 0.8em; color: var(--text-muted);">
+            You are running v{{ update_info.current_version }}.
+            <a href="{{ update_info.release_url }}" target="_blank" rel="noopener noreferrer">View release on GitHub</a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- ===== Server Connection ===== -->
 <div class="settings-section">
     <div class="graphs-section-divider">
@@ -232,18 +244,6 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         <span>About</span>
     </div>
-
-    {% if update_info and update_info.update_available %}
-    <div class="chart-card" style="max-width: 480px; border-left: 3px solid var(--accent);">
-        <div class="settings-card-body" style="padding: 1rem 1.5rem;">
-            <div style="font-size: 0.9em; font-weight: 600; margin-bottom: 0.3rem;">Update available: v{{ update_info.latest_version }}</div>
-            <div style="font-size: 0.8em; color: var(--text-muted);">
-                You are running v{{ update_info.current_version }}.
-                <a href="{{ update_info.release_url }}" target="_blank" rel="noopener noreferrer">View release on GitHub</a>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 
     <div class="chart-card" style="max-width: 480px;">
         <div class="settings-card-body" style="text-align: center; padding: 1.5rem;">
