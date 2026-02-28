@@ -36,6 +36,11 @@ class EmpulseTemplates(Jinja2Templates):
                 context["current_user"] = getattr(request.state, "user", None)
             if not context.get("csp_nonce"):
                 context["csp_nonce"] = getattr(request.state, "csp_nonce", "")
+            if "update_available" not in context:
+                checker = getattr(request.app.state, "update_checker", None)
+                context["update_available"] = bool(
+                    checker and checker.info.update_available
+                )
         return super().TemplateResponse(name, context, **kwargs)
 
 
