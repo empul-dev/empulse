@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from starlette.requests import Request
+from starlette.responses import Response
 
 from empulse.config import settings
 from empulse.database import init_db, get_db
@@ -211,6 +212,18 @@ def create_app() -> FastAPI:
     app.include_router(web_router)
     app.include_router(api_router, prefix="/api")
     app.include_router(ws_router)
+
+    @app.exception_handler(404)
+    async def not_found_handler(request: Request, exc):
+        if request.headers.get("hx-request"):
+            return Response(status_code=404)
+        return templates.TemplateResponse("404.html", {"request": request}, status_code=404)
+
+    @app.exception_handler(500)
+    async def server_error_handler(request: Request, exc):
+        if request.headers.get("hx-request"):
+            return Response(status_code=500)
+        return templates.TemplateResponse("500.html", {"request": request}, status_code=500)
 
     # Auth middleware is always active — authentication is mandatory.
     # If no AUTH_PASSWORD or EMBY_API_KEY is configured, the login page
