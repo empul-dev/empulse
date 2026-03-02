@@ -391,18 +391,17 @@ input.days-input {
 }
 
 /* Highlight hovered list item */
-.stat-list li[data-img] {
-    cursor: pointer;
+.stat-list li {
     padding: 0.2rem 0.3rem;
     border-radius: 4px;
     transition: background var(--anim-fast);
 }
 
-.stat-list li[data-img]:hover {
+.stat-list li:hover {
     background: rgba(255, 255, 255, 0.07);
 }
 
-.stat-list li[data-img]:hover .stat-list-name {
+.stat-list li:hover .stat-list-name {
     color: var(--accent);
 }
 
