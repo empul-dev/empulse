@@ -5,6 +5,7 @@ import aiosqlite
 
 from empulse.database import SCHEMA
 from empulse.notifications.engine import NotificationEngine
+from empulse.web.api import _redact_channel, _preserve_channel_secrets
 
 
 @pytest_asyncio.fixture
@@ -106,7 +107,6 @@ class TestNotificationEngine:
 
     @pytest.mark.asyncio
     async def test_cache_invalidation(self, db, engine):
-        import time
         from datetime import datetime, timezone
 
         # Insert two channels
@@ -139,6 +139,28 @@ class TestNotificationEngine:
         engine.invalidate_cache()
         channels = await engine._load_channels()
         assert len(channels) == 2
+
+
+class TestNotificationSecretHandling:
+    def test_redact_channel_masks_secret_config_fields(self):
+        channel = {
+            "id": 1,
+            "channel_type": "telegram",
+            "config": {"bot_token": "secret-token", "chat_id": "123"},
+        }
+        redacted = _redact_channel(channel)
+        assert redacted["config"]["bot_token"] == "***"
+        assert redacted["config"]["chat_id"] == "123"
+
+    def test_preserve_channel_secrets_keeps_masked_values(self):
+        merged = _preserve_channel_secrets(
+            "webhook",
+            {"url": "***", "headers": "***", "method": "POST"},
+            {"url": "https://example.com/hook", "headers": {"Authorization": "Bearer token"}},
+        )
+        assert merged["url"] == "https://example.com/hook"
+        assert merged["headers"] == {"Authorization": "Bearer token"}
+        assert merged["method"] == "POST"
 
 
 class TestWebhookTemplate:
@@ -261,6 +283,48 @@ class TestNewsletter:
         config = await get_newsletter_config(db)
         assert config["schedule"] == "daily"
         assert config["enabled"] == 0
+
+    @pytest.mark.asyncio
+    async def test_config_preserves_masked_password(self, db):
+        from empulse.newsletter import get_newsletter_config, save_newsletter_config
+
+        await save_newsletter_config(db, {
+            "enabled": True,
+            "schedule": "weekly",
+            "day_of_week": 1,
+            "hour": 10,
+            "recently_added_days": 7,
+            "recently_added_limit": 20,
+            "include_stats": True,
+            "smtp_host": "smtp.example.com",
+            "smtp_port": 587,
+            "smtp_user": "user",
+            "smtp_pass": "original-secret",
+            "smtp_tls": True,
+            "from_addr": "from@example.com",
+            "to_addrs": "to@example.com",
+        })
+
+        await save_newsletter_config(db, {
+            "enabled": True,
+            "schedule": "daily",
+            "day_of_week": 0,
+            "hour": 8,
+            "recently_added_days": 3,
+            "recently_added_limit": 10,
+            "include_stats": False,
+            "smtp_host": "mail.example.com",
+            "smtp_port": 465,
+            "smtp_user": "user",
+            "smtp_pass": "***",
+            "smtp_tls": False,
+            "from_addr": "from@example.com",
+            "to_addrs": "to@example.com",
+        })
+
+        config = await get_newsletter_config(db)
+        assert config["smtp_pass"] == "original-secret"
+        assert config["schedule"] == "daily"
 
     @pytest.mark.asyncio
     async def test_build_newsletter_html(self, db):

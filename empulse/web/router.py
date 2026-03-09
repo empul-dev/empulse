@@ -415,6 +415,8 @@ async def settings_newsletter(request: Request):
     db = get_db()
     from empulse.newsletter import get_newsletter_config
     config = await get_newsletter_config(db)
+    if config and config.get("smtp_pass"):
+        config = {**config, "smtp_pass": "***"}
     return templates.TemplateResponse("settings_newsletter.html", {
         "request": request, "active": "settings",
         "config": config or {},

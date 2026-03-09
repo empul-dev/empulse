@@ -358,7 +358,7 @@ function editChannel(id) {
             toggleTypeFields();
 
             var config = typeof ch.config === 'string' ? JSON.parse(ch.config) : ch.config;
-            document.getElementById('ch-url').value = config.url || '';
+                document.getElementById('ch-url').value = config.url || '';
             if (ch.channel_type === 'webhook') {
                 document.getElementById('ch-method').value = config.method || 'POST';
                 document.getElementById('ch-headers').value = config.headers ? JSON.stringify(config.headers) : '';

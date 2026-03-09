@@ -77,6 +77,14 @@ logger = logging.getLogger("empulse.api")
 router = APIRouter()
 
 VALID_ID = re.compile(r"^[a-zA-Z0-9_-]+$")
+MASKED_SECRET = "***"
+CHANNEL_SECRET_FIELDS = {
+    "discord": {"url"},
+    "webhook": {"url", "headers"},
+    "email": {"smtp_pass"},
+    "telegram": {"bot_token"},
+    "ntfy": {"auth"},
+}
 
 
 def _get_tz_offset(request: Request) -> float:
@@ -86,6 +94,36 @@ def _get_tz_offset(request: Request) -> float:
 
 def _validate_id(value: str) -> bool:
     return bool(VALID_ID.match(value)) and len(value) <= 64
+
+
+def _parse_json_dict(value: object) -> dict:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _redact_channel(channel: dict) -> dict:
+    redacted = dict(channel)
+    config = _parse_json_dict(redacted.get("config", {}))
+    for field in CHANNEL_SECRET_FIELDS.get(redacted.get("channel_type", ""), set()):
+        if field in config and config.get(field):
+            config[field] = MASKED_SECRET
+    redacted["config"] = config
+    return redacted
+
+
+def _preserve_channel_secrets(channel_type: str, new_config: dict, existing_config: dict) -> dict:
+    merged = dict(new_config)
+    for field in CHANNEL_SECRET_FIELDS.get(channel_type, set()):
+        if merged.get(field) == MASKED_SECRET:
+            merged[field] = existing_config.get(field, "")
+    return merged
 
 
 @router.get("/now-playing")
@@ -765,7 +803,7 @@ async def list_notification_channels():
         "SELECT * FROM notification_channels ORDER BY created_at DESC"
     )
     rows = await cursor.fetchall()
-    return JSONResponse([dict(r) for r in rows])
+    return JSONResponse([_redact_channel(dict(r)) for r in rows])
 
 
 VALID_CHANNEL_TYPES = {"discord", "webhook", "email", "telegram", "ntfy"}
@@ -826,16 +864,23 @@ async def update_notification_channel(request: Request, channel_id: int):
 
     db = get_db()
     cursor = await db.execute(
-        "SELECT id FROM notification_channels WHERE id = ?", [channel_id]
+        "SELECT config FROM notification_channels WHERE id = ?", [channel_id]
     )
-    if not await cursor.fetchone():
+    row = await cursor.fetchone()
+    if not row:
         return Response(status_code=404)
+    existing_config = _parse_json_dict(row["config"])
+    merged_config = _preserve_channel_secrets(
+        channel_type,
+        _parse_json_dict(data.get("config", {})),
+        existing_config,
+    )
     await db.execute(
         "UPDATE notification_channels SET name=?, channel_type=?, config=?, triggers=?, conditions=?, enabled=? WHERE id=?",
         [
             str(data.get("name", ""))[:100],
             channel_type,
-            json.dumps(data.get("config", {})),
+            json.dumps(merged_config),
             json.dumps(data.get("triggers", [])),
             json.dumps(data.get("conditions", {})),
             1 if data.get("enabled", True) else 0,
@@ -899,7 +944,7 @@ async def get_newsletter_config_api():
 
     config = await get_newsletter_config(db)
     if config and config.get("smtp_pass"):
-        config = {**config, "smtp_pass": "***"}
+        config = {**config, "smtp_pass": MASKED_SECRET}
     return JSONResponse(config or {})
 
 

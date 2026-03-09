@@ -25,9 +25,6 @@
             {{ sort_header('Product', 'product', sort_by, sort_order) }}
             {{ sort_header('Player', 'player', sort_by, sort_order) }}
             {{ sort_header('Title', 'title', sort_by, sort_order) }}
-            {{ sort_header('Started', 'started', sort_by, sort_order) }}
-            <th>Paused</th>
-            {{ sort_header('Stopped', 'stopped', sort_by, sort_order) }}
             {{ sort_header('Duration', 'duration', sort_by, sort_order) }}
         </tr>
     </thead>
@@ -54,13 +51,10 @@
                     {% endif %}
                 </a>
             </td>
-            <td class="col-time">{{ r.started_at | fmt_time(display) }}</td>
-            <td class="col-time">{{ r.paused_display }}</td>
-            <td class="col-time">{{ r.stopped_at | fmt_time(display) }}</td>
             <td class="col-duration">{{ r.duration_display }}</td>
         </tr>
         <tr class="detail-row" id="detail-{{ r.id }}" style="display:none">
-            <td colspan="12">
+            <td colspan="9">
                 <div class="detail-content-wrap" id="detail-content-{{ r.id }}">
                     <p class="detail-loading">Loading...</p>
                 </div>
