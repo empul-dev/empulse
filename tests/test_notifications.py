@@ -333,3 +333,75 @@ class TestNewsletter:
         html = await build_newsletter_html(db, config)
         assert "Empulse Newsletter" in html
         assert "Watch Statistics" in html
+
+    @pytest.mark.asyncio
+    async def test_build_newsletter_html_recently_added_layout(self, db):
+        from empulse.newsletter import build_newsletter_html
+
+        class FakeEmbyClient:
+            async def get_recently_added(self, limit=10):
+                return [
+                    {
+                        "Id": "movie-1",
+                        "Name": "Arco",
+                        "Type": "Movie",
+                        "ProductionYear": 2025,
+                        "RunTimeTicks": 88 * 600_000_000,
+                        "Genres": ["Animation", "Science Fiction"],
+                        "CommunityRating": 9.2,
+                        "Taglines": ["What if rainbows were people from the future traveling in time?"],
+                        "Overview": "Als der Junge Arco aus einer fernen Zukunft zufaellig in die Welt der Iris stuerzt.",
+                        "DateCreated": "2026-03-08T12:00:00.0000000Z",
+                    },
+                    {
+                        "Id": "episode-1",
+                        "SeriesId": "series-1",
+                        "SeriesName": "Dark Winds - Der Wind des Boesen",
+                        "Name": "Folge #4.3",
+                        "Type": "Episode",
+                        "ProductionYear": 2022,
+                        "RunTimeTicks": 49 * 600_000_000,
+                        "Genres": ["Krimi", "Drama"],
+                        "CommunityRating": 8.0,
+                        "Overview": "Eine neue Spur fuehrt tiefer in den Fall.",
+                        "ParentIndexNumber": 4,
+                        "IndexNumber": 3,
+                        "DateCreated": "2026-03-08T11:00:00.0000000Z",
+                    },
+                    {
+                        "Id": "episode-2",
+                        "SeriesId": "series-1",
+                        "SeriesName": "Dark Winds - Der Wind des Boesen",
+                        "Name": "Folge #4.2",
+                        "Type": "Episode",
+                        "ProductionYear": 2022,
+                        "RunTimeTicks": 49 * 600_000_000,
+                        "Genres": ["Krimi", "Drama"],
+                        "CommunityRating": 8.0,
+                        "Overview": "Die Ermittlungen gehen weiter.",
+                        "ParentIndexNumber": 4,
+                        "IndexNumber": 2,
+                        "DateCreated": "2026-03-07T11:00:00.0000000Z",
+                    },
+                ]
+
+            async def get_image_data_url(self, item_id, image_type="Primary", max_width=300):
+                return "data:image/jpeg;base64,ZmFrZQ=="
+
+        html = await build_newsletter_html(
+            db,
+            {"recently_added_days": 7, "recently_added_limit": 10, "include_stats": 0},
+            FakeEmbyClient(),
+        )
+
+        assert "Recently Added Movies" in html
+        assert "1 movie" in html
+        assert "Arco" in html
+        assert "Animation" in html
+        assert "Science Fiction" in html
+        assert "Recently Added TV Shows" in html
+        assert "1 show / 2 episodes" in html
+        assert "Dark Winds - Der Wind des Boesen" in html
+        assert "2 episodes" in html
+        assert "Season 4 &middot; Episodes 02-03" in html
+        assert "data:image/jpeg;base64,ZmFrZQ==" in html

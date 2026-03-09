@@ -1,4 +1,6 @@
 import logging
+import base64
+
 import httpx
 from empulse.config import settings
 from empulse.emby.models import EmbySessionInfo, EmbyUser, EmbyLibrary
@@ -78,12 +80,32 @@ class EmbyClient:
             "SortOrder": "Descending",
             "Recursive": "true",
             "Limit": str(limit),
-            "Fields": "DateCreated,ProductionYear,Overview",
-            "IncludeItemTypes": item_type or "Movie,Series",
+            "Fields": (
+                "DateCreated,ProductionYear,Overview,Genres,CommunityRating,"
+                "RunTimeTicks,Taglines,SeriesName,SeriesId,ParentIndexNumber,"
+                "IndexNumber,OriginalTitle"
+            ),
+            "IncludeItemTypes": item_type or "Movie,Episode",
         }
         r = await self._client.get(f"{self.base_url}/Items", params=params)
         r.raise_for_status()
         return r.json().get("Items", [])
+
+    async def get_image_data_url(
+        self,
+        item_id: str,
+        image_type: str = "Primary",
+        max_width: int = 300,
+    ) -> str:
+        """Fetch an Emby image and return it as a data URL for email embedding."""
+        r = await self._client.get(
+            f"{self.base_url}/Items/{item_id}/Images/{image_type}",
+            params={"maxWidth": str(max_width)},
+        )
+        r.raise_for_status()
+        content_type = r.headers.get("content-type", "image/jpeg")
+        encoded = base64.b64encode(r.content).decode("ascii")
+        return f"data:{content_type};base64,{encoded}"
 
     async def authenticate_user(self, username: str, password: str) -> dict | None:
         """Authenticate a user against Emby via AuthenticateByName.

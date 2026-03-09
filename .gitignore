@@ -14,6 +14,7 @@ build/
 .ruff_cache/
 .empulse_secret
 .emtulli_secret
+.agents/
 .claude/
 share/
 tasks/
