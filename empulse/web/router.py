@@ -22,7 +22,7 @@ router = APIRouter()
 
 @router.get("/")
 async def dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request, "active": "dashboard"})
+    return templates.TemplateResponse(request, "dashboard.html", {"active": "dashboard"})
 
 
 @router.get("/history")
@@ -30,8 +30,8 @@ async def history_page(request: Request):
     db = get_db()
     all_users = await users_db.get_all_users(db)
     user_list = [UserInfo(**u) for u in all_users]
-    return templates.TemplateResponse("history.html", {
-        "request": request, "active": "history", "users": user_list,
+    return templates.TemplateResponse(request, "history.html", {
+        "active": "history", "users": user_list,
     })
 
 
@@ -40,8 +40,8 @@ async def users_page(request: Request):
     db = get_db()
     all_users = await users_db.get_all_users(db)
     user_list = [UserInfo(**u) for u in all_users]
-    return templates.TemplateResponse("users.html", {
-        "request": request, "active": "users", "users": user_list,
+    return templates.TemplateResponse(request, "users.html", {
+        "active": "users", "users": user_list,
     })
 
 
@@ -56,8 +56,8 @@ async def user_detail(request: Request, user_id: str):
     most_watched = await stats_db.get_user_most_watched(db, user_id, limit=10, days=30)
     history_rows = await history_db.get_history_for_user(db, user_id, limit=50)
     history_list = [HistoryRecord(**r) for r in history_rows]
-    return templates.TemplateResponse("user.html", {
-        "request": request, "active": "users",
+    return templates.TemplateResponse(request, "user.html", {
+        "active": "users",
         "user": user, "user_stats": user_stats,
         "most_watched": most_watched, "history": history_list,
     })
@@ -175,8 +175,7 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
     imdb_id = provider_ids.get("Imdb") or provider_ids.get("IMDB") or provider_ids.get("imdb", "")
     tmdb_id = provider_ids.get("Tmdb") or provider_ids.get("TMDB") or provider_ids.get("tmdb", "")
 
-    return templates.TemplateResponse("item.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "item.html", {
         "active": "",
         "item": item_data,
         "item_id": item_id,
@@ -209,8 +208,8 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
 
 @router.get("/graphs")
 async def graphs_page(request: Request):
-    return templates.TemplateResponse("graphs.html", {
-        "request": request, "active": "graphs",
+    return templates.TemplateResponse(request, "graphs.html", {
+        "active": "graphs",
     })
 
 
@@ -218,8 +217,8 @@ async def graphs_page(request: Request):
 async def libraries_page(request: Request):
     db = get_db()
     all_libs = await libraries_db.get_all_libraries(db)
-    return templates.TemplateResponse("libraries.html", {
-        "request": request, "active": "libraries",
+    return templates.TemplateResponse(request, "libraries.html", {
+        "active": "libraries",
         "libraries": all_libs,
     })
 
@@ -232,8 +231,8 @@ async def library_detail(request: Request, item_type: str):
     lib_stats = await stats_db.get_library_stats(db, item_type)
     top_items = await stats_db.get_library_top_items(db, item_type, limit=10, days=30)
     top_users = await stats_db.get_library_top_users(db, item_type, limit=10, days=30)
-    return templates.TemplateResponse("library.html", {
-        "request": request, "active": "libraries",
+    return templates.TemplateResponse(request, "library.html", {
+        "active": "libraries",
         "item_type": item_type, "label": label,
         "lib_stats": lib_stats, "top_items": top_items, "top_users": top_users,
     })
@@ -253,8 +252,8 @@ async def login_page(request: Request, error: str = ""):
     error_msg = _LOGIN_ERRORS.get(error, "")
     has_fallback = bool(settings.auth_password)
     auth_configured = bool(settings.auth_password or settings.emby_api_key)
-    return templates.TemplateResponse("login.html", {
-        "request": request, "active": "", "error": error_msg,
+    return templates.TemplateResponse(request, "login.html", {
+        "active": "", "error": error_msg,
         "has_fallback": has_fallback,
         "auth_configured": auth_configured,
     })
@@ -403,8 +402,8 @@ async def settings_page(request: Request):
     server_info = await libraries_db.get_server_info(db)
     update_checker = getattr(request.app.state, "update_checker", None)
     update_info = update_checker.info if update_checker else None
-    return templates.TemplateResponse("settings.html", {
-        "request": request, "active": "settings",
+    return templates.TemplateResponse(request, "settings.html", {
+        "active": "settings",
         "settings": settings, "server_info": server_info,
         "update_info": update_info,
     })
@@ -417,8 +416,8 @@ async def settings_newsletter(request: Request):
     config = await get_newsletter_config(db)
     if config and config.get("smtp_pass"):
         config = {**config, "smtp_pass": "***"}
-    return templates.TemplateResponse("settings_newsletter.html", {
-        "request": request, "active": "settings",
+    return templates.TemplateResponse(request, "settings_newsletter.html", {
+        "active": "settings",
         "config": config or {},
     })
 
@@ -430,7 +429,7 @@ async def settings_notifications(request: Request):
     channels = [dict(r) for r in await cursor.fetchall()]
     cursor = await db.execute("SELECT * FROM notification_log ORDER BY sent_at DESC LIMIT 20")
     logs = [dict(r) for r in await cursor.fetchall()]
-    return templates.TemplateResponse("settings_notifications.html", {
-        "request": request, "active": "settings",
+    return templates.TemplateResponse(request, "settings_notifications.html", {
+        "active": "settings",
         "channels": channels, "logs": logs,
     })

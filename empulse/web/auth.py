@@ -223,5 +223,5 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return Response(status_code=403)
         from empulse.app import templates
         return templates.TemplateResponse(
-            "403.html", {"request": request}, status_code=403,
+            request, "403.html", status_code=403,
         )

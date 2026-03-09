@@ -1,5 +1,4 @@
 import pytest
-import pytest_asyncio
 
 from empulse.db import history as history_db, users as users_db, libraries as libraries_db, stats as stats_db
 
@@ -180,7 +179,6 @@ class TestHistoryCRUD:
 
     @pytest.mark.asyncio
     async def test_merge_history(self, db):
-        from datetime import datetime, timezone
         await history_db.insert_history(db, {
             "session_key": "s1",
             "user_id": "u1",
@@ -455,6 +453,48 @@ class TestStats:
         assert len(top) >= 1
         assert top[0]["title"] == "Popular Movie"
         assert top[0]["plays"] == 3
+
+    @pytest.mark.asyncio
+    async def test_show_aggregations_prefer_latest_non_empty_series_id(self, db):
+        from datetime import date
+
+        today = date.today().isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "show-old",
+            "user_id": "u1",
+            "user_name": "Alice",
+            "item_id": "25450",
+            "item_name": "Pilot",
+            "item_type": "Episode",
+            "series_name": "The Pitt",
+            "series_id": "",
+            "started_at": f"{today}T12:00:00",
+            "stopped_at": f"{today}T13:00:00",
+            "duration_seconds": 1800,
+        })
+        await history_db.insert_history(db, {
+            "session_key": "show-new",
+            "user_id": "u2",
+            "user_name": "Bob",
+            "item_id": "25451",
+            "item_name": "Episode 2",
+            "item_type": "Episode",
+            "series_name": "The Pitt",
+            "series_id": "35974",
+            "started_at": f"{today}T14:00:00",
+            "stopped_at": f"{today}T15:00:00",
+            "duration_seconds": 1800,
+        })
+
+        watched = await stats_db.get_most_watched_shows(db, limit=5, days=99999)
+        popular = await stats_db.get_most_popular_shows(db, limit=5, days=99999)
+        user_top = await stats_db.get_user_most_watched(db, "u2", limit=5, days=99999)
+        library_top = await stats_db.get_library_top_items(db, "Episode", limit=5, days=99999)
+
+        assert watched[0]["poster_id"] == "35974"
+        assert popular[0]["poster_id"] == "35974"
+        assert user_top[0]["poster_id"] == "35974"
+        assert library_top[0]["poster_id"] == "35974"
 
     @pytest.mark.asyncio
     async def test_library_top_items(self, db):

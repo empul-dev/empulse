@@ -37,8 +37,9 @@ def get_version() -> str:
 class EmpulseTemplates(Jinja2Templates):
     """Auto-inject current_user, CSP nonce, and display settings into all template contexts."""
 
-    def TemplateResponse(self, name, context, **kwargs):
-        request: Request | None = context.get("request")
+    def TemplateResponse(self, request: Request, name: str, context: dict | None = None, **kwargs):
+        context = dict(context or {})
+        context.setdefault("request", request)
         if request:
             if not context.get("current_user"):
                 context["current_user"] = getattr(request.state, "user", None)
@@ -55,7 +56,7 @@ class EmpulseTemplates(Jinja2Templates):
                 context["display"] = getattr(
                     request.app.state, "display_settings", DEFAULT_DISPLAY
                 )
-        return super().TemplateResponse(name, context, **kwargs)
+        return super().TemplateResponse(request, name, context, **kwargs)
 
 
 templates = EmpulseTemplates(directory=str(BASE_DIR / "templates"))
@@ -217,13 +218,13 @@ def create_app() -> FastAPI:
     async def not_found_handler(request: Request, exc):
         if request.headers.get("hx-request"):
             return Response(status_code=404)
-        return templates.TemplateResponse("404.html", {"request": request}, status_code=404)
+        return templates.TemplateResponse(request, "404.html", status_code=404)
 
     @app.exception_handler(500)
     async def server_error_handler(request: Request, exc):
         if request.headers.get("hx-request"):
             return Response(status_code=500)
-        return templates.TemplateResponse("500.html", {"request": request}, status_code=500)
+        return templates.TemplateResponse(request, "500.html", status_code=500)
 
     # Auth middleware is always active — authentication is mandatory.
     # If no AUTH_PASSWORD or EMBY_API_KEY is configured, the login page

@@ -128,6 +128,43 @@ class TestAPIRoutes:
         assert "Most Watched Movies" in r.text
 
     @pytest.mark.asyncio
+    async def test_stats_cards_show_links_use_series_id(self, client):
+        db = client._test_db
+        today = datetime.now(timezone.utc).date().isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "show-old",
+            "user_id": "u1",
+            "user_name": "Alice",
+            "item_id": "25450",
+            "item_name": "Pilot",
+            "item_type": "Episode",
+            "series_name": "The Pitt",
+            "series_id": "",
+            "started_at": f"{today}T20:00:00",
+            "stopped_at": f"{today}T20:30:00",
+            "duration_seconds": 1800,
+        })
+        await history_db.insert_history(db, {
+            "session_key": "show-new",
+            "user_id": "u2",
+            "user_name": "Bob",
+            "item_id": "25451",
+            "item_name": "Episode 2",
+            "item_type": "Episode",
+            "series_name": "The Pitt",
+            "series_id": "35974",
+            "started_at": f"{today}T21:00:00",
+            "stopped_at": f"{today}T21:30:00",
+            "duration_seconds": 1800,
+        })
+
+        r = await client.get("/api/stats-cards?days=365")
+
+        assert r.status_code == 200
+        assert '/item/35974?type=series&name=The%20Pitt' in r.text
+        assert '/item/25450?type=series&name=The%20Pitt' not in r.text
+
+    @pytest.mark.asyncio
     async def test_recent_history_empty(self, client):
         r = await client.get("/api/recent-history")
         assert r.status_code == 200

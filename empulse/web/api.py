@@ -133,9 +133,9 @@ async def now_playing(request: Request):
     if state_tracker:
         sessions = [SessionInfo(**s) for s in state_tracker.get_all_sessions()]
     return templates.TemplateResponse(
+        request,
         "partials/now_playing.html",
         {
-            "request": request,
             "sessions": sessions,
         },
     )
@@ -248,9 +248,9 @@ async def _stats_cards(request: Request, days: int, metric: str):
         )
 
     return templates.TemplateResponse(
+        request,
         "partials/stats_cards.html",
         {
-            "request": request,
             "active_streams": active_streams,
             "most_watched_movies": most_watched_movies,
             "most_popular_movies": most_popular_movies,
@@ -272,9 +272,9 @@ async def recent_history(request: Request):
     rows = await history_db.get_history(db, limit=10)
     records = [HistoryRecord(**r) for r in rows]
     return templates.TemplateResponse(
+        request,
         "partials/history_table.html",
         {
-            "request": request,
             "records": records,
             "page": 1,
             "total_pages": 1,
@@ -339,9 +339,9 @@ async def history_table(
         filter_params += f"&sort_order={quote(sort_order)}"
 
     return templates.TemplateResponse(
+        request,
         "partials/history_table.html",
         {
-            "request": request,
             "records": records,
             "page": page,
             "total_pages": total_pages,
@@ -366,9 +366,9 @@ async def stream_info(request: Request, history_id: int):
         info = {}
 
     return templates.TemplateResponse(
+        request,
         "partials/stream_info.html",
         {
-            "request": request,
             "record": record,
             "info": info,
         },
@@ -389,9 +389,9 @@ async def history_detail(request: Request, history_id: int):
         info = {}
 
     return templates.TemplateResponse(
+        request,
         "partials/history_detail.html",
         {
-            "request": request,
             "record": record,
             "info": info,
         },
@@ -650,9 +650,9 @@ async def recently_added(request: Request, limit: int = 10, item_type: str = "")
     emby_client = getattr(request.app.state, "emby_client", None)
     if not emby_client:
         return templates.TemplateResponse(
+            request,
             "partials/recently_added.html",
             {
-                "request": request,
                 "items": [],
             },
         )
@@ -663,9 +663,9 @@ async def recently_added(request: Request, limit: int = 10, item_type: str = "")
         logger.error(f"Recently added fetch failed: {e}")
         items = []
     return templates.TemplateResponse(
+        request,
         "partials/recently_added.html",
         {
-            "request": request,
             "items": items,
         },
     )

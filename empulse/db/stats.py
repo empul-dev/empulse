@@ -83,14 +83,25 @@ async def get_most_watched_shows(
 ) -> list[dict]:
     order = _safe_order(metric)
     cursor = await db.execute(
-        f"""SELECT series_name, COUNT(*) as plays,
+        f"""SELECT h.series_name, COUNT(*) as plays,
                   COUNT(DISTINCT user_id) as users,
                   SUM(duration_seconds) as total_duration,
-                  COALESCE(series_id, MIN(item_id)) as poster_id
-           FROM history
-           WHERE item_type = 'Episode' AND series_name IS NOT NULL
+                  COALESCE(
+                      (
+                          SELECT h2.series_id
+                          FROM history h2
+                          WHERE h2.item_type = 'Episode'
+                            AND h2.series_name = h.series_name
+                            AND NULLIF(h2.series_id, '') IS NOT NULL
+                          ORDER BY h2.started_at DESC
+                          LIMIT 1
+                      ),
+                      MIN(h.item_id)
+                  ) as poster_id
+           FROM history h
+           WHERE h.item_type = 'Episode' AND h.series_name IS NOT NULL
                  AND started_at >= datetime('now', ?)
-           GROUP BY series_name
+           GROUP BY h.series_name
            ORDER BY {order} DESC LIMIT ?""",
         [f"-{days} days", limit],
     )
@@ -102,13 +113,24 @@ async def get_most_popular_shows(
     db: aiosqlite.Connection, limit: int = 5, days: int = 30
 ) -> list[dict]:
     cursor = await db.execute(
-        """SELECT series_name, COUNT(DISTINCT user_id) as users,
+        """SELECT h.series_name, COUNT(DISTINCT user_id) as users,
                   COUNT(*) as plays,
-                  COALESCE(series_id, MIN(item_id)) as poster_id
-           FROM history
-           WHERE item_type = 'Episode' AND series_name IS NOT NULL
+                  COALESCE(
+                      (
+                          SELECT h2.series_id
+                          FROM history h2
+                          WHERE h2.item_type = 'Episode'
+                            AND h2.series_name = h.series_name
+                            AND NULLIF(h2.series_id, '') IS NOT NULL
+                          ORDER BY h2.started_at DESC
+                          LIMIT 1
+                      ),
+                      MIN(h.item_id)
+                  ) as poster_id
+           FROM history h
+           WHERE h.item_type = 'Episode' AND h.series_name IS NOT NULL
                  AND started_at >= datetime('now', ?)
-           GROUP BY series_name
+           GROUP BY h.series_name
            ORDER BY users DESC, plays DESC LIMIT ?""",
         [f"-{days} days", limit],
     )
@@ -304,13 +326,25 @@ async def get_user_most_watched(
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT
-               COALESCE(series_name, item_name) as title,
-               MIN(COALESCE(series_id, item_id)) as poster_id,
+               COALESCE(h.series_name, h.item_name) as title,
+               COALESCE(
+                   (
+                       SELECT h2.series_id
+                       FROM history h2
+                       WHERE h2.user_id = h.user_id
+                         AND h2.item_type = 'Episode'
+                         AND h2.series_name = h.series_name
+                         AND NULLIF(h2.series_id, '') IS NOT NULL
+                       ORDER BY h2.started_at DESC
+                       LIMIT 1
+                   ),
+                   MIN(COALESCE(NULLIF(h.series_id, ''), h.item_id))
+               ) as poster_id,
                COUNT(*) as plays,
                SUM(duration_seconds) as total_duration
-           FROM history
-           WHERE user_id = ? AND started_at >= datetime('now', ?)
-           GROUP BY COALESCE(series_name, item_name)
+           FROM history h
+           WHERE h.user_id = ? AND h.started_at >= datetime('now', ?)
+           GROUP BY COALESCE(h.series_name, h.item_name)
            ORDER BY plays DESC LIMIT ?""",
         [user_id, f"-{days} days", limit],
     )
@@ -344,14 +378,25 @@ async def get_library_top_items(
 ) -> list[dict]:
     if item_type == "Episode":
         cursor = await db.execute(
-            """SELECT series_name as title,
-                      COALESCE(series_id, MIN(item_id)) as poster_id,
+            """SELECT h.series_name as title,
+                      COALESCE(
+                          (
+                              SELECT h2.series_id
+                              FROM history h2
+                              WHERE h2.item_type = 'Episode'
+                                AND h2.series_name = h.series_name
+                                AND NULLIF(h2.series_id, '') IS NOT NULL
+                              ORDER BY h2.started_at DESC
+                              LIMIT 1
+                          ),
+                          MIN(h.item_id)
+                      ) as poster_id,
                       COUNT(*) as plays,
                       SUM(duration_seconds) as total_duration,
                       COUNT(DISTINCT user_id) as users
-               FROM history
-               WHERE item_type = ? AND started_at >= datetime('now', ?)
-               GROUP BY series_name
+               FROM history h
+               WHERE h.item_type = ? AND h.started_at >= datetime('now', ?)
+               GROUP BY h.series_name
                ORDER BY plays DESC LIMIT ?""",
             [item_type, f"-{days} days", limit],
         )
