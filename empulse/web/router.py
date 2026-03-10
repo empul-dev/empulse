@@ -67,32 +67,56 @@ async def user_detail(request: Request, user_id: str):
 async def item_detail(request: Request, item_id: str, type: str = "", name: str = ""):
     db = get_db()
     emby_client = getattr(request.app.state, "emby_client", None)
+    requested_type = type
+
+    async def _load_item(target_id: str) -> dict:
+        if not emby_client:
+            return {}
+        try:
+            return await emby_client.get_item(target_id)
+        except Exception as e:
+            logger.warning(f"Could not fetch item {target_id}: {e}")
+            return {}
 
     # Fetch item metadata from Emby
     item_data = {}
     if emby_client:
-        try:
-            item_data = await emby_client.get_item(item_id)
-        except Exception as e:
-            logger.warning(f"Could not fetch item {item_id}: {e}")
+        item_data = await _load_item(item_id)
+        if requested_type == "series":
+            resolved_series_id = item_data.get("SeriesId")
+            if item_data.get("Type") != "Series" and resolved_series_id and resolved_series_id != item_id:
+                series_item = await _load_item(resolved_series_id)
+                if series_item:
+                    item_data = series_item
+                    item_id = resolved_series_id
 
     # Fallback to local history data when Emby returns nothing (404 / deleted items)
     local_record = None
     if not item_data:
         import json as _json
-        cursor = await db.execute(
-            "SELECT item_name, item_type, year, series_name, series_id, "
-            "season_number, episode_number, runtime_ticks, stream_info "
-            "FROM history WHERE item_id = ? ORDER BY started_at DESC LIMIT 1",
-            [item_id],
-        )
+        if requested_type == "series" and name:
+            cursor = await db.execute(
+                "SELECT item_id, item_name, item_type, year, series_name, series_id, "
+                "season_number, episode_number, runtime_ticks, stream_info "
+                "FROM history WHERE series_name = ? ORDER BY started_at DESC LIMIT 1",
+                [name],
+            )
+        else:
+            cursor = await db.execute(
+                "SELECT item_id, item_name, item_type, year, series_name, series_id, "
+                "season_number, episode_number, runtime_ticks, stream_info "
+                "FROM history WHERE item_id = ? ORDER BY started_at DESC LIMIT 1",
+                [item_id],
+            )
         local_record = await cursor.fetchone()
         if local_record:
             rec = dict(local_record)
+            if requested_type == "series" and rec.get("series_id"):
+                item_id = rec["series_id"]
             item_data = {
                 "Id": item_id,
-                "Name": rec.get("item_name") or "Unknown",
-                "Type": rec.get("item_type") or "",
+                "Name": (name or rec.get("series_name") or rec.get("item_name") or "Unknown"),
+                "Type": "Series" if requested_type == "series" else (rec.get("item_type") or ""),
                 "ProductionYear": rec.get("year"),
                 "SeriesName": rec.get("series_name") or "",
                 "SeriesId": rec.get("series_id") or "",

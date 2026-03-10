@@ -32,6 +32,13 @@ class TestSessionInfo:
 
 
 class TestHistoryRecord:
+    def test_item_link_episode_prefers_series_page(self):
+        r = HistoryRecord(
+            id=1, session_key="k", started_at="2024-01-01", stopped_at="2024-01-01",
+            item_id="ep5", item_type="Episode", series_id="series123", series_name="Lead Children",
+        )
+        assert r.item_link == "/item/series123?type=series&name=Lead%20Children"
+
     def test_duration_display_hours(self):
         r = HistoryRecord(
             id=1, session_key="k", started_at="2024-01-01", stopped_at="2024-01-01",

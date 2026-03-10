@@ -1,4 +1,5 @@
 from datetime import datetime
+from urllib.parse import quote
 
 from pydantic import BaseModel
 
@@ -103,7 +104,11 @@ class HistoryRecord(BaseModel):
 
     @property
     def item_link(self) -> str:
-        """Link to item detail page (episode-level for episodes)."""
+        """Link to item detail page, preferring the series page for episodes."""
+        if self.item_type == "Episode" and self.series_name:
+            target_id = self.series_id or self.item_id
+            if target_id:
+                return f"/item/{target_id}?type=series&name={quote(self.series_name)}"
         if self.item_id:
             return f"/item/{self.item_id}"
         return "#"

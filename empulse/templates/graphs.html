@@ -283,7 +283,8 @@ function baseOpts(extra) {
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 400, easing: 'easeOutQuart' },
-        interaction: { mode: 'index', intersect: false },
+        interaction: { mode: 'nearest', intersect: true, axis: 'xy' },
+        hover: { mode: 'nearest', intersect: true, axis: 'xy' },
         plugins: {
             tooltip: tooltipConfig(),
             legend: { display: false }
@@ -953,7 +954,7 @@ function loadGraphs() {
         if (!el || !data.current || !data.previous) { if (el) el.style.display = 'none'; return; }
         var c = data.current, p = data.previous;
         function delta(curr, prev) {
-            if (!prev) return curr > 0 ? 'New' : '—';
+            if (!prev) return '—';
             var pct = Math.round((curr - prev) / prev * 100);
             return (pct >= 0 ? '+' : '') + pct + '%';
         }

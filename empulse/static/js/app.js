@@ -105,6 +105,7 @@ function initStatCards() {
 
         // Click navigation for stat list items with data-href
         card.querySelectorAll("li[data-href]").forEach(function(li) {
+            li.style.cursor = "pointer";
             li.addEventListener("click", function() {
                 window.location.href = li.dataset.href;
             });

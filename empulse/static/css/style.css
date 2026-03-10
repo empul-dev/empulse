@@ -526,6 +526,10 @@ input.days-input {
     gap: 0.5rem;
 }
 
+.stat-list li[data-href] {
+    cursor: pointer;
+}
+
 .stat-list li::before {
     content: counter(stat-counter);
     color: var(--text-muted);

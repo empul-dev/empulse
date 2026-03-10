@@ -230,6 +230,30 @@ class TestAPIRoutes:
         assert "history-row" in r.text
 
     @pytest.mark.asyncio
+    async def test_history_table_episode_links_to_series_page(self, client):
+        db = client._test_db
+        await history_db.insert_history(db, {
+            "session_key": "ep-series-link",
+            "user_id": "u1",
+            "user_name": "Alice",
+            "item_id": "29865",
+            "item_name": "Episode 5",
+            "item_type": "Episode",
+            "series_name": "Lead Children",
+            "series_id": "38131",
+            "season_number": 1,
+            "episode_number": 5,
+            "started_at": "2024-01-15T20:00:00",
+            "stopped_at": "2024-01-15T21:00:00",
+            "duration_seconds": 3600,
+        })
+
+        r = await client.get("/api/history-table")
+
+        assert r.status_code == 200
+        assert '/item/38131?type=series&amp;name=Lead%20Children' in r.text
+
+    @pytest.mark.asyncio
     async def test_history_detail_not_found(self, client):
         """History detail returns error for missing record."""
         r = await client.get("/api/history-detail/99999")
@@ -449,6 +473,40 @@ class TestAPIRoutes:
         assert r.status_code == 200
         assert "Graphs" in r.text
         assert "g-daily-stacked" in r.text
+
+    @pytest.mark.asyncio
+    async def test_item_detail_series_request_resolves_from_episode_id(self, client):
+        class StubEmbyClient:
+            async def get_item(self, item_id):
+                if item_id == "29840":
+                    return {
+                        "Id": "29840",
+                        "Name": "Episode 5",
+                        "Type": "Episode",
+                        "SeriesName": "Lead Children",
+                        "SeriesId": "38131",
+                        "ParentIndexNumber": 1,
+                        "IndexNumber": 5,
+                    }
+                if item_id == "38131":
+                    return {
+                        "Id": "38131",
+                        "Name": "Lead Children",
+                        "Type": "Series",
+                        "Overview": "Series overview",
+                        "ProductionYear": 2026,
+                        "Genres": ["Drama"],
+                    }
+                return {}
+
+        client._test_app.state.emby_client = StubEmbyClient()
+
+        r = await client.get("/item/29840?type=series&name=Lead%20Children")
+
+        assert r.status_code == 200
+        assert "Series overview" in r.text
+        assert "/api/img/38131?w=400" in r.text
+        assert ">Lead Children<" in r.text
 
     @pytest.mark.asyncio
     async def test_chart_plays_by_dow(self, client):
