@@ -1,6 +1,6 @@
 [project]
 name = "empulse"
-version = "0.2.3"
+version = "0.2.4"
 description = "Activity monitoring for Emby Server"
 requires-python = ">=3.11"
 dependencies = [

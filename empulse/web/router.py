@@ -406,6 +406,7 @@ async def settings_page(request: Request):
         "active": "settings",
         "settings": settings, "server_info": server_info,
         "update_info": update_info,
+        "update_check_enabled": bool(update_checker),
     })
 
 

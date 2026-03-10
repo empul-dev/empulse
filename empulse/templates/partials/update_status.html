@@ -1,0 +1,51 @@
+<div id="update-status" class="chart-card" style="margin-bottom: 1.5rem;{% if update_info and update_info.update_available %} border-left: 3px solid var(--accent);{% endif %}">
+    <div class="settings-card-body" style="padding: 1rem 1.5rem;">
+        {% if not update_check_enabled %}
+        <div style="font-size: 0.9em; font-weight: 600; margin-bottom: 0.3rem;">Update checks are disabled</div>
+        <div style="font-size: 0.8em; color: var(--text-muted);">
+            Current version: v{{ version }}.
+        </div>
+        {% else %}
+        <div style="font-size: 0.9em; font-weight: 600; margin-bottom: 0.3rem;">
+            {% if update_info and update_info.update_available %}
+            Update available: v{{ update_info.latest_version }}
+            {% elif update_info and update_info.last_error %}
+            Update check failed
+            {% elif update_info and update_info.latest_version %}
+            You're up to date
+            {% else %}
+            Update status
+            {% endif %}
+        </div>
+        <div style="font-size: 0.8em; color: var(--text-muted);">
+            Current version: v{{ (update_info.current_version if update_info else version) }}.
+            {% if update_info and update_info.latest_version %}
+            Latest release: v{{ update_info.latest_version }}.
+            {% endif %}
+            {% if update_info and update_info.release_url %}
+            <a href="{{ update_info.release_url }}" target="_blank" rel="noopener noreferrer">View release on GitHub</a>
+            {% endif %}
+        </div>
+        {% if update_info and update_info.last_checked_at %}
+        <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 0.35rem;">
+            Last checked: {{ update_info.last_checked_at | fmt_datetime(display) }}.
+        </div>
+        {% endif %}
+        {% if update_info and update_info.last_error %}
+        <div style="font-size: 0.8em; color: var(--del-color); margin-top: 0.35rem;">
+            {{ update_info.last_error }}
+        </div>
+        {% endif %}
+        <div class="settings-actions" style="margin-top: 0.75rem;">
+            <button type="button"
+                    class="settings-btn settings-btn-secondary"
+                    hx-post="/api/update-check"
+                    hx-target="#update-status"
+                    hx-swap="outerHTML"
+                    {% if update_info and update_info.checking %}disabled{% endif %}>
+                {% if update_info and update_info.checking %}Checking...{% else %}Check for Updates{% endif %}
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>

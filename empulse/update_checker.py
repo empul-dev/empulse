@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import httpx
 
@@ -18,6 +19,9 @@ class UpdateInfo:
     current_version: str = ""
     release_url: str = ""
     release_notes: str = ""
+    last_checked_at: str = ""
+    last_error: str = ""
+    checking: bool = False
 
 
 def _parse_version(v: str) -> tuple[int, ...] | None:
@@ -43,30 +47,43 @@ class UpdateChecker:
         self.current_version = current_version
         self.interval = interval
         self.info: UpdateInfo = UpdateInfo(current_version=current_version)
+        self._lock = asyncio.Lock()
 
     async def check_once(self) -> UpdateInfo:
         """Perform a single check against the GitHub releases API."""
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(
-                GITHUB_RELEASES_URL,
-                headers={"Accept": "application/vnd.github+json"},
-            )
-            resp.raise_for_status()
-            data = resp.json()
+        async with self._lock:
+            checked_at = datetime.now(timezone.utc).isoformat()
+            self.info.checking = True
+            self.info.last_error = ""
+            try:
+                async with httpx.AsyncClient(timeout=15) as client:
+                    resp = await client.get(
+                        GITHUB_RELEASES_URL,
+                        headers={"Accept": "application/vnd.github+json"},
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
 
-        tag = data.get("tag_name", "")
-        url = data.get("html_url", "")
-        notes = data.get("body", "")
+                tag = data.get("tag_name", "")
+                url = data.get("html_url", "")
+                notes = data.get("body", "")
 
-        info = UpdateInfo(
-            update_available=_is_newer(tag, self.current_version),
-            latest_version=tag.lstrip("v"),
-            current_version=self.current_version,
-            release_url=url,
-            release_notes=notes,
-        )
-        self.info = info
-        return info
+                info = UpdateInfo(
+                    update_available=_is_newer(tag, self.current_version),
+                    latest_version=tag.lstrip("v"),
+                    current_version=self.current_version,
+                    release_url=url,
+                    release_notes=notes,
+                    last_checked_at=checked_at,
+                    checking=False,
+                )
+                self.info = info
+                return info
+            except Exception as exc:
+                self.info.last_checked_at = checked_at
+                self.info.last_error = str(exc)
+                self.info.checking = False
+                raise
 
     async def run(self) -> None:
         """Background loop: check on startup, then every `interval` seconds."""
@@ -82,5 +99,5 @@ class UpdateChecker:
                 else:
                     logger.debug("No update available (latest: v%s)", self.info.latest_version)
             except Exception:
-                logger.debug("Update check failed", exc_info=True)
+                logger.warning("Update check failed: %s", self.info.last_error, exc_info=True)
             await asyncio.sleep(self.interval)

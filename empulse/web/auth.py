@@ -152,6 +152,7 @@ ADMIN_PREFIXES = (
     "/api/backup",
     "/api/restore",
     "/api/test-connection",
+    "/api/update-check",
 )
 ADMIN_METHODS_ROUTES = [
     # (method, prefix) — routes that require admin for specific methods

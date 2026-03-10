@@ -1,11 +1,11 @@
 import time
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock
 from httpx import AsyncClient, ASGITransport
 
 from empulse.web.auth import (
     create_session_token, verify_session_token, hash_token,
-    SessionUser, _encode_user_id, _decode_user_id,
+    _encode_user_id, _decode_user_id,
 )
 
 
@@ -351,6 +351,10 @@ class TestMiddleware:
 
                     # Settings should be blocked (403)
                     r = await ac.get("/settings")
+                    assert r.status_code == 403
+
+                    # Manual update checks should also be blocked
+                    r = await ac.post("/api/update-check", headers={"Origin": "http://test"})
                     assert r.status_code == 403
 
             await db.close()

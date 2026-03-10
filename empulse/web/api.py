@@ -189,6 +189,18 @@ def _validate_metric(metric: str) -> str:
     return metric if metric in VALID_METRICS else "plays"
 
 
+def _render_update_status(request: Request):
+    update_checker = getattr(request.app.state, "update_checker", None)
+    return templates.TemplateResponse(
+        request,
+        "partials/update_status.html",
+        {
+            "update_info": update_checker.info if update_checker else None,
+            "update_check_enabled": bool(update_checker),
+        },
+    )
+
+
 @router.get("/stats-cards")
 async def stats_cards(request: Request, days: int = 30, metric: str = "plays"):
     days = _clamp_days(days)
@@ -758,6 +770,17 @@ async def chart_top_users(days: int = 30, metric: str = "plays"):
     db = get_db()
     rows = await stats_db.get_top_users(db, limit=10, days=days, metric=metric)
     return JSONResponse(rows)
+
+
+@router.post("/update-check")
+async def update_check(request: Request):
+    update_checker = getattr(request.app.state, "update_checker", None)
+    if update_checker:
+        try:
+            await update_checker.check_once()
+        except Exception:
+            logger.warning("Manual update check failed: %s", update_checker.info.last_error)
+    return _render_update_status(request)
 
 
 @router.get("/charts/completion-rate")

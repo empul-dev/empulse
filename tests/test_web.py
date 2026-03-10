@@ -7,6 +7,7 @@ from httpx import AsyncClient, ASGITransport
 
 from empulse.app import create_app
 from empulse.db import history as history_db
+from empulse.update_checker import UpdateInfo
 from empulse.web.auth import create_session_token, hash_token, COOKIE_NAME, SESSION_MAX_AGE
 
 
@@ -21,6 +22,8 @@ async def client():
         mock_settings.db_path = ":memory:"
         mock_settings.auth_password = "testpass"
         mock_settings.secret_key = "testsecret"
+        mock_settings.disable_update_check = True
+        mock_settings.update_check_interval = 43200
 
         app = create_app()
 
@@ -57,6 +60,7 @@ async def client():
             ) as ac:
                 ac.cookies.set(COOKIE_NAME, token)
                 ac._test_db = db  # expose for seeding data
+                ac._test_app = app
                 yield ac
 
         await db.close()
@@ -112,6 +116,27 @@ class TestPageRoutes:
         r = await client.get("/settings")
         assert r.status_code == 200
         assert "Settings" in r.text
+
+    @pytest.mark.asyncio
+    async def test_settings_page_shows_update_status(self, client):
+        class StubChecker:
+            def __init__(self):
+                self.info = UpdateInfo(
+                    update_available=True,
+                    latest_version="0.2.3",
+                    current_version="0.2.1",
+                    release_url="https://github.com/empul-dev/empulse/releases/tag/v0.2.3",
+                    last_checked_at="2026-03-10T08:30:00+00:00",
+                )
+
+        client._test_app.state.update_checker = StubChecker()
+
+        r = await client.get("/settings")
+
+        assert r.status_code == 200
+        assert "Update available: v0.2.3" in r.text
+        assert "Current version: v0.2.1" in r.text
+        assert "Check for Updates" in r.text
 
 
 class TestAPIRoutes:
@@ -484,6 +509,30 @@ class TestAPIRoutes:
         r = await client.get("/api/recently-added")
         assert r.status_code == 200
         assert "No recently added" in r.text
+
+    @pytest.mark.asyncio
+    async def test_manual_update_check_renders_status(self, client):
+        class StubChecker:
+            def __init__(self):
+                self.info = UpdateInfo(current_version="0.2.1")
+
+            async def check_once(self):
+                self.info = UpdateInfo(
+                    update_available=True,
+                    latest_version="0.2.3",
+                    current_version="0.2.1",
+                    release_url="https://github.com/empul-dev/empulse/releases/tag/v0.2.3",
+                    last_checked_at="2026-03-10T09:00:00+00:00",
+                )
+                return self.info
+
+        client._test_app.state.update_checker = StubChecker()
+
+        r = await client.post("/api/update-check")
+
+        assert r.status_code == 200
+        assert "Update available: v0.2.3" in r.text
+        assert "Current version: v0.2.1" in r.text
 
     @pytest.mark.asyncio
     async def test_notification_channels_crud(self, client):

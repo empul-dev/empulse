@@ -5,7 +5,6 @@ from empulse.update_checker import (
     _parse_version,
     _is_newer,
     UpdateChecker,
-    UpdateInfo,
 )
 
 
@@ -84,6 +83,9 @@ class TestUpdateChecker:
         assert info.latest_version == "0.2.0"
         assert info.current_version == "0.1.0"
         assert "v0.2.0" in info.release_url
+        assert info.last_checked_at
+        assert info.last_error == ""
+        assert info.checking is False
         assert checker.info is info
 
     async def test_check_once_no_update(self):
@@ -126,14 +128,19 @@ class TestUpdateChecker:
             with pytest.raises(httpx.HTTPStatusError):
                 await checker.check_once()
 
-        # info should remain the default (no update)
+        # info should retain failure metadata for the UI
         assert checker.info.update_available is False
+        assert checker.info.last_checked_at
+        assert checker.info.last_error
+        assert checker.info.checking is False
 
     async def test_default_info(self):
         checker = UpdateChecker("1.0.0")
         assert checker.info.update_available is False
         assert checker.info.current_version == "1.0.0"
         assert checker.info.latest_version == ""
+        assert checker.info.last_checked_at == ""
+        assert checker.info.last_error == ""
 
 
 class TestGetVersion:
