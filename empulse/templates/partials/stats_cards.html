@@ -130,7 +130,7 @@
 
     <!-- Most Active Libraries -->
     <div class="stat-card">
-        <div class="stat-card-poster stat-card-icon">
+        <div class="stat-card-poster stat-card-icon" data-default-icon="library">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>
         </div>
         <div class="stat-card-content">
@@ -140,7 +140,7 @@
             </div>
             <ol class="stat-list">
                 {% for lib in most_active_libraries %}
-                <li>
+                <li data-icon="{{ lib.item_type or 'other' }}">
                     <span class="stat-list-name">{{ lib.label }}</span>
                     <span class="stat-list-value">{{ lib.plays }}</span>
                 </li>
@@ -155,6 +155,7 @@
         <div class="stat-card-poster{% if not most_active_users %} stat-card-icon{% endif %}">
             {% if most_active_users %}
             <img src="/api/img/user/{{ most_active_users[0].user_id }}?name={{ most_active_users[0].user_name | urlencode }}" alt="{{ most_active_users[0].user_name }}" loading="lazy">
+            <div class="poster-fallback">{{ (most_active_users[0].user_name or '?')[:1] }}</div>
             {% else %}
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
             {% endif %}
@@ -166,7 +167,7 @@
             </div>
             <ol class="stat-list">
                 {% for u in most_active_users %}
-                <li data-href="/users/{{ u.user_id }}">
+                <li data-href="/users/{{ u.user_id }}" data-img="/api/img/user/{{ u.user_id }}?name={{ u.user_name | urlencode }}" data-title="{{ (u.user_name or '?')[:1] }}">
                     <span class="stat-list-name">{{ u.user_name or 'Unknown' }}</span>
                     <span class="stat-list-value">{{ u.plays if metric == 'plays' else (u.total_duration // 3600) ~ 'h' }}</span>
                 </li>
@@ -178,7 +179,7 @@
 
     <!-- Most Active Platforms -->
     <div class="stat-card">
-        <div class="stat-card-poster stat-card-icon">
+        <div class="stat-card-poster stat-card-icon" data-default-icon="platform">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7l-2 3v1h8v-1l-2-3h7c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 12H3V4h18v10z"/></svg>
         </div>
         <div class="stat-card-content">
@@ -188,7 +189,7 @@
             </div>
             <ol class="stat-list">
                 {% for p in most_active_platforms %}
-                <li>
+                <li data-icon="{{ p.client or 'Unknown' }}">
                     <span class="stat-list-name">{{ p.client or 'Unknown' }}</span>
                     <span class="stat-list-value">{{ p.plays }}</span>
                 </li>

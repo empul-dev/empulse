@@ -190,6 +190,46 @@ class TestAPIRoutes:
         assert '/item/25450?type=series&name=The%20Pitt' not in r.text
 
     @pytest.mark.asyncio
+    async def test_stats_cards_include_hover_metadata_for_users_libraries_platforms(self, client):
+        db = client._test_db
+        today = datetime.now(timezone.utc).date().isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "hover-users",
+            "user_id": "u1",
+            "user_name": "Alice",
+            "item_id": "m1",
+            "item_name": "Movie One",
+            "item_type": "Movie",
+            "client": "Emby Web",
+            "started_at": f"{today}T20:00:00",
+            "stopped_at": f"{today}T21:00:00",
+            "duration_seconds": 3600,
+        })
+        await history_db.insert_history(db, {
+            "session_key": "hover-tv",
+            "user_id": "u2",
+            "user_name": "Bob",
+            "item_id": "e1",
+            "item_name": "Episode One",
+            "item_type": "Episode",
+            "series_name": "Show",
+            "series_id": "s1",
+            "client": "Emby for LG",
+            "started_at": f"{today}T22:00:00",
+            "stopped_at": f"{today}T23:00:00",
+            "duration_seconds": 3600,
+        })
+
+        r = await client.get("/api/stats-cards?days=365")
+
+        assert r.status_code == 200
+        assert 'data-img="/api/img/user/u1?name=Alice"' in r.text
+        assert 'data-icon="Movie"' in r.text
+        assert 'data-icon="Episode"' in r.text
+        assert 'data-icon="Emby Web"' in r.text
+        assert 'data-icon="Emby for LG"' in r.text
+
+    @pytest.mark.asyncio
     async def test_recent_history_empty(self, client):
         r = await client.get("/api/recent-history")
         assert r.status_code == 200
@@ -567,6 +607,29 @@ class TestAPIRoutes:
         r = await client.get("/api/recently-added")
         assert r.status_code == 200
         assert "No recently added" in r.text
+
+    @pytest.mark.asyncio
+    async def test_recently_added_episode_uses_series_poster_and_link(self, client):
+        class StubEmbyClient:
+            async def get_recently_added(self, limit=10, item_type=""):
+                return [{
+                    "Id": "ep123",
+                    "Name": "Episode 5",
+                    "Type": "Episode",
+                    "SeriesId": "series456",
+                    "SeriesName": "Lead Children",
+                    "ProductionYear": 2026,
+                    "DateCreated": "2026-03-10T08:00:00Z",
+                }]
+
+        client._test_app.state.emby_client = StubEmbyClient()
+
+        r = await client.get("/api/recently-added")
+
+        assert r.status_code == 200
+        assert '/item/series456?type=series&amp;name=Lead%20Children' in r.text
+        assert '/api/img/series456' in r.text
+        assert '/api/img/ep123' not in r.text
 
     @pytest.mark.asyncio
     async def test_manual_update_check_renders_status(self, client):

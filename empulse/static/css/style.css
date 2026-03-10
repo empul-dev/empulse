@@ -394,11 +394,12 @@ input.days-input {
 .stat-list li {
     padding: 0.2rem 0.3rem;
     border-radius: 4px;
-    transition: background var(--anim-fast);
+    transition: background var(--anim-fast), transform var(--anim-fast);
 }
 
 .stat-list li:hover {
-    background: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.09);
+    transform: translateX(3px);
 }
 
 .stat-list li:hover .stat-list-name {

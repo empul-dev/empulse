@@ -1,9 +1,14 @@
 {% if items %}
 <div class="recently-added-grid">
     {% for item in items %}
-    <a href="/item/{{ item.Id }}" class="recently-added-item">
+    {% set target_id = item.SeriesId if item.Type == 'Episode' and item.SeriesId else item.Id %}
+    {% set target_href = '/item/' ~ target_id %}
+    {% if item.Type == 'Episode' and item.SeriesName and target_id %}
+    {% set target_href = '/item/' ~ target_id ~ '?type=series&name=' ~ (item.SeriesName | urlencode) %}
+    {% endif %}
+    <a href="{{ target_href }}" class="recently-added-item">
         <div class="recently-added-poster">
-            <img src="/api/img/{{ item.Id }}" alt="{{ item.Name }}" loading="lazy">
+            <img src="/api/img/{{ target_id }}" alt="{{ item.Name }}" loading="lazy">
             {% if item.DateCreated %}<span class="recently-added-ago" data-added="{{ item.DateCreated }}"></span>{% endif %}
         </div>
         <div class="recently-added-title">{{ item.Name or "Unknown" }}</div>

@@ -84,26 +84,75 @@
 
 // Stat card: hover over list items swaps poster + blur background
 function initStatCards() {
-    document.querySelectorAll(".stat-card[data-bg]").forEach(function(card) {
-        var poster = card.querySelector(".stat-card-poster img");
-        var fallback = card.querySelector(".poster-fallback");
-        var defaultSrc = card.dataset.bg;
+    function iconSvg(kind) {
+        switch (kind) {
+            case "Movie":
+            case "movie":
+                return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm0 3h16V6H4v2zm3 0V6H5v2h2zm4 0V6H9v2h2zm4 0V6h-2v2h2zm4 0V6h-2v2h2z"/></svg>';
+            case "Episode":
+            case "episode":
+            case "tv":
+                return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 17H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h18a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2zM8 21h8v-2H8v2z"/></svg>';
+            case "Audio":
+            case "audio":
+            case "music":
+                return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h6V3h-8z"/></svg>';
+            case "browser":
+            case "web":
+                return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16a2 2 0 0 1 2 2v3H2V6a2 2 0 0 1 2-2zm-2 7h20v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7zm3 2v5h14v-5H5z"/></svg>';
+            case "mobile":
+            case "ios":
+                return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm5 18a1.25 1.25 0 1 0 0-2.5A1.25 1.25 0 0 0 12 20z"/></svg>';
+            case "desktop":
+            case "platform":
+                return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 3H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7l-2 3v1h8v-1l-2-3h7a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg>';
+            default:
+                return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>';
+        }
+    }
+
+    function iconKind(raw) {
+        var v = (raw || "").toLowerCase();
+        if (v.indexOf("movie") !== -1) return "movie";
+        if (v.indexOf("episode") !== -1 || v.indexOf("tv") !== -1 || v.indexOf("show") !== -1) return "tv";
+        if (v.indexOf("audio") !== -1 || v.indexOf("music") !== -1) return "music";
+        if (v.indexOf("ios") !== -1 || v.indexOf("iphone") !== -1 || v.indexOf("ipad") !== -1 || v.indexOf("android") !== -1) return "mobile";
+        if (v.indexOf("web") !== -1 || v.indexOf("chrome") !== -1 || v.indexOf("firefox") !== -1 || v.indexOf("safari") !== -1 || v.indexOf("edge") !== -1) return "browser";
+        if (v.indexOf("lg") !== -1 || v.indexOf("samsung") !== -1 || v.indexOf("roku") !== -1 || v.indexOf("apple tv") !== -1 || v.indexOf("macos") !== -1 || v.indexOf("windows") !== -1 || v.indexOf("desktop") !== -1) return "desktop";
+        return v || "platform";
+    }
+
+    document.querySelectorAll(".stat-card").forEach(function(card) {
+        var posterWrap = card.querySelector(".stat-card-poster");
+        var poster = posterWrap ? posterWrap.querySelector("img") : null;
+        var fallback = posterWrap ? posterWrap.querySelector(".poster-fallback") : null;
+        var defaultSrc = poster ? poster.getAttribute("src") : "";
         var defaultTitle = fallback ? fallback.textContent : "";
+        var defaultBg = card.dataset.bg || "";
+        var defaultIcon = posterWrap && posterWrap.classList.contains("stat-card-icon")
+            ? posterWrap.innerHTML
+            : "";
 
-        // Set initial blur bg
-        card.style.setProperty("--hover-bg", "url(" + defaultSrc + ")");
+        if (defaultBg) {
+            card.style.setProperty("--hover-bg", "url(" + defaultBg + ")");
+        }
 
-        card.querySelectorAll("li[data-img]").forEach(function(li) {
+        card.querySelectorAll("li").forEach(function(li) {
             li.addEventListener("mouseenter", function() {
-                var src = li.dataset.img;
-                if (poster) poster.src = src;
-                if (fallback && li.dataset.title) fallback.textContent = li.dataset.title;
-                card.style.setProperty("--hover-bg", "url(" + src + ")");
-                card.classList.add("is-hovered");
+                if (li.dataset.img && poster) {
+                    poster.src = li.dataset.img;
+                    if (fallback && li.dataset.title) fallback.textContent = li.dataset.title;
+                    if (defaultBg) {
+                        card.style.setProperty("--hover-bg", "url(" + li.dataset.img + ")");
+                        card.classList.add("is-hovered");
+                    }
+                }
+                if (li.dataset.icon && posterWrap && posterWrap.classList.contains("stat-card-icon")) {
+                    posterWrap.innerHTML = iconSvg(iconKind(li.dataset.icon));
+                }
             });
         });
 
-        // Click navigation for stat list items with data-href
         card.querySelectorAll("li[data-href]").forEach(function(li) {
             li.style.cursor = "pointer";
             li.addEventListener("click", function() {
@@ -112,10 +161,15 @@ function initStatCards() {
         });
 
         card.addEventListener("mouseleave", function() {
-            if (poster) poster.src = defaultSrc;
+            if (poster && defaultSrc) poster.src = defaultSrc;
             if (fallback) fallback.textContent = defaultTitle;
-            card.style.setProperty("--hover-bg", "url(" + defaultSrc + ")");
-            card.classList.remove("is-hovered");
+            if (defaultBg) {
+                card.style.setProperty("--hover-bg", "url(" + defaultBg + ")");
+                card.classList.remove("is-hovered");
+            }
+            if (posterWrap && posterWrap.classList.contains("stat-card-icon")) {
+                posterWrap.innerHTML = defaultIcon;
+            }
         });
     });
 
