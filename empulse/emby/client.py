@@ -92,6 +92,50 @@ class EmbyClient:
         r.raise_for_status()
         return r.json().get("Items", [])
 
+    async def get_catalog_page(
+        self,
+        limit: int = 100,
+        start_index: int = 0,
+        search: str = "",
+        parent_id: str = "",
+        include_item_types: str = "Series",
+    ) -> dict:
+        params = {
+            "Recursive": "true",
+            "IncludeItemTypes": include_item_types,
+            "SortBy": "SortName",
+            "SortOrder": "Ascending",
+            "StartIndex": str(max(0, start_index)),
+            "Limit": str(max(1, limit)),
+            "Fields": "ProductionYear,Overview,PremiereDate,DateCreated",
+        }
+        if search:
+            params["SearchTerm"] = search
+        if parent_id:
+            params["ParentId"] = parent_id
+        r = await self._client.get(f"{self.base_url}/Items", params=params)
+        r.raise_for_status()
+        data = r.json()
+        return {
+            "items": data.get("Items", []),
+            "total": data.get("TotalRecordCount", 0),
+        }
+
+    async def get_series_catalog_page(
+        self,
+        limit: int = 100,
+        start_index: int = 0,
+        search: str = "",
+        parent_id: str = "",
+    ) -> dict:
+        return await self.get_catalog_page(
+            limit=limit,
+            start_index=start_index,
+            search=search,
+            parent_id=parent_id,
+            include_item_types="Series",
+        )
+
     async def get_image_data_url(
         self,
         item_id: str,

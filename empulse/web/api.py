@@ -16,6 +16,7 @@ from empulse.db import history as history_db, stats as stats_db, users as users_
 from empulse.formatting import DEFAULT_DISPLAY, get_tz_offset_hours
 from empulse.models import SessionInfo, HistoryRecord
 from empulse.web.poster_cache import POSTER_WIDTH
+from empulse.web.unwatched import fetch_unwatched_items
 
 # SVG placeholder for missing images (film icon on dark background)
 _PLACEHOLDER_SVG = (
@@ -40,16 +41,16 @@ def _placeholder_response() -> Response:
 
 # Curated gradient pairs for user avatars (from, to)
 _AVATAR_GRADIENTS = [
-    ("#6366f1", "#8b5cf6"),  # indigo → violet
-    ("#ec4899", "#f43f5e"),  # pink → rose
-    ("#3b82f6", "#06b6d4"),  # blue → cyan
-    ("#10b981", "#14b8a6"),  # emerald → teal
-    ("#f59e0b", "#ef4444"),  # amber → red
-    ("#8b5cf6", "#ec4899"),  # violet → pink
-    ("#06b6d4", "#3b82f6"),  # cyan → blue
-    ("#f97316", "#eab308"),  # orange → yellow
-    ("#14b8a6", "#22c55e"),  # teal → green
-    ("#a855f7", "#6366f1"),  # purple → indigo
+    ("#f59e0b", "#f97316"),  # amber -> orange
+    ("#fb923c", "#f97316"),  # soft orange -> orange
+    ("#f97316", "#ef4444"),  # orange -> red
+    ("#fb7185", "#f97316"),  # rose -> orange
+    ("#f59e0b", "#ef4444"),  # amber -> red
+    ("#f97316", "#ea580c"),  # orange -> deep orange
+    ("#fdba74", "#f97316"),  # light amber -> orange
+    ("#fca5a5", "#f97316"),  # soft coral -> orange
+    ("#fb7185", "#ef4444"),  # rose -> red
+    ("#fbbf24", "#fb7185"),  # golden amber -> coral
 ]
 
 
@@ -679,6 +680,75 @@ async def recently_added(request: Request, limit: int = 10, item_type: str = "")
         "partials/recently_added.html",
         {
             "items": items,
+        },
+    )
+
+
+@router.get("/unwatched")
+@router.get("/unwatched-series")
+async def unwatched_items(
+    request: Request,
+    page: int = 1,
+    page_size: int = 48,
+    search: str = "",
+    sort: str = "name_asc",
+    library_id: str = "",
+):
+    data = await fetch_unwatched_items(
+        request,
+        page=page,
+        page_size=page_size,
+        search=search,
+        sort=sort,
+        library_id=library_id,
+    )
+    return JSONResponse(data)
+
+
+@router.get("/unwatched-table")
+@router.get("/unwatched-series-table")
+async def unwatched_items_table(
+    request: Request,
+    page: int = 1,
+    page_size: int = 48,
+    search: str = "",
+    sort: str = "name_asc",
+    library_id: str = "",
+):
+    data = await fetch_unwatched_items(
+        request,
+        page=page,
+        page_size=page_size,
+        search=search,
+        sort=sort,
+        library_id=library_id,
+    )
+
+    filter_params = ""
+    if data["search"]:
+        filter_params += f"&search={quote(data['search'])}"
+    if data["sort"] != "name_asc":
+        filter_params += f"&sort={quote(data['sort'])}"
+    if data["library_id"]:
+        filter_params += f"&library_id={quote(data['library_id'])}"
+    if data["page_size"] != 48:
+        filter_params += f"&page_size={data['page_size']}"
+
+    return templates.TemplateResponse(
+        request,
+        "partials/unwatched_table.html",
+        {
+            "items": data["items"],
+            "total": data["total"],
+            "shown": data["shown"],
+            "page": data["page"],
+            "total_pages": data["total_pages"],
+            "search": data["search"],
+            "catalog_available": data["available"],
+            "load_error": data["error"],
+            "filter_params": filter_params,
+            "scope_label": data["scope_label"],
+            "empty_label": data["empty_label"],
         },
     )
 

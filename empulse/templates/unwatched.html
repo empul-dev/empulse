@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Unwatched — Empulse{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <div>
+        <h2>Unwatched</h2>
+        <p class="chart-desc">Items with no playback history yet.</p>
+    </div>
+</div>
+
+<div class="history-toolbar" id="unwatched-filters">
+    <input
+        type="search"
+        name="search"
+        value="{{ search }}"
+        placeholder="Search unwatched items"
+        aria-label="Search unwatched items"
+        class="search-input"
+        hx-get="/api/unwatched-table"
+        hx-trigger="input changed delay:250ms, search"
+        hx-target="#unwatched-results"
+        hx-include="#unwatched-filters"
+    >
+    <select
+        name="library_id"
+        class="filter-select"
+        aria-label="Library"
+        hx-get="/api/unwatched-table"
+        hx-trigger="change"
+        hx-target="#unwatched-results"
+        hx-include="#unwatched-filters">
+        <option value="">All libraries</option>
+        {% for lib in libraries %}
+        <option value="{{ lib.emby_library_id }}" {% if library_id == lib.emby_library_id %}selected{% endif %}>
+            {{ lib.name }}
+        </option>
+        {% endfor %}
+    </select>
+    <select
+        name="sort"
+        class="filter-select"
+        aria-label="Sort order"
+        hx-get="/api/unwatched-table"
+        hx-trigger="change"
+        hx-target="#unwatched-results"
+        hx-include="#unwatched-filters">
+        <option value="name_asc" {% if sort == "name_asc" %}selected{% endif %}>Name A-Z</option>
+        <option value="name_desc" {% if sort == "name_desc" %}selected{% endif %}>Name Z-A</option>
+        <option value="year_desc" {% if sort == "year_desc" %}selected{% endif %}>Newest year</option>
+        <option value="year_asc" {% if sort == "year_asc" %}selected{% endif %}>Oldest year</option>
+        <option value="added_desc" {% if sort == "added_desc" %}selected{% endif %}>Newest added</option>
+    </select>
+    <select
+        name="page_size"
+        aria-label="Results per page"
+        class="filter-select"
+        hx-get="/api/unwatched-table"
+        hx-trigger="change"
+        hx-target="#unwatched-results"
+        hx-include="#unwatched-filters">
+        {% for size in [25, 50, 100] %}
+        <option value="{{ size }}" {% if page_size == size %}selected{% endif %}>{{ size }} per page</option>
+        {% endfor %}
+    </select>
+    <input type="hidden" name="page" value="{{ page }}">
+</div>
+
+<div id="unwatched-results" aria-live="polite"
+     hx-get="/api/unwatched-table?{{ initial_query }}"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+document.getElementById('unwatched-filters').addEventListener('input', function(e) {
+    if (e.target.name === 'search') {
+        this.querySelector('input[name="page"]').value = '1';
+    }
+});
+document.getElementById('unwatched-filters').addEventListener('change', function(e) {
+    if (e.target.name !== 'page') {
+        this.querySelector('input[name="page"]').value = '1';
+    }
+});
+</script>
+{% endblock %}

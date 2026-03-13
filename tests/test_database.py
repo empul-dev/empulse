@@ -497,6 +497,41 @@ class TestStats:
         assert library_top[0]["poster_id"] == "35974"
 
     @pytest.mark.asyncio
+    async def test_get_watched_series_keys(self, db):
+        from datetime import date
+
+        today = date.today().isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "show-keys-1",
+            "user_id": "u1",
+            "user_name": "Alice",
+            "item_id": "ep1",
+            "item_name": "Pilot",
+            "item_type": "Episode",
+            "series_name": "Severance",
+            "series_id": "series-1",
+            "started_at": f"{today}T12:00:00",
+            "stopped_at": f"{today}T13:00:00",
+        })
+        await history_db.insert_history(db, {
+            "session_key": "show-keys-2",
+            "user_id": "u2",
+            "user_name": "Bob",
+            "item_id": "ep2",
+            "item_name": "Episode 2",
+            "item_type": "Episode",
+            "series_name": "Severance",
+            "series_id": "",
+            "started_at": f"{today}T14:00:00",
+            "stopped_at": f"{today}T15:00:00",
+        })
+
+        watched = await stats_db.get_watched_series_keys(db)
+
+        assert watched["series_ids"] == {"series-1"}
+        assert watched["series_names"] == {"Severance"}
+
+    @pytest.mark.asyncio
     async def test_library_top_items(self, db):
         from datetime import date
         today = date.today().isoformat()

@@ -150,6 +150,44 @@ async def get_recently_watched(db: aiosqlite.Connection, limit: int = 5) -> list
     return [dict(r) for r in rows]
 
 
+async def get_watched_series_keys(db: aiosqlite.Connection) -> dict[str, set[str]]:
+    """Return known watched series identifiers from local playback history."""
+    cursor = await db.execute(
+        """SELECT DISTINCT NULLIF(TRIM(series_id), '') as series_id,
+                  NULLIF(TRIM(series_name), '') as series_name
+           FROM history
+           WHERE item_type = 'Episode'
+             AND (NULLIF(TRIM(series_id), '') IS NOT NULL
+                  OR NULLIF(TRIM(series_name), '') IS NOT NULL)"""
+    )
+    rows = await cursor.fetchall()
+    series_ids = {row["series_id"] for row in rows if row["series_id"]}
+    series_names = {row["series_name"] for row in rows if row["series_name"]}
+    return {"series_ids": series_ids, "series_names": series_names}
+
+
+async def get_watched_item_keys(
+    db: aiosqlite.Connection, item_type: str
+) -> dict[str, set[str]]:
+    """Return watched identifiers for a given history item type."""
+    if item_type == "Episode":
+        return await get_watched_series_keys(db)
+
+    cursor = await db.execute(
+        """SELECT DISTINCT NULLIF(TRIM(item_id), '') as item_id,
+                  NULLIF(TRIM(item_name), '') as item_name
+           FROM history
+           WHERE item_type = ?
+             AND (NULLIF(TRIM(item_id), '') IS NOT NULL
+                  OR NULLIF(TRIM(item_name), '') IS NOT NULL)""",
+        [item_type],
+    )
+    rows = await cursor.fetchall()
+    item_ids = {row["item_id"] for row in rows if row["item_id"]}
+    item_names = {row["item_name"] for row in rows if row["item_name"]}
+    return {"series_ids": item_ids, "series_names": item_names}
+
+
 async def get_most_active_platforms(
     db: aiosqlite.Connection, limit: int = 5, days: int = 30
 ) -> list[dict]:

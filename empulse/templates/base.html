@@ -29,6 +29,7 @@
             <li><a href="/graphs" {% if active == 'graphs' %}class="active"{% endif %}>Graphs</a></li>
             <li><a href="/users" {% if active == 'users' %}class="active"{% endif %}>Users</a></li>
             <li><a href="/libraries" {% if active == 'libraries' %}class="active"{% endif %}>Libraries</a></li>
+            <li><a href="/unwatched" {% if active == 'unwatched' %}class="active"{% endif %}>Unwatched</a></li>
             {% if not current_user or current_user.role == 'admin' %}
             <li><a href="/settings" {% if active == 'settings' %}class="active"{% endif %}>Settings{% if update_available %}<span class="nav-badge" title="Update available"></span>{% endif %}</a></li>
             {% endif %}

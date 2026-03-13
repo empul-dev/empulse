@@ -1,0 +1,75 @@
+{% if not catalog_available %}
+<div class="empty-state">
+    <div class="empty-state-title">Emby is not connected</div>
+    <div class="empty-state-text">This view needs direct access to your Emby catalog.</div>
+</div>
+{% elif load_error %}
+<div class="empty-state">
+    <div class="empty-state-title">Items could not be loaded</div>
+    <div class="empty-state-text">{{ load_error }}</div>
+</div>
+{% elif items %}
+<div class="unwatched-meta">
+    <span>{{ total }} unwatched items found</span>
+    <span>{{ scope_label }}</span>
+    <span>Page {{ page }} of {{ total_pages }}</span>
+</div>
+
+<div class="history-table-wrap">
+<table class="unwatched-table">
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Year</th>
+            <th>Premiered</th>
+            <th>Added</th>
+            <th>Overview</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>
+                <a href="{{ item.link }}" class="title-link">
+                    <span class="title-text">{{ item.name }}</span>
+                </a>
+            </td>
+            <td>{{ item.year or "—" }}</td>
+            <td>{{ item.premiere_date or "—" }}</td>
+            <td>{{ item.date_created or "—" }}</td>
+            <td class="unwatched-overview-cell">{{ item.overview or "No playback history yet." }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+{% if total_pages > 1 %}
+<nav class="history-pagination">
+    <ul>
+        {% if page > 1 %}
+        <li><a href="#"
+               hx-get="/api/unwatched-table?page={{ page - 1 }}{{ filter_params }}"
+               hx-target="#unwatched-results">&laquo; Prev</a></li>
+        {% endif %}
+        <li><small>Page {{ page }} of {{ total_pages }}</small></li>
+        {% if page < total_pages %}
+        <li><a href="#"
+               hx-get="/api/unwatched-table?page={{ page + 1 }}{{ filter_params }}"
+               hx-target="#unwatched-results">Next &raquo;</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-title">No unwatched {{ empty_label }} found</div>
+    <div class="empty-state-text">
+        {% if search %}
+        No unwatched {{ empty_label }} matched your current filters.
+        {% else %}
+        Every {{ empty_label }} in {{ scope_label }} already appears in playback history.
+        {% endif %}
+    </div>
+</div>
+{% endif %}

@@ -6,7 +6,7 @@ from unittest.mock import patch, AsyncMock
 from httpx import AsyncClient, ASGITransport
 
 from empulse.app import create_app
-from empulse.db import history as history_db
+from empulse.db import history as history_db, libraries as libraries_db
 from empulse.update_checker import UpdateInfo
 from empulse.web.auth import create_session_token, hash_token, COOKIE_NAME, SESSION_MAX_AGE
 
@@ -91,6 +91,32 @@ class TestPageRoutes:
         r = await client.get("/libraries")
         assert r.status_code == 200
         assert "Libraries" in r.text
+
+    @pytest.mark.asyncio
+    async def test_unwatched_page(self, client):
+        db = client._test_db
+        await libraries_db.upsert_library(db, {
+            "emby_library_id": "tv-lib-1",
+            "name": "TV Shows",
+            "library_type": "tvshows",
+            "item_count": 50,
+        })
+        await libraries_db.upsert_library(db, {
+            "emby_library_id": "movie-lib-1",
+            "name": "Movies",
+            "library_type": "movies",
+            "item_count": 80,
+        })
+
+        r = await client.get("/unwatched?library_id=tv-lib-1&sort=year_desc&page_size=25")
+
+        assert r.status_code == 200
+        assert "Unwatched" in r.text
+        assert "/api/unwatched" in r.text
+        assert "TV Shows" in r.text
+        assert "Movies" in r.text
+        assert "/api/unwatched-table?page=1&amp;page_size=25&amp;search=&amp;sort=year_desc&amp;library_id=tv-lib-1" in r.text
+        assert "All libraries" in r.text
 
     @pytest.mark.asyncio
     async def test_user_detail_page(self, client):
@@ -630,6 +656,305 @@ class TestAPIRoutes:
         assert '/item/series456?type=series&amp;name=Lead%20Children' in r.text
         assert '/api/img/series456' in r.text
         assert '/api/img/ep123' not in r.text
+
+    @pytest.mark.asyncio
+    async def test_unwatched_api_filters_watched_shows(self, client):
+        db = client._test_db
+        today = datetime.now(timezone.utc).date().isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "watched-show",
+            "user_id": "u1",
+            "user_name": "Alice",
+            "item_id": "ep1",
+            "item_name": "Pilot",
+            "item_type": "Episode",
+            "series_name": "Severance",
+            "series_id": "series-1",
+            "started_at": f"{today}T20:00:00",
+            "stopped_at": f"{today}T21:00:00",
+        })
+
+        class StubEmbyClient:
+            async def get_catalog_page(
+                self,
+                limit=100,
+                start_index=0,
+                search="",
+                parent_id="",
+                include_item_types="Series",
+            ):
+                assert include_item_types == "Movie,Series,Audio"
+                return {
+                    "items": [
+                        {
+                            "Id": "series-1",
+                            "Name": "Severance",
+                            "Type": "Series",
+                            "ProductionYear": 2022,
+                        },
+                        {
+                            "Id": "series-2",
+                            "Name": "Andor",
+                            "Type": "Series",
+                            "ProductionYear": 2022,
+                            "Overview": "Rebel spy thriller",
+                        },
+                    ],
+                    "total": 2,
+                }
+
+        client._test_app.state.emby_client = StubEmbyClient()
+
+        r = await client.get("/api/unwatched")
+
+        assert r.status_code == 200
+        data = r.json()
+        assert data["available"] is True
+        assert data["shown"] == 1
+        assert data["items"][0]["item_id"] == "series-2"
+        assert data["items"][0]["name"] == "Andor"
+
+    @pytest.mark.asyncio
+    async def test_unwatched_table_partial_uses_compact_rows(self, client):
+        class StubEmbyClient:
+            async def get_catalog_page(
+                self,
+                limit=100,
+                start_index=0,
+                search="",
+                parent_id="",
+                include_item_types="Series",
+            ):
+                return {
+                    "items": [
+                        {
+                            "Id": "series-2",
+                            "Name": "Andor",
+                            "Type": "Series",
+                            "ProductionYear": 2022,
+                            "Overview": "Rebel spy thriller",
+                            "PremiereDate": "2022-09-21T00:00:00Z",
+                            "DateCreated": "2026-03-12T10:00:00Z",
+                        }
+                    ],
+                    "total": 1,
+                }
+
+        client._test_app.state.emby_client = StubEmbyClient()
+
+        r = await client.get("/api/unwatched-table")
+
+        assert r.status_code == 200
+        assert "<table" in r.text
+        assert "Andor" in r.text
+        assert "No playback history yet." not in r.text
+
+    @pytest.mark.asyncio
+    async def test_unwatched_api_deduplicates_same_title_with_multiple_ids(self, client):
+        class StubEmbyClient:
+            async def get_catalog_page(
+                self,
+                limit=100,
+                start_index=0,
+                search="",
+                parent_id="",
+                include_item_types="Series",
+            ):
+                return {
+                    "items": [
+                        {
+                            "Id": "movie-1",
+                            "Name": "28 Years Later",
+                            "Type": "Movie",
+                            "ProductionYear": 2025,
+                            "PremiereDate": "2025-06-17T00:00:00Z",
+                            "DateCreated": "2026-02-20T00:00:00Z",
+                            "Overview": "",
+                        },
+                        {
+                            "Id": "movie-2",
+                            "Name": "28 Years Later",
+                            "Type": "Movie",
+                            "ProductionYear": 2025,
+                            "PremiereDate": "2025-06-17T00:00:00Z",
+                            "DateCreated": "2026-02-20T00:00:00Z",
+                            "Overview": "A richer overview",
+                        },
+                    ],
+                    "total": 2,
+                }
+
+        client._test_app.state.emby_client = StubEmbyClient()
+
+        r = await client.get("/api/unwatched")
+
+        assert r.status_code == 200
+        data = r.json()
+        assert data["total"] == 1
+        assert data["items"][0]["name"] == "28 Years Later"
+        assert data["items"][0]["overview"] == "A richer overview"
+
+    @pytest.mark.asyncio
+    async def test_unwatched_api_filters_seen_titles_with_normalized_name(self, client):
+        db = client._test_db
+        today = datetime.now(timezone.utc).date().isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "seen-series-normalized",
+            "user_id": "u1",
+            "user_name": "Alice",
+            "item_id": "ep1",
+            "item_name": "Episode 1",
+            "item_type": "Episode",
+            "series_name": "S.W.A.T.",
+            "series_id": "series-1",
+            "started_at": f"{today}T20:00:00",
+            "stopped_at": f"{today}T21:00:00",
+        })
+
+        class StubEmbyClient:
+            async def get_catalog_page(
+                self,
+                limit=100,
+                start_index=0,
+                search="",
+                parent_id="",
+                include_item_types="Series",
+            ):
+                return {
+                    "items": [
+                        {
+                            "Id": "series-2",
+                            "Name": "SWAT",
+                            "Type": "Series",
+                            "ProductionYear": 2017,
+                        }
+                    ],
+                    "total": 1,
+                }
+
+        client._test_app.state.emby_client = StubEmbyClient()
+
+        r = await client.get("/api/unwatched")
+
+        assert r.status_code == 200
+        data = r.json()
+        assert data["total"] == 0
+
+    @pytest.mark.asyncio
+    async def test_unwatched_api_supports_pagination_sort_and_library_filter(self, client):
+        db = client._test_db
+        await libraries_db.upsert_library(db, {
+            "emby_library_id": "tv-lib-2",
+            "name": "Drama",
+            "library_type": "tvshows",
+            "item_count": 3,
+        })
+
+        class StubEmbyClient:
+            async def get_catalog_page(
+                self,
+                limit=100,
+                start_index=0,
+                search="",
+                parent_id="",
+                include_item_types="Series",
+            ):
+                assert parent_id == "tv-lib-2"
+                assert include_item_types == "Series"
+                return {
+                    "items": [
+                        {
+                            "Id": "series-a",
+                            "Name": "Dark",
+                            "Type": "Series",
+                            "ProductionYear": 2017,
+                            "DateCreated": "2026-03-10T08:00:00Z",
+                        },
+                        {
+                            "Id": "series-b",
+                            "Name": "Andor",
+                            "Type": "Series",
+                            "ProductionYear": 2022,
+                            "DateCreated": "2026-03-11T08:00:00Z",
+                        },
+                        {
+                            "Id": "series-c",
+                            "Name": "Bodies",
+                            "Type": "Series",
+                            "ProductionYear": 2023,
+                            "DateCreated": "2026-03-12T08:00:00Z",
+                        },
+                    ],
+                    "total": 3,
+                }
+
+        client._test_app.state.emby_client = StubEmbyClient()
+
+        r = await client.get(
+            "/api/unwatched?library_id=tv-lib-2&sort=name_asc&page=2&page_size=1"
+        )
+
+        assert r.status_code == 200
+        data = r.json()
+        assert data["library_id"] == "tv-lib-2"
+        assert data["sort"] == "name_asc"
+        assert data["total"] == 3
+        assert data["total_pages"] == 3
+        assert data["page"] == 2
+        assert data["shown"] == 1
+        assert data["items"][0]["name"] == "Bodies"
+
+    @pytest.mark.asyncio
+    async def test_unwatched_movies_library_uses_movie_catalog_and_empty_label(self, client):
+        db = client._test_db
+        await libraries_db.upsert_library(db, {
+            "emby_library_id": "movie-lib-2",
+            "name": "Films",
+            "library_type": "movies",
+            "item_count": 1,
+        })
+        today = datetime.now(timezone.utc).date().isoformat()
+        await history_db.insert_history(db, {
+            "session_key": "watched-movie",
+            "user_id": "u1",
+            "user_name": "Alice",
+            "item_id": "movie-1",
+            "item_name": "Arrival",
+            "item_type": "Movie",
+            "started_at": f"{today}T20:00:00",
+            "stopped_at": f"{today}T22:00:00",
+        })
+
+        class StubEmbyClient:
+            async def get_catalog_page(
+                self,
+                limit=100,
+                start_index=0,
+                search="",
+                parent_id="",
+                include_item_types="Series",
+            ):
+                assert parent_id == "movie-lib-2"
+                assert include_item_types == "Movie"
+                return {
+                    "items": [
+                        {
+                            "Id": "movie-1",
+                            "Name": "Arrival",
+                            "Type": "Movie",
+                            "ProductionYear": 2016,
+                        }
+                    ],
+                    "total": 1,
+                }
+
+        client._test_app.state.emby_client = StubEmbyClient()
+
+        r = await client.get("/api/unwatched-table?library_id=movie-lib-2")
+
+        assert r.status_code == 200
+        assert "No unwatched movie found" in r.text
+        assert "Every movie in Films already appears in playback history." in r.text
 
     @pytest.mark.asyncio
     async def test_manual_update_check_renders_status(self, client):

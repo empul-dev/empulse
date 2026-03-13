@@ -531,6 +531,10 @@ input.days-input {
     cursor: pointer;
 }
 
+.stat-list li[data-icon] {
+    cursor: pointer;
+}
+
 .stat-list li::before {
     content: counter(stat-counter);
     color: var(--text-muted);
@@ -2495,6 +2499,52 @@ textarea.settings-input {
     font-size: 0.72em;
     color: var(--accent);
     font-weight: 700;
+}
+
+/* === Unwatched === */
+.unwatched-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.84em;
+    margin-bottom: 1rem;
+}
+
+.unwatched-table td,
+.unwatched-table th {
+    vertical-align: top;
+}
+
+.unwatched-table tbody td {
+    transition: background-color var(--anim-fast), color var(--anim-fast);
+}
+
+.unwatched-table tbody tr:hover td {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.unwatched-overview-cell {
+    color: var(--text-secondary);
+    max-width: 560px;
+    line-height: 1.45;
+    font-size: 0.9em;
+}
+
+.unwatched-table tbody tr:hover .title-text {
+    color: var(--accent);
+}
+
+#unwatched-filters {
+    margin-bottom: 1rem;
+}
+
+#unwatched-filters .search-input {
+    min-width: 240px;
+}
+
+#unwatched-filters .filter-select {
+    min-width: 160px;
 }
 
 /* === Library Detail === */

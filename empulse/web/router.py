@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urlencode
 
 import hmac
 import httpx
@@ -244,6 +245,40 @@ async def libraries_page(request: Request):
     return templates.TemplateResponse(request, "libraries.html", {
         "active": "libraries",
         "libraries": all_libs,
+    })
+
+
+@router.get("/unwatched")
+@router.get("/series/unwatched")
+async def unwatched_page(
+    request: Request,
+    page: int = 1,
+    page_size: int = 48,
+    search: str = "",
+    sort: str = "name_asc",
+    library_id: str = "",
+):
+    db = get_db()
+    all_libraries = await libraries_db.get_all_libraries(db)
+    initial_query = urlencode(
+        {
+            "page": max(1, page),
+            "page_size": max(1, min(page_size, 100)),
+            "search": search,
+            "sort": sort,
+            "library_id": library_id,
+        }
+    )
+
+    return templates.TemplateResponse(request, "unwatched.html", {
+        "active": "unwatched",
+        "page": max(1, page),
+        "page_size": max(1, min(page_size, 100)),
+        "search": search,
+        "sort": sort,
+        "library_id": library_id,
+        "libraries": all_libraries,
+        "initial_query": initial_query,
     })
 
 
