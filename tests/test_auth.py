@@ -405,13 +405,31 @@ class TestMiddleware:
                     r = await ac.get("/")
                     assert r.status_code == 200
 
-                    # Settings should be blocked (403)
-                    r = await ac.get("/settings")
-                    assert r.status_code == 403
-
-                    # Manual update checks should also be blocked
-                    r = await ac.post("/api/update-check", headers={"Origin": "http://test"})
-                    assert r.status_code == 403
+                    # E-3: every admin route must reject a viewer (403), whether
+                    # blocked by AuthMiddleware or the per-handler admin_only dep.
+                    admin_routes = [
+                        ("GET", "/settings"),
+                        ("GET", "/settings/newsletter"),
+                        ("GET", "/settings/notifications"),
+                        ("POST", "/api/update-check"),
+                        ("GET", "/api/notification-channels"),
+                        ("POST", "/api/notification-channels"),
+                        ("PUT", "/api/notification-channels/1"),
+                        ("DELETE", "/api/notification-channels/1"),
+                        ("POST", "/api/notification-channels/1/test"),
+                        ("GET", "/api/newsletter/config"),
+                        ("POST", "/api/newsletter/config"),
+                        ("GET", "/api/newsletter/preview"),
+                        ("POST", "/api/newsletter/send"),
+                        ("GET", "/api/backup"),
+                        ("POST", "/api/restore"),
+                        ("POST", "/api/test-connection"),
+                        ("DELETE", "/api/history/1"),
+                        ("PUT", "/api/users/some-user/enabled"),
+                    ]
+                    for method, path in admin_routes:
+                        r = await ac.request(method, path, headers={"Origin": "http://test"})
+                        assert r.status_code == 403, f"{method} {path} not blocked for viewer (got {r.status_code})"
 
             await db.close()
 
@@ -455,6 +473,11 @@ class TestMiddleware:
                     r = await ac.post("/login", data={"username": "RegularUser", "password": "pass"}, headers={"Origin": "http://test"})
                     assert r.status_code == 302
                     assert "/login?error=disabled" in r.headers["location"]
+
+                    # E-6: a disabled user must never get a persisted session row,
+                    # not even transiently (previously inserted-then-deleted).
+                    cur = await db.execute("SELECT COUNT(*) FROM login_sessions")
+                    assert (await cur.fetchone())[0] == 0
 
             await db.close()
 

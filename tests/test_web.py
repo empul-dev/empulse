@@ -1585,3 +1585,109 @@ class TestAPIRoutes:
         r = await client.get("/static/js/app.js")
         assert r.status_code == 200
         assert "WebSocket" in r.text
+
+
+class TestSettingsViewNoSecretLeak:
+    """I-2: the settings page must never receive secret values in its context."""
+
+    @pytest.mark.asyncio
+    async def test_settings_view_whitelist_only(self):
+        from types import SimpleNamespace
+        from empulse.web.router import SettingsView
+
+        fake = SimpleNamespace(
+            emby_url="http://localhost:8096",
+            poll_interval=15,
+            emby_api_key="super-secret-key",
+            secret_key="top-secret-hmac",
+            auth_password="hunter2",
+        )
+        with patch("empulse.web.router.settings", fake):
+            view = SettingsView.from_settings()
+
+        assert view.emby_url == "http://localhost:8096"
+        assert view.poll_interval == 15
+        assert view.has_api_key is True
+        # No secret ever survives onto the view object.
+        for secret in ("super-secret-key", "top-secret-hmac", "hunter2"):
+            assert secret not in repr(view)
+        for attr in ("emby_api_key", "secret_key", "auth_password"):
+            assert not hasattr(view, attr)
+
+    @pytest.mark.asyncio
+    async def test_settings_page_omits_secrets(self, client):
+        from types import SimpleNamespace
+
+        fake = SimpleNamespace(
+            emby_url="http://localhost:8096",
+            poll_interval=10,
+            emby_api_key="super-secret-key",
+            secret_key="top-secret-hmac",
+            auth_password="hunter2",
+        )
+        with patch("empulse.web.router.settings", fake):
+            r = await client.get("/settings")
+
+        assert r.status_code == 200
+        assert "super-secret-key" not in r.text
+        assert "top-secret-hmac" not in r.text
+        assert "hunter2" not in r.text
+        assert "••••••••" in r.text  # masked key shown
+
+
+class TestEmbyUrlValidation:
+    """A4 (S-2, E-4): refuse boot on an unsafe EMBY_URL, allow LAN/loopback."""
+
+    def _run(self, url, *, resolves_to=None, allow_insecure=False, allow_private=False):
+        """Validate `url`, patching DNS resolution to `resolves_to` (list of IP
+        strings, or None to force an unresolvable host) so tests never hit the
+        network."""
+        import ipaddress
+        from types import SimpleNamespace
+        from empulse.emby import client as emby_client
+
+        fake = SimpleNamespace(
+            emby_url=url,
+            emby_allow_insecure=allow_insecure,
+            emby_allow_private=allow_private,
+        )
+        ips = [ipaddress.ip_address(ip) for ip in (resolves_to or [])]
+        with (
+            patch.object(emby_client, "settings", fake),
+            patch.object(emby_client, "_resolve_ips", return_value=ips),
+        ):
+            emby_client.validate_emby_url()
+
+    def test_loopback_http_allowed(self):
+        self._run("http://localhost:8096", resolves_to=["127.0.0.1"])
+        self._run("http://127.0.0.1:8096", resolves_to=["127.0.0.1"])
+
+    def test_private_lan_http_allowed(self):
+        # RFC1918 LAN over plain HTTP is the normal self-hosted case.
+        self._run("http://192.168.1.50:8096", resolves_to=["192.168.1.50"])
+
+    def test_public_https_allowed(self):
+        self._run("https://emby.example.com", resolves_to=["93.184.216.34"])
+
+    def test_public_http_refused(self):
+        with pytest.raises(RuntimeError, match="unencrypted"):
+            self._run("http://emby.example.com", resolves_to=["93.184.216.34"])
+
+    def test_public_http_override(self):
+        self._run("http://emby.example.com", resolves_to=["93.184.216.34"], allow_insecure=True)
+
+    def test_metadata_ip_refused(self):
+        with pytest.raises(RuntimeError, match="link-local"):
+            self._run("http://169.254.169.254", resolves_to=["169.254.169.254"])
+
+    def test_metadata_hostname_refused(self):
+        # Classic SSRF bypass: a benign-looking name resolving to the metadata IP.
+        with pytest.raises(RuntimeError, match="link-local"):
+            self._run("http://metadata.internal", resolves_to=["169.254.169.254"])
+
+    def test_metadata_ip_override(self):
+        self._run("http://169.254.169.254", resolves_to=["169.254.169.254"], allow_private=True)
+
+    def test_unresolvable_host_is_lenient(self):
+        # DNS not ready at container start must not block a legit start-up.
+        self._run("http://emby-that-does-not-resolve.invalid:8096", resolves_to=None)

@@ -1,4 +1,4 @@
-from fastapi import Request
+from fastapi import HTTPException, Request
 from starlette.responses import Response
 
 from empulse.database import get_db
@@ -30,6 +30,19 @@ def require_self_or_admin(request: Request, user_id: str) -> Response | None:
     if user.role == "admin" or user.user_id == user_id:
         return None
     return forbidden_response(request)
+
+
+async def admin_only(request: Request) -> None:
+    """Route dependency: 403 unless the session user is an admin (E-3).
+
+    Defence-in-depth backstop for AuthMiddleware's ADMIN_PREFIXES/-METHODS gate,
+    so a newly-added admin route is protected even if the middleware list isn't
+    updated. The middleware runs first and renders 403.html for page routes; if
+    execution ever reaches here, a bare 403 is fine (these are API/htmx routes).
+    """
+    user = getattr(request.state, "user", None)
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403)
 
 
 def scoped_user_filter(request: Request, user_id: str) -> str | None:

@@ -1,11 +1,12 @@
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
 import hmac
 import httpx
 
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse
 from empulse.app import templates
 from empulse.config import settings
@@ -15,7 +16,7 @@ from empulse.models import UserInfo, HistoryRecord
 from empulse.web.auth import (
     create_session_token, hash_token, COOKIE_NAME, SESSION_MAX_AGE,
 )
-from empulse.web.deps import require_self_or_admin
+from empulse.web.deps import admin_only, require_self_or_admin
 
 logger = logging.getLogger("empulse.router")
 
@@ -393,6 +394,26 @@ async def login_submit(
     expires = now + timedelta(seconds=SESSION_MAX_AGE)
 
     db = get_db()
+
+    # Upsert user and verify the account is enabled BEFORE writing any session
+    # row (E-6): a disabled user must never get a persisted session, not even
+    # transiently between INSERT and a compensating DELETE.
+    if user_id != "__admin__":
+        await users_db.upsert_user(db, {
+            "emby_user_id": user_id,
+            "username": display_name,
+            "is_admin": 1 if role == "admin" else 0,
+            "thumb_url": None,
+            "last_seen": now.isoformat(),
+        })
+        # Emby admins are auto-enabled
+        if role == "admin":
+            await users_db.set_user_enabled(db, user_id, True)
+        # Check if user account is enabled
+        if not await users_db.is_user_enabled(db, user_id):
+            await db.commit()  # persist the upsert; no session was created
+            return RedirectResponse("/login?error=disabled", status_code=302)
+
     await db.execute(
         """INSERT INTO login_sessions
            (token_hash, emby_user_id, username, role, created_at, expires_at, ip_address, user_agent)
@@ -408,28 +429,6 @@ async def login_submit(
             request.headers.get("user-agent", "")[:256],
         ],
     )
-
-    # Upsert user in users table (sync is_admin from Emby)
-    if user_id != "__admin__":
-        await users_db.upsert_user(db, {
-            "emby_user_id": user_id,
-            "username": display_name,
-            "is_admin": 1 if role == "admin" else 0,
-            "thumb_url": None,
-            "last_seen": now.isoformat(),
-        })
-        # Emby admins are auto-enabled
-        if role == "admin":
-            await users_db.set_user_enabled(db, user_id, True)
-        # Check if user account is enabled
-        if not await users_db.is_user_enabled(db, user_id):
-            # Remove the session we just inserted
-            await db.execute(
-                "DELETE FROM login_sessions WHERE token_hash = ?",
-                [hash_token(token)],
-            )
-            await db.commit()
-            return RedirectResponse("/login?error=disabled", status_code=302)
 
     await db.commit()
 
@@ -458,7 +457,27 @@ async def logout(request: Request):
     return response
 
 
-@router.get("/settings")
+@dataclass(frozen=True)
+class SettingsView:
+    """Whitelist of settings safe to expose to the settings template (I-2).
+
+    Never carries secrets (secret_key, emby_api_key, auth_password, SMTP creds) —
+    the API key is reduced to a boolean so the template can show a mask without
+    the value ever reaching the render context."""
+    emby_url: str
+    poll_interval: int
+    has_api_key: bool
+
+    @classmethod
+    def from_settings(cls) -> "SettingsView":
+        return cls(
+            emby_url=settings.emby_url,
+            poll_interval=settings.poll_interval,
+            has_api_key=bool(settings.emby_api_key),
+        )
+
+
+@router.get("/settings", dependencies=[Depends(admin_only)])
 async def settings_page(request: Request):
     db = get_db()
     server_info = await libraries_db.get_server_info(db)
@@ -466,13 +485,13 @@ async def settings_page(request: Request):
     update_info = update_checker.info if update_checker else None
     return templates.TemplateResponse(request, "settings.html", {
         "active": "settings",
-        "settings": settings, "server_info": server_info,
+        "settings": SettingsView.from_settings(), "server_info": server_info,
         "update_info": update_info,
         "update_check_enabled": bool(update_checker),
     })
 
 
-@router.get("/settings/newsletter")
+@router.get("/settings/newsletter", dependencies=[Depends(admin_only)])
 async def settings_newsletter(request: Request):
     db = get_db()
     from empulse.newsletter import get_newsletter_config
@@ -485,7 +504,7 @@ async def settings_newsletter(request: Request):
     })
 
 
-@router.get("/settings/notifications")
+@router.get("/settings/notifications", dependencies=[Depends(admin_only)])
 async def settings_notifications(request: Request):
     db = get_db()
     cursor = await db.execute("SELECT * FROM notification_channels ORDER BY created_at DESC")

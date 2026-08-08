@@ -1,4 +1,4 @@
-<div id="update-status" class="chart-card" style="margin-bottom: 1.5rem;{% if update_info and update_info.update_available %} border-left: 3px solid var(--accent);{% endif %}">
+<div id="update-status" class="chart-card{% if update_info and update_info.update_available %} update-available{% endif %}" style="margin-bottom: 1.5rem;">
     <div class="settings-card-body" style="padding: 1rem 1.5rem;">
         {% if not update_check_enabled %}
         <div style="font-size: 0.9em; font-weight: 600; margin-bottom: 0.3rem;">Update checks are disabled</div>
@@ -6,7 +6,7 @@
             Current version: v{{ version }}.
         </div>
         {% else %}
-        <div style="font-size: 0.9em; font-weight: 600; margin-bottom: 0.3rem;">
+        <div class="{% if update_info and update_info.update_available %}update-heading{% endif %}" style="font-size: 0.9em; font-weight: 600; margin-bottom: 0.3rem;">
             {% if update_info and update_info.update_available %}
             Update available: v{{ update_info.latest_version }}
             {% elif update_info and update_info.last_error %}
@@ -22,10 +22,13 @@
             {% if update_info and update_info.latest_version %}
             Latest release: v{{ update_info.latest_version }}.
             {% endif %}
-            {% if update_info and update_info.release_url %}
+            {% if update_info and update_info.release_url and not update_info.update_available %}
             <a href="{{ update_info.release_url }}" target="_blank" rel="noopener noreferrer">View release on GitHub</a>
             {% endif %}
         </div>
+        {% if update_info and update_info.update_available and update_info.release_url %}
+        <a class="empty-state-action" style="margin-top: 0.6rem;" href="{{ update_info.release_url }}" target="_blank" rel="noopener noreferrer">View release on GitHub &rarr;</a>
+        {% endif %}
         {% if update_info and update_info.last_checked_at %}
         <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 0.35rem;">
             Last checked: {{ update_info.last_checked_at | fmt_datetime(display) }}.

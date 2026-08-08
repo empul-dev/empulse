@@ -30,7 +30,7 @@
                         </div>
                         <div class="settings-field">
                             <label class="settings-label">API Key</label>
-                            <input type="text" name="emby_api_key" value="{{ '••••••••' if settings.emby_api_key else '' }}" readonly class="settings-input">
+                            <input type="text" name="emby_api_key" value="{{ '••••••••' if settings.has_api_key else '' }}" readonly class="settings-input">
                         </div>
                     </div>
                     <div class="settings-actions">

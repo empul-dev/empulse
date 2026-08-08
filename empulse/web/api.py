@@ -7,7 +7,7 @@ import logging
 import re
 from datetime import date, timedelta
 from urllib.parse import quote
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse, Response
 from empulse.app import templates
 from empulse.config import settings
@@ -16,7 +16,7 @@ from empulse.db import history as history_db, stats as stats_db, users as users_
 from empulse.formatting import DEFAULT_DISPLAY, get_tz_offset_hours
 from empulse.models import SessionInfo, HistoryRecord
 from empulse.notifications import secrets as notification_secrets
-from empulse.web.deps import require_self_or_admin, scoped_user_filter
+from empulse.web.deps import admin_only, require_self_or_admin, scoped_user_filter
 from empulse.web.poster_cache import POSTER_WIDTH
 from empulse.web.unwatched import fetch_unwatched_items
 
@@ -414,7 +414,7 @@ async def history_detail(request: Request, history_id: int):
     )
 
 
-@router.delete("/history/{history_id}")
+@router.delete("/history/{history_id}", dependencies=[Depends(admin_only)])
 async def delete_history(history_id: int):
     db = get_db()
     deleted = await history_db.delete_history(db, history_id)
@@ -853,7 +853,7 @@ async def chart_top_users(days: int = 30, metric: str = "plays"):
     return JSONResponse(rows)
 
 
-@router.post("/update-check")
+@router.post("/update-check", dependencies=[Depends(admin_only)])
 async def update_check(request: Request):
     update_checker = getattr(request.app.state, "update_checker", None)
     if update_checker:
@@ -902,7 +902,7 @@ async def chart_watch_heatmap(request: Request, days: int = 30):
     return JSONResponse(rows)
 
 
-@router.get("/notification-channels")
+@router.get("/notification-channels", dependencies=[Depends(admin_only)])
 async def list_notification_channels():
     db = get_db()
     cursor = await db.execute(
@@ -915,7 +915,7 @@ async def list_notification_channels():
 VALID_CHANNEL_TYPES = {"discord", "webhook", "email", "telegram", "ntfy"}
 
 
-@router.post("/notification-channels")
+@router.post("/notification-channels", dependencies=[Depends(admin_only)])
 async def create_notification_channel(request: Request):
     data = await request.json()
 
@@ -958,7 +958,7 @@ async def create_notification_channel(request: Request):
     return JSONResponse({"status": "created"}, status_code=201)
 
 
-@router.put("/notification-channels/{channel_id}")
+@router.put("/notification-channels/{channel_id}", dependencies=[Depends(admin_only)])
 async def update_notification_channel(request: Request, channel_id: int):
     data = await request.json()
 
@@ -1004,7 +1004,7 @@ async def update_notification_channel(request: Request, channel_id: int):
     return JSONResponse({"status": "updated"})
 
 
-@router.delete("/notification-channels/{channel_id}")
+@router.delete("/notification-channels/{channel_id}", dependencies=[Depends(admin_only)])
 async def delete_notification_channel(request: Request, channel_id: int):
     db = get_db()
     cursor = await db.execute(
@@ -1019,7 +1019,7 @@ async def delete_notification_channel(request: Request, channel_id: int):
     return Response(status_code=204)
 
 
-@router.post("/notification-channels/{channel_id}/test")
+@router.post("/notification-channels/{channel_id}/test", dependencies=[Depends(admin_only)])
 async def test_notification_channel(request: Request, channel_id: int):
     db = get_db()
     cursor = await db.execute(
@@ -1047,7 +1047,7 @@ async def notification_log():
     return JSONResponse([dict(r) for r in rows])
 
 
-@router.get("/newsletter/config")
+@router.get("/newsletter/config", dependencies=[Depends(admin_only)])
 async def get_newsletter_config_api():
     db = get_db()
     from empulse.newsletter import get_newsletter_config
@@ -1058,7 +1058,7 @@ async def get_newsletter_config_api():
     return JSONResponse(config or {})
 
 
-@router.post("/newsletter/config")
+@router.post("/newsletter/config", dependencies=[Depends(admin_only)])
 async def save_newsletter_config_api(request: Request):
     data = await request.json()
     db = get_db()
@@ -1068,7 +1068,7 @@ async def save_newsletter_config_api(request: Request):
     return JSONResponse({"status": "saved"})
 
 
-@router.get("/newsletter/preview")
+@router.get("/newsletter/preview", dependencies=[Depends(admin_only)])
 async def newsletter_preview(request: Request):
     db = get_db()
     from empulse.newsletter import get_newsletter_config, build_newsletter_html
@@ -1085,7 +1085,7 @@ async def newsletter_preview(request: Request):
     return Response(content=html, media_type="text/html")
 
 
-@router.post("/newsletter/send")
+@router.post("/newsletter/send", dependencies=[Depends(admin_only)])
 async def send_newsletter_now(request: Request):
     db = get_db()
     from empulse.newsletter import get_newsletter_config, send_newsletter
@@ -1100,7 +1100,7 @@ async def send_newsletter_now(request: Request):
     return JSONResponse({"success": success, "message": message})
 
 
-@router.get("/backup")
+@router.get("/backup", dependencies=[Depends(admin_only)])
 async def backup_database():
     from pathlib import Path
 
@@ -1115,7 +1115,7 @@ async def backup_database():
     )
 
 
-@router.post("/restore")
+@router.post("/restore", dependencies=[Depends(admin_only)])
 async def restore_database(request: Request):
     from pathlib import Path
     import shutil
@@ -1268,7 +1268,7 @@ async def list_timezones():
     return JSONResponse(COMMON_TIMEZONES)
 
 
-@router.post("/test-connection")
+@router.post("/test-connection", dependencies=[Depends(admin_only)])
 async def test_connection(request: Request):
     emby_client = getattr(request.app.state, "emby_client", None)
     if not emby_client:
@@ -1299,7 +1299,7 @@ async def test_connection(request: Request):
         return '<p class="error">Connection failed. Check server logs for details.</p>'
 
 
-@router.put("/users/{user_id}/enabled")
+@router.put("/users/{user_id}/enabled", dependencies=[Depends(admin_only)])
 async def set_user_enabled(request: Request, user_id: str):
     if not _validate_id(user_id):
         return Response(status_code=400)

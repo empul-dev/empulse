@@ -1,11 +1,75 @@
 import logging
 import base64
+import ipaddress
+import socket
+from urllib.parse import urlparse
 
 import httpx
 from empulse.config import settings
 from empulse.emby.models import EmbySessionInfo, EmbyUser, EmbyLibrary
 
 logger = logging.getLogger("empulse.emby")
+
+_LINK_LOCAL_NETS = [
+    ipaddress.ip_network("169.254.0.0/16"),  # IPv4 link-local / cloud metadata
+    ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
+]
+
+
+def _resolve_ips(hostname: str) -> list:
+    """Resolve hostname to IP addresses; empty list if resolution fails."""
+    try:
+        results = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+    except socket.gaierror:
+        return []
+    ips = []
+    for *_, sockaddr in results:
+        try:
+            ips.append(ipaddress.ip_address(sockaddr[0]))
+        except ValueError:
+            pass
+    return ips
+
+
+def validate_emby_url() -> None:
+    """Refuse to boot on an unsafe EMBY_URL (S-2 key-in-clear, E-4 metadata SSRF).
+
+    Self-hosted Emby normally lives on loopback or a private LAN over plain HTTP,
+    so those stay allowed. Only the genuinely dangerous cases are blocked:
+    plaintext HTTP to a *public* host (API key sent unencrypted over the WAN) and
+    resolution to the link-local / cloud-metadata range. Both have env overrides.
+    If the host can't be resolved yet (e.g. DNS not ready at container start) we
+    stay lenient rather than block a legitimate start-up.
+    """
+    parsed = urlparse(settings.emby_url)
+    host = parsed.hostname or ""
+    if not host:
+        raise RuntimeError(f"EMBY_URL '{settings.emby_url}' has no hostname")
+
+    ips = _resolve_ips(host)
+    is_loopback = host == "localhost" or any(ip.is_loopback for ip in ips)
+    is_private = any(ip.is_private for ip in ips)  # RFC1918 + loopback + link-local
+    is_public = bool(ips) and not is_loopback and not is_private
+
+    if not settings.emby_allow_private and any(
+        ip in net for ip in ips for net in _LINK_LOCAL_NETS
+    ):
+        raise RuntimeError(
+            f"EMBY_URL '{settings.emby_url}' resolves to the link-local/metadata "
+            "range (169.254.0.0/16) — a common SSRF target, not a real Emby server. "
+            "Set EMBY_ALLOW_PRIVATE=1 to override."
+        )
+
+    if (
+        parsed.scheme == "http"
+        and is_public
+        and not settings.emby_allow_insecure
+    ):
+        raise RuntimeError(
+            f"EMBY_URL '{settings.emby_url}' uses plain http:// to public host "
+            f"'{host}' — the Emby API key would be sent unencrypted over the "
+            "internet. Use https:// or set EMBY_ALLOW_INSECURE=1 to override."
+        )
 
 
 class EmbyClient:

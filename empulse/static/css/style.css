@@ -196,6 +196,16 @@ nav a.active {
     50% { opacity: 0.4; }
 }
 
+/* Update-available card: integrated accent highlight (no floating stripe) */
+#update-status.update-available {
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-glow);
+}
+
+#update-status .update-heading {
+    color: var(--accent);
+}
+
 /* Hamburger menu */
 .nav-hamburger {
     display: none;

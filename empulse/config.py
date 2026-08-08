@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     disable_update_check: bool = False
     update_check_interval: int = 43200
     api_rate_limit_per_minute: int = 120
+    # EMBY_URL safety overrides (see empulse.emby.client.validate_emby_url).
+    # LAN/loopback over plain HTTP is allowed by default (normal self-hosting);
+    # these only unlock the genuinely risky cases.
+    emby_allow_insecure: bool = False  # allow http:// to a public host (key in clear)
+    emby_allow_private: bool = False  # allow link-local/metadata (169.254.0.0/16)
 
     model_config = {"env_file_encoding": "utf-8"}
 

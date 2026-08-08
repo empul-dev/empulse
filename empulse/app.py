@@ -74,6 +74,10 @@ templates.env.filters["fmt_transcode_reason"] = format_transcode_reason
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from empulse.emby.client import validate_emby_url
+
+    validate_emby_url()  # refuse to boot on an unsafe EMBY_URL (A4: S-2, E-4)
+
     await init_db()
     logger.info("Database initialized")
 
