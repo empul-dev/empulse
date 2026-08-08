@@ -1,6 +1,6 @@
 [project]
 name = "empulse"
-version = "0.2.7"
+version = "0.2.8"
 description = "Activity monitoring for Emby Server"
 requires-python = ">=3.11"
 dependencies = [
@@ -13,6 +13,7 @@ dependencies = [
     "jinja2~=3.1",
     "python-dotenv~=1.0",
     "python-multipart~=0.0.18",
+    "cryptography~=44.0",
 ]
 
 [project.optional-dependencies]

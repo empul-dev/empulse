@@ -522,14 +522,22 @@ async def get_plays_by_hour(
     return [dict(r) for r in rows]
 
 
-async def get_plays_per_month(db: aiosqlite.Connection, months: int = 12) -> list[dict]:
+async def get_plays_per_month(
+    db: aiosqlite.Connection, months: int | None = 12, days: int | None = None
+) -> list[dict]:
+    if days is not None:
+        window = f"-{days} days"
+    else:
+        safe_months = months if months is not None else 12
+        window = f"-{safe_months} months"
+
     cursor = await db.execute(
         """SELECT strftime('%Y-%m', started_at) as month,
-                  COUNT(*) as plays, SUM(duration_seconds) as total_duration
+                  COUNT(*) as plays, COALESCE(SUM(duration_seconds), 0) as total_duration
            FROM history
            WHERE started_at >= datetime('now', ?)
            GROUP BY month ORDER BY month""",
-        [f"-{months} months"],
+        [window],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]

@@ -96,6 +96,62 @@ class TestTokens:
         assert hash_token(token) == h  # deterministic
 
 
+class TestLoginRateLimiter:
+    """S-1: account-level lockout, independent of source IP."""
+
+    def _limiter(self):
+        from empulse.web.auth import LoginRateLimiter
+        return LoginRateLimiter(max_attempts=1000, window_seconds=300)
+
+    def test_account_locks_after_max_attempts_regardless_of_ip(self):
+        limiter = self._limiter()
+        # 5 failures for "alice" from 5 different IPs
+        for i in range(5):
+            assert not limiter.is_limited(f"10.0.0.{i}", "alice")
+            limiter.record(f"10.0.0.{i}", "alice")
+
+        # A brand-new IP is still blocked because the account itself is locked
+        assert limiter.is_limited("10.0.0.99", "alice")
+        # A different account is unaffected
+        assert not limiter.is_limited("10.0.0.99", "bob")
+
+    def test_lockout_is_case_insensitive_on_username(self):
+        limiter = self._limiter()
+        for i in range(5):
+            limiter.record(f"10.0.0.{i}", "Alice")
+        assert limiter.is_limited("10.0.0.99", "alice")
+        assert limiter.is_limited("10.0.0.99", "ALICE")
+
+    def test_lockout_duration_escalates_on_repeat_offense(self):
+        limiter = self._limiter()
+
+        def _lock_account():
+            for i in range(5):
+                limiter.record(f"192.168.0.{i}", "carol")
+
+        _lock_account()
+        first_until = limiter._account_lockouts["carol"]
+        first_duration = first_until - time.time()
+        assert 14 * 60 < first_duration <= 15 * 60
+
+        # Force the lock to have expired, then trigger a second lockout
+        limiter._account_lockouts["carol"] = time.time() - 1
+        _lock_account()
+        second_until = limiter._account_lockouts["carol"]
+        second_duration = second_until - time.time()
+        assert 59 * 60 < second_duration <= 60 * 60
+        assert second_duration > first_duration
+
+    def test_successful_login_resets_lockout(self):
+        limiter = self._limiter()
+        for i in range(5):
+            limiter.record(f"10.0.0.{i}", "dave")
+        assert limiter.is_limited("10.0.0.99", "dave")
+
+        limiter.reset("10.0.0.0", "dave")
+        assert not limiter.is_limited("10.0.0.99", "dave")
+
+
 def _make_test_app(auth_password="", emby_api_key="", secret_key="testsecret"):
     """Helper to create a test app with given settings."""
     with patch("empulse.app.init_db", new_callable=AsyncMock), \

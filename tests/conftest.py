@@ -29,6 +29,19 @@ async def db():
     await conn.close()
 
 
+@pytest.fixture(autouse=True)
+def _reset_api_rate_limiter():
+    """`api_limiter` (D-1) is a module-level singleton keyed per user_id.
+
+    Without a reset, requests accumulate across the whole test session (many
+    tests reuse the same "__admin__" fixture user) and could eventually start
+    returning 429s to unrelated tests. Clear it before every test."""
+    from empulse.web.rate_limit import api_limiter
+    api_limiter._requests.clear()
+    yield
+    api_limiter._requests.clear()
+
+
 @pytest.fixture
 def sample_emby_session_data():
     """Raw Emby session JSON as dict."""

@@ -89,3 +89,18 @@ class TestActivityProcessor:
         assert len(rows) == 1
         assert rows[0]["watched"] == 1
         assert rows[0]["percent_complete"] == 90.0
+
+    @pytest.mark.asyncio
+    async def test_transcode_reasons_captured_in_stream_info(self, processor, db, sample_emby_episode_data):
+        import json
+
+        proc, tracker = processor
+        session = self._make_session(sample_emby_episode_data)
+
+        await proc.process_sessions([session])
+        await proc.process_sessions([])  # stop -> flush to history
+
+        rows = await history_db.get_history(db)
+        assert len(rows) == 1
+        info = json.loads(rows[0]["stream_info"])
+        assert info["transcode"]["reasons"] == ["ContainerNotSupported"]

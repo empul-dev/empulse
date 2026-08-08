@@ -70,15 +70,22 @@ def verify_session_token(token: str, secret: str) -> SessionUser | None:
 
 
 class LoginRateLimiter:
-    """In-memory rate limiter for login attempts (IP + account-level)."""
+    """In-memory rate limiter for login attempts (IP + account-level).
+
+    Account-level protection is a real lockout, not just a rate limit: after
+    `max_account_attempts` failures within `account_window_seconds` for a
+    given username — regardless of source IP — the account is locked for an
+    escalating duration (`LOCK_DURATIONS`, indexed by repeat-offense count).
+    """
 
     MAX_TRACKED_KEYS = 10_000
+    LOCK_DURATIONS = (15 * 60, 60 * 60, 24 * 60 * 60)  # 15m -> 1h -> 24h
 
     def __init__(
         self,
         max_attempts: int = 5,
         window_seconds: int = 300,
-        max_account_attempts: int = 10,
+        max_account_attempts: int = 5,
         account_window_seconds: int = 600,
     ):
         self.max_attempts = max_attempts
@@ -86,6 +93,8 @@ class LoginRateLimiter:
         self.max_account_attempts = max_account_attempts
         self.account_window = account_window_seconds
         self._attempts: dict[str, list[float]] = defaultdict(list)
+        self._account_lockouts: dict[str, float] = {}
+        self._account_strikes: dict[str, int] = defaultdict(int)
 
     def _key_limited(self, key: str, max_att: int, window: int) -> bool:
         now = time.time()
@@ -93,24 +102,38 @@ class LoginRateLimiter:
         return len(self._attempts[key]) >= max_att
 
     def is_limited(self, ip: str, username: str = "") -> bool:
+        now = time.time()
         if len(self._attempts) > self.MAX_TRACKED_KEYS:
-            self._cleanup(time.time())
+            self._cleanup(now)
         if self._key_limited(f"ip:{ip}", self.max_attempts, self.window):
             return True
-        if username and self._key_limited(
-            f"user:{username.lower()}", self.max_account_attempts, self.account_window
-        ):
-            return True
+        if username:
+            locked_until = self._account_lockouts.get(username.lower())
+            if locked_until and now < locked_until:
+                return True
         return False
 
     def record(self, ip: str, username: str = ""):
         now = time.time()
         self._attempts[f"ip:{ip}"].append(now)
         if username:
-            self._attempts[f"user:{username.lower()}"].append(now)
+            uname = username.lower()
+            key = f"user:{uname}"
+            self._attempts[key].append(now)
+            if self._key_limited(key, self.max_account_attempts, self.account_window):
+                strike = self._account_strikes[uname]
+                duration = self.LOCK_DURATIONS[min(strike, len(self.LOCK_DURATIONS) - 1)]
+                self._account_lockouts[uname] = now + duration
+                self._account_strikes[uname] = strike + 1
+                self._attempts[key] = []
 
-    def reset(self, ip: str):
+    def reset(self, ip: str, username: str = ""):
         self._attempts.pop(f"ip:{ip}", None)
+        if username:
+            uname = username.lower()
+            self._attempts.pop(f"user:{uname}", None)
+            self._account_lockouts.pop(uname, None)
+            self._account_strikes.pop(uname, None)
 
     def _cleanup(self, now: float):
         max_window = max(self.window, self.account_window)
@@ -118,6 +141,10 @@ class LoginRateLimiter:
                    if not ts or now - ts[-1] > max_window]
         for k in expired:
             del self._attempts[k]
+        expired_locks = [u for u, until in self._account_lockouts.items() if now > until]
+        for u in expired_locks:
+            self._account_lockouts.pop(u, None)
+            self._account_strikes.pop(u, None)
 
 
 login_limiter = LoginRateLimiter()
@@ -210,6 +237,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
             for method, prefix in ADMIN_METHODS_ROUTES:
                 if request.method == method and path.startswith(prefix):
                     return self._forbidden(request)
+
+        # Rate limit authenticated API usage per user (unauth'd /api paths are
+        # already excluded above via EXCLUDED_PREFIXES).
+        if path.startswith("/api/"):
+            from empulse.web.rate_limit import api_limiter
+
+            if api_limiter.is_limited(session_user.user_id):
+                return Response(status_code=429, headers={"Retry-After": "60"})
+            api_limiter.record(session_user.user_id)
 
         request.state.user = session_user
         return await call_next(request)

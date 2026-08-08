@@ -21,3 +21,5 @@ tasks/
 .DS_Store
 CLAUDE.md
 SPECS.md
+docs/SECURITY-STRIDE.md
+docs/SECURITY-ACTION-PLAN.md

@@ -246,6 +246,54 @@ async def _migrate(db: aiosqlite.Connection):
 
     await db.commit()
 
+    await _encrypt_legacy_secrets(db)
+
+
+async def _encrypt_legacy_secrets(db: aiosqlite.Connection):
+    """One-time upgrade pass: encrypt any plaintext notification/newsletter
+    secrets left over from before secrets were encrypted at rest. Safe to run
+    on every boot — encrypt_secret / encrypt_channel_config are idempotent for
+    values that are already encrypted."""
+    import json as _json
+
+    from empulse.crypto import encrypt_secret
+    from empulse.notifications.secrets import (
+        CHANNEL_SECRET_FIELDS,
+        encrypt_channel_config,
+    )
+
+    cursor = await db.execute("SELECT id, channel_type, config FROM notification_channels")
+    rows = await cursor.fetchall()
+    for row in rows:
+        channel_type = row["channel_type"]
+        if channel_type not in CHANNEL_SECRET_FIELDS:
+            continue
+        try:
+            config = _json.loads(row["config"] or "{}")
+        except (_json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(config, dict):
+            continue
+        encrypted = encrypt_channel_config(channel_type, config)
+        if encrypted != config:
+            await db.execute(
+                "UPDATE notification_channels SET config = ? WHERE id = ?",
+                [_json.dumps(encrypted), row["id"]],
+            )
+            logger.info(f"Migration: encrypted secrets for notification channel {row['id']}")
+
+    cursor = await db.execute("SELECT smtp_pass FROM newsletter_config WHERE id = 1")
+    row = await cursor.fetchone()
+    if row and row["smtp_pass"]:
+        encrypted_pass = encrypt_secret(row["smtp_pass"])
+        if encrypted_pass != row["smtp_pass"]:
+            await db.execute(
+                "UPDATE newsletter_config SET smtp_pass = ? WHERE id = 1", [encrypted_pass]
+            )
+            logger.info("Migration: encrypted newsletter SMTP password")
+
+    await db.commit()
+
 
 def get_db() -> aiosqlite.Connection:
     assert _db is not None, "Database not initialized"

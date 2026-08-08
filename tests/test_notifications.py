@@ -163,6 +163,204 @@ class TestNotificationSecretHandling:
         assert merged["method"] == "POST"
 
 
+class TestSecretEncryption:
+    """I-1: notification channel / newsletter secrets are encrypted at rest."""
+
+    def test_roundtrip(self):
+        from empulse.crypto import decrypt_secret, encrypt_secret
+
+        encrypted = encrypt_secret("hunter2")
+        assert encrypted != "hunter2"
+        assert encrypted.startswith("enc:v1:")
+        assert decrypt_secret(encrypted) == "hunter2"
+
+    def test_empty_value_passes_through(self):
+        from empulse.crypto import decrypt_secret, encrypt_secret
+
+        assert encrypt_secret("") == ""
+        assert encrypt_secret(None) == ""
+        assert decrypt_secret("") == ""
+
+    def test_legacy_plaintext_passes_through_unchanged(self):
+        from empulse.crypto import decrypt_secret
+
+        # Value without the enc:v1: prefix is treated as pre-migration plaintext.
+        assert decrypt_secret("plain-old-secret") == "plain-old-secret"
+
+    def test_undecryptable_token_fails_closed(self):
+        # A valid enc:v1: token that can't be decrypted (e.g. after SECRET_KEY
+        # rotation) must return "" — never the ciphertext, which would leak
+        # enc:v1:… as the literal credential to the channel.
+        from empulse.crypto import decrypt_secret
+
+        bogus = "enc:v1:gAAAAABmnot-a-real-token"
+        assert decrypt_secret(bogus) == ""
+
+    def test_encrypt_is_idempotent(self):
+        from empulse.crypto import encrypt_secret
+
+        once = encrypt_secret("hunter2")
+        twice = encrypt_secret(once)
+        assert once == twice
+
+    def test_encrypt_decrypt_channel_config_roundtrip(self):
+        from empulse.notifications.secrets import (
+            decrypt_channel_config,
+            encrypt_channel_config,
+        )
+
+        config = {"bot_token": "abc123", "chat_id": "999"}
+        encrypted = encrypt_channel_config("telegram", config)
+        assert encrypted["bot_token"] != "abc123"
+        assert encrypted["bot_token"].startswith("enc:v1:")
+        assert encrypted["chat_id"] == "999"  # non-secret field untouched
+
+        decrypted = decrypt_channel_config("telegram", encrypted)
+        assert decrypted["bot_token"] == "abc123"
+
+    def test_encrypt_decrypt_webhook_headers_dict(self):
+        from empulse.notifications.secrets import (
+            decrypt_channel_config,
+            encrypt_channel_config,
+        )
+
+        config = {
+            "url": "https://example.com/hook",
+            "headers": {"Authorization": "Bearer secret-token"},
+            "method": "POST",
+        }
+        encrypted = encrypt_channel_config("webhook", config)
+        assert isinstance(encrypted["headers"], str)
+        assert "secret-token" not in encrypted["headers"]
+        assert encrypted["method"] == "POST"
+
+        decrypted = decrypt_channel_config("webhook", encrypted)
+        assert decrypted["headers"] == {"Authorization": "Bearer secret-token"}
+
+    @pytest.mark.asyncio
+    async def test_created_channel_stores_encrypted_secret_in_db(self, db):
+        """End-to-end through the API write path."""
+        from unittest.mock import AsyncMock, patch
+
+        from empulse.app import create_app
+
+        with (
+            patch("empulse.app.init_db", new_callable=AsyncMock),
+            patch("empulse.app.settings") as mock_settings,
+        ):
+            mock_settings.emby_api_key = ""
+            mock_settings.emby_url = "http://localhost:8096"
+            mock_settings.auth_password = "testpass"
+            mock_settings.secret_key = "testsecret"
+            mock_settings.disable_update_check = True
+            mock_settings.update_check_interval = 43200
+
+            app = create_app()
+
+        from datetime import datetime, timedelta, timezone
+
+        from empulse.web.auth import (
+            COOKIE_NAME,
+            SESSION_MAX_AGE,
+            create_session_token,
+            hash_token,
+        )
+
+        token = create_session_token("testsecret", "__admin__", "admin")
+        now = datetime.now(timezone.utc)
+        expires = now + timedelta(seconds=SESSION_MAX_AGE)
+        await db.execute(
+            "INSERT INTO login_sessions (token_hash, emby_user_id, username, role, created_at, expires_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            [hash_token(token), None, "TestAdmin", "admin", now.isoformat(), expires.isoformat()],
+        )
+        await db.commit()
+
+        from httpx import ASGITransport, AsyncClient
+
+        with (
+            patch("empulse.web.router.get_db", return_value=db),
+            patch("empulse.web.api.get_db", return_value=db),
+            patch("empulse.database.get_db", return_value=db),
+        ):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(
+                transport=transport, base_url="http://test", headers={"Origin": "http://test"}
+            ) as ac:
+                ac.cookies.set(COOKIE_NAME, token)
+                r = await ac.post(
+                    "/api/notification-channels",
+                    json={
+                        "name": "My Telegram",
+                        "channel_type": "telegram",
+                        "config": {"bot_token": "abc123", "chat_id": "999"},
+                        "triggers": ["playback_start"],
+                        "enabled": True,
+                    },
+                )
+                assert r.status_code == 201
+
+        cursor = await db.execute("SELECT config FROM notification_channels")
+        row = await cursor.fetchone()
+        stored_config = json.loads(row["config"])
+        assert stored_config["bot_token"].startswith("enc:v1:")
+        assert "abc123" not in row["config"]
+
+
+class TestNotificationRedaction:
+    """I-3: notification failure messages don't leak secrets into logs."""
+
+    def test_scrub_query_param_tokens(self):
+        from empulse.notifications._redact import scrub
+
+        text = "Request to https://example.com/hook?token=abc123&user=bob failed"
+        scrubbed = scrub(text)
+        assert "abc123" not in scrubbed
+        assert "token=***" in scrubbed
+
+    def test_scrub_telegram_bot_token(self):
+        from empulse.notifications._redact import scrub
+
+        text = "POST https://api.telegram.org/bot123456:AAFsecretvalue/sendMessage failed"
+        scrubbed = scrub(text)
+        assert "AAFsecretvalue" not in scrubbed
+
+    def test_scrub_discord_webhook_token(self):
+        from empulse.notifications._redact import scrub
+
+        text = "https://discord.com/api/webhooks/123456789/superSecretToken failed with 401"
+        scrubbed = scrub(text)
+        assert "superSecretToken" not in scrubbed
+
+    @pytest.mark.asyncio
+    async def test_dispatch_failure_log_is_scrubbed(self, db, engine, caplog):
+        import logging
+
+        channel = {
+            "id": 1,
+            "name": "Bad Webhook",
+            "channel_type": "webhook",
+            "config": json.dumps({"url": "https://example.com/hook?token=leak-me-1234"}),
+        }
+        with (
+            caplog.at_level(logging.ERROR, logger="empulse.notifications"),
+            pytest.MonkeyPatch.context() as mp,
+        ):
+            async def _boom(*a, **k):
+                raise ValueError("failed for url https://example.com/hook?token=leak-me-1234")
+
+            from empulse.notifications.channels import webhook as webhook_mod
+            mp.setattr(webhook_mod, "send_webhook", _boom)
+
+            await engine._dispatch(channel, "playback_start", {"user_name": "Alice", "item_name": "Movie"})
+
+        assert "leak-me-1234" not in caplog.text
+
+        cursor = await db.execute("SELECT error FROM notification_log")
+        row = await cursor.fetchone()
+        assert "leak-me-1234" not in (row["error"] or "")
+
+
 class TestWebhookTemplate:
     def test_apply_template(self):
         from empulse.notifications.channels.webhook import _apply_template
@@ -323,7 +521,11 @@ class TestNewsletter:
         })
 
         config = await get_newsletter_config(db)
-        assert config["smtp_pass"] == "original-secret"
+        from empulse.crypto import decrypt_secret
+
+        # Stored encrypted at rest (I-1) — decrypt to compare the real value.
+        assert config["smtp_pass"] != "original-secret"
+        assert decrypt_secret(config["smtp_pass"]) == "original-secret"
         assert config["schedule"] == "daily"
 
     @pytest.mark.asyncio

@@ -8,6 +8,7 @@ from empulse.formatting import (
     format_time,
     format_datetime,
     format_last_seen,
+    format_transcode_reason,
     get_dow_labels,
     get_dow_order,
     get_hour_label,
@@ -189,3 +190,23 @@ def test_tz_offset_utc():
 def test_tz_offset_nonzero():
     offset = get_tz_offset_hours("Asia/Kolkata")
     assert offset == 5.5
+
+
+# ── Transcode reason labels ─────────────────────────────────────────────────
+
+
+def test_format_transcode_reason_known_code():
+    assert format_transcode_reason("VideoBitrateNotSupported") == "Video bitrate not supported"
+
+
+def test_format_transcode_reason_container():
+    assert format_transcode_reason("ContainerNotSupported") == "Container not supported"
+
+
+def test_format_transcode_reason_unknown_code_falls_back_to_split():
+    # Not in the curated map — still humanized via PascalCase splitting.
+    assert format_transcode_reason("SomeFutureEmbyReason") == "Some future emby reason"
+
+
+def test_format_transcode_reason_empty():
+    assert format_transcode_reason("") == ""

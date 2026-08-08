@@ -128,6 +128,13 @@ All settings are via environment variables (in `.env` or `docker-compose.yml`):
 
 - This is expected today. Empulse clears existing login sessions on startup, so you need to sign in again after each restart.
 
+## Secrets & Key Rotation
+
+Notification channel credentials (webhook URLs/headers, SMTP passwords, Telegram bot tokens, etc.) are encrypted at rest, using a key derived from `SECRET_KEY`. This means:
+
+- Rotating `SECRET_KEY` (deleting `.empulse_secret` or changing the env var) invalidates previously-encrypted secrets — after rotating, re-enter credentials for any notification channels and the newsletter SMTP password.
+- Session tokens are also signed with `SECRET_KEY`, so rotating it logs everyone out as well.
+
 ## Features
 
 - **Live Activity** -- Active streams in real-time with player, quality, and transcode details
