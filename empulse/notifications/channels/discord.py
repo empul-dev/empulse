@@ -9,6 +9,7 @@ EVENT_COLORS = {
     "playback_resume": 0x3498DB,  # blue
     "watched": 0xF1C40F,          # gold
     "transcode": 0x9B59B6,        # purple
+    "new_media": 0x1ABC9C,        # teal
 }
 
 EVENT_LABELS = {
@@ -18,6 +19,7 @@ EVENT_LABELS = {
     "playback_resume": "Playback Resumed",
     "watched": "Watched",
     "transcode": "Transcode Detected",
+    "new_media": "New Media Added",
 }
 
 
@@ -35,10 +37,9 @@ async def send_discord(config: dict, event_type: str, data: dict):
     if series:
         title = f"{series} - {title}"
 
-    fields = [
-        {"name": "User", "value": data.get("user_name", "Unknown"), "inline": True},
-        {"name": "Title", "value": title, "inline": True},
-    ]
+    fields = [{"name": "Title", "value": title, "inline": True}]
+    if data.get("user_name"):
+        fields.insert(0, {"name": "User", "value": data["user_name"], "inline": True})
 
     if data.get("play_method"):
         fields.append({"name": "Play Method", "value": data["play_method"], "inline": True})

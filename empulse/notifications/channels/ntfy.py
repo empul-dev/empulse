@@ -9,6 +9,7 @@ EVENT_LABELS = {
     "playback_resume": "Playback Resumed",
     "watched": "Watched",
     "transcode": "Transcode Detected",
+    "new_media": "New Media Added",
 }
 
 EVENT_TAGS = {
@@ -18,6 +19,7 @@ EVENT_TAGS = {
     "playback_resume": "arrow_forward",
     "watched": "white_check_mark",
     "transcode": "arrows_counterclockwise",
+    "new_media": "new",
 }
 
 
@@ -34,10 +36,12 @@ async def send_ntfy(config: dict, event_type: str, data: dict):
     if series:
         title_text = f"{series} - {title_text}"
 
-    user = data.get("user_name", "Unknown")
     label = EVENT_LABELS.get(event_type, event_type)
 
-    body_lines = [f"User: {user}", f"Title: {title_text}"]
+    body_lines = []
+    if data.get("user_name"):
+        body_lines.append(f"User: {data['user_name']}")
+    body_lines.append(f"Title: {title_text}")
     if data.get("play_method"):
         body_lines.append(f"Play Method: {data['play_method']}")
     if data.get("client"):

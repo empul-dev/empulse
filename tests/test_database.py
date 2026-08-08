@@ -391,24 +391,6 @@ class TestStats:
         assert top[0]["plays"] == 5
 
     @pytest.mark.asyncio
-    async def test_most_played(self, db):
-        for i in range(3):
-            await history_db.insert_history(db, {
-                "session_key": f"s{i}", "item_id": "movie1", "item_name": "Popular Movie",
-                "item_type": "Movie",
-                "started_at": "2024-01-01T12:00:00", "stopped_at": "2024-01-01T14:00:00",
-            })
-        await history_db.insert_history(db, {
-            "session_key": "s99", "item_id": "movie2", "item_name": "Less Popular",
-            "item_type": "Movie",
-            "started_at": "2024-01-01T12:00:00", "stopped_at": "2024-01-01T14:00:00",
-        })
-
-        top = await stats_db.get_most_played(db, limit=10)
-        assert top[0]["item_name"] == "Popular Movie"
-        assert top[0]["plays"] == 3
-
-    @pytest.mark.asyncio
     async def test_plays_by_type(self, db):
         await history_db.insert_history(db, {
             "session_key": "s1", "item_type": "Movie",

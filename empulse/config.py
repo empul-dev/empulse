@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # these only unlock the genuinely risky cases.
     emby_allow_insecure: bool = False  # allow http:// to a public host (key in clear)
     emby_allow_private: bool = False  # allow link-local/metadata (169.254.0.0/16)
+    # "Recently Added" notifications (new_media event via Emby LibraryChanged)
+    new_media_max_age_minutes: int = 120  # skip items whose DateCreated is older (rescans)
+    new_media_debounce_seconds: int = 15  # collect LibraryChanged IDs before fetching
+    new_media_batch_cap: int = 20  # over this many new items -> one aggregated notification
 
     model_config = {"env_file_encoding": "utf-8"}
 

@@ -141,6 +141,52 @@ class TestNotificationEngine:
         assert len(channels) == 2
 
 
+class TestNewMedia:
+    @pytest.mark.asyncio
+    async def test_build_summary_single(self, engine):
+        summary = engine._build_summary("new_media", {"item_name": "Some Movie"})
+        assert summary == "New: Some Movie"
+        assert "Unknown" not in summary
+
+    @pytest.mark.asyncio
+    async def test_build_summary_batch(self, engine):
+        summary = engine._build_summary(
+            "new_media", {"item_name": "37 new items added", "item_type": "Batch"}
+        )
+        assert summary == "New: 37 new items added"
+        assert "Unknown" not in summary
+
+    def test_select_new_items_drops_stale(self):
+        from empulse.emby.websocket import _select_new_items
+        from datetime import datetime, timezone
+
+        now = datetime(2026, 8, 8, 12, 0, 0, tzinfo=timezone.utc)
+        items = [
+            {"Id": "1", "Name": "Fresh", "Type": "Movie",
+             "DateCreated": "2026-08-08T11:59:00.0000000Z"},
+            {"Id": "2", "Name": "Rescanned", "Type": "Movie",
+             "DateCreated": "2020-01-01T00:00:00.0000000Z"},
+            {"Id": "3", "Name": "Season folder", "Type": "Season",
+             "DateCreated": "2026-08-08T11:59:00.0000000Z"},
+        ]
+        events = _select_new_items(items, now, max_age_minutes=120, cap=20)
+        assert len(events) == 1
+        assert events[0]["item_name"] == "Fresh"
+
+    def test_select_new_items_aggregates_over_cap(self):
+        from empulse.emby.websocket import _select_new_items
+        from datetime import datetime, timezone
+
+        now = datetime(2026, 8, 8, 12, 0, 0, tzinfo=timezone.utc)
+        items = [
+            {"Id": str(i), "Name": f"M{i}", "Type": "Movie",
+             "DateCreated": "2026-08-08T11:59:00.0000000Z"}
+            for i in range(5)
+        ]
+        events = _select_new_items(items, now, max_age_minutes=120, cap=2)
+        assert events == [{"item_name": "5 new items added", "item_type": "Batch"}]
+
+
 class TestNotificationSecretHandling:
     def test_redact_channel_masks_secret_config_fields(self):
         channel = {

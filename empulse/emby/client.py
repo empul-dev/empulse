@@ -130,7 +130,8 @@ class EmbyClient:
                 "Fields": "Overview,People,Genres,Studios,CommunityRating,CriticRating,"
                           "OfficialRating,ProductionYear,PremiereDate,ExternalUrls,"
                           "ProviderIds,MediaStreams,RunTimeTicks,Taglines,OriginalTitle,"
-                          "SeriesName,SeriesId,ParentIndexNumber,IndexNumber,ParentId",
+                          "SeriesName,SeriesId,ParentIndexNumber,IndexNumber,ParentId,"
+                "DateCreated",
             },
         )
         r.raise_for_status()

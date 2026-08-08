@@ -737,15 +737,3 @@ async def get_watch_heatmap(
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
-
-
-async def get_most_played(db: aiosqlite.Connection, limit: int = 10) -> list[dict]:
-    cursor = await db.execute(
-        """SELECT item_name, series_name, item_type, year, COUNT(*) as plays,
-                  SUM(duration_seconds) as total_duration
-           FROM history GROUP BY item_id
-           ORDER BY plays DESC LIMIT ?""",
-        [limit],
-    )
-    rows = await cursor.fetchall()
-    return [dict(r) for r in rows]

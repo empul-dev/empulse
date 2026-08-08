@@ -15,6 +15,7 @@ EVENT_TYPES = [
     "playback_resume",
     "watched",
     "transcode",
+    "new_media",
 ]
 
 CACHE_TTL = 60  # seconds
@@ -124,11 +125,14 @@ class NotificationEngine:
         await self._log(channel["id"], event_type, summary, status, error)
 
     def _build_summary(self, event_type: str, data: dict) -> str:
-        user = data.get("user_name", "Unknown")
         title = data.get("item_name", "Unknown")
         series = data.get("series_name")
         if series:
             title = f"{series} - {title}"
+        if event_type == "new_media":
+            # No user for library additions; item_name may be an aggregate label.
+            return f"New: {title}"
+        user = data.get("user_name", "Unknown")
         labels = {
             "playback_start": "started",
             "playback_stop": "stopped",

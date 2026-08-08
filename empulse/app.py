@@ -153,7 +153,7 @@ async def lifespan(app: FastAPI):
 
         from empulse.emby.websocket import EmbyWebSocket
 
-        emby_ws = EmbyWebSocket(poller)
+        emby_ws = EmbyWebSocket(poller, emby_client, notification_engine)
         ws_task = asyncio.create_task(emby_ws.run())
         app.state.emby_ws = emby_ws
         logger.info("Emby WebSocket listener started")

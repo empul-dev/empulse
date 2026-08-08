@@ -14,6 +14,7 @@ EVENT_LABELS = {
     "playback_resume": "Playback Resumed",
     "watched": "Watched",
     "transcode": "Transcode Detected",
+    "new_media": "New Media Added",
 }
 
 
@@ -28,13 +29,10 @@ def _build_title(event_type: str, data: dict) -> str:
 def _build_plain(event_type: str, data: dict) -> str:
     label = EVENT_LABELS.get(event_type, event_type)
     title = _build_title(event_type, data)
-    user = data.get("user_name", "Unknown")
-    lines = [
-        f"{label}",
-        "",
-        f"User: {user}",
-        f"Title: {title}",
-    ]
+    lines = [f"{label}", ""]
+    if data.get("user_name"):
+        lines.append(f"User: {data['user_name']}")
+    lines.append(f"Title: {title}")
     if data.get("play_method"):
         lines.append(f"Play Method: {data['play_method']}")
     if data.get("client"):
@@ -52,12 +50,11 @@ def _build_plain(event_type: str, data: dict) -> str:
 def _build_html(event_type: str, data: dict) -> str:
     label = escape(EVENT_LABELS.get(event_type, event_type))
     title = escape(_build_title(event_type, data))
-    user = escape(data.get("user_name", "Unknown"))
 
-    rows = [
-        f"<tr><td><b>User</b></td><td>{user}</td></tr>",
-        f"<tr><td><b>Title</b></td><td>{title}</td></tr>",
-    ]
+    rows = []
+    if data.get("user_name"):
+        rows.append(f"<tr><td><b>User</b></td><td>{escape(str(data['user_name']))}</td></tr>")
+    rows.append(f"<tr><td><b>Title</b></td><td>{title}</td></tr>")
     if data.get("play_method"):
         rows.append(f"<tr><td><b>Play Method</b></td><td>{escape(str(data['play_method']))}</td></tr>")
     if data.get("client"):

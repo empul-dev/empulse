@@ -7,6 +7,7 @@ EVENT_LABELS = {
     "playback_resume": "▶️ Playback Resumed",
     "watched": "✅ Watched",
     "transcode": "🔄 Transcode Detected",
+    "new_media": "🆕 New Media Added",
 }
 
 
@@ -17,14 +18,10 @@ def _build_message(event_type: str, data: dict) -> str:
     if series:
         title = f"{series} \\- {title}"
 
-    user = data.get("user_name", "Unknown")
-
-    lines = [
-        f"*{label}*",
-        "",
-        f"👤 *User:* {_escape(user)}",
-        f"🎬 *Title:* {_escape(title)}",
-    ]
+    lines = [f"*{label}*", ""]
+    if data.get("user_name"):
+        lines.append(f"👤 *User:* {_escape(data['user_name'])}")
+    lines.append(f"🎬 *Title:* {_escape(title)}")
 
     if data.get("play_method"):
         lines.append(f"📡 *Play Method:* {_escape(data['play_method'])}")
