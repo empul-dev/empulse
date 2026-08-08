@@ -9,6 +9,11 @@ from empulse.db import history as history_db, users as users_db
 
 logger = logging.getLogger("empulse.processor")
 
+# Live TV has no fixed runtime, so progress/watched stats are meaningless and
+# the "watched" duration balloons to absurd values. Emby types these items as
+# TvChannel; ignore them entirely so they never reach history.
+LIVE_TV_ITEM_TYPES = {"TvChannel", "LiveTvChannel", "Program", "Recording"}
+
 
 class ActivityProcessor:
     def __init__(self, state_tracker: SessionStateTracker, db_factory: Callable):
@@ -136,6 +141,7 @@ class ActivityProcessor:
             f"{s.user_id}_{s.device_id}_{s.now_playing_item.id}": s
             for s in emby_sessions
             if s.now_playing_item and s.user_id
+            and s.now_playing_item.type not in LIVE_TV_ITEM_TYPES
         }
 
         current_keys = self.state.get_active_keys()

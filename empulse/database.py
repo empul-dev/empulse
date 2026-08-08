@@ -75,6 +75,7 @@ CREATE INDEX IF NOT EXISTS idx_history_user_id ON history(user_id);
 CREATE INDEX IF NOT EXISTS idx_history_item_id ON history(item_id);
 CREATE INDEX IF NOT EXISTS idx_history_started_at ON history(started_at);
 CREATE INDEX IF NOT EXISTS idx_history_item_type ON history(item_type);
+CREATE INDEX IF NOT EXISTS idx_history_user_started ON history(user_id, started_at);
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -225,6 +226,13 @@ async def _migrate(db: aiosqlite.Connection):
     """)
     await db.execute(
         "CREATE INDEX IF NOT EXISTS idx_login_sessions_token ON login_sessions(token_hash)"
+    )
+
+    # D-4: composite index for per-user stats queries (the single-column indexes
+    # ship in SCHEMA; this one covers WHERE user_id = ? ORDER BY started_at).
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_history_user_started "
+        "ON history(user_id, started_at)"
     )
 
     # Ensure display_settings table exists (for pre-existing DBs)

@@ -374,6 +374,29 @@ class TestWebhookTemplate:
         assert parsed["user"] == "Alice"
         assert parsed["title"] == "Movie"
 
+    def test_user_controlled_value_cannot_expand_placeholder(self):
+        # E-5: a username of "{ip}" must NOT expand into the real IP.
+        from empulse.notifications.channels.webhook import _apply_template
+        result = _apply_template(
+            "{user} watched from {ip}",
+            "playback_start",
+            {"user_name": "{ip}", "ip_address": "10.0.0.9"},
+        )
+        assert result == "{ip} watched from 10.0.0.9"
+
+    def test_json_mode_escapes_quotes(self):
+        # E-5: a value with a quote must not break out of its JSON string.
+        from empulse.notifications.channels.webhook import _apply_template
+        result = _apply_template(
+            '{"user": "{user}"}',
+            "playback_start",
+            {"user_name": 'evil", "admin": true, "x": "'},
+            json_mode=True,
+        )
+        parsed = json.loads(result)
+        assert set(parsed) == {"user"}
+        assert parsed["user"] == 'evil", "admin": true, "x": "'
+
 
 class TestEmailChannel:
     def test_build_plain(self):

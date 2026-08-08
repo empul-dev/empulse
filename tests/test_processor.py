@@ -45,6 +45,19 @@ class TestActivityProcessor:
         assert rows[0]["item_name"] == "Test Movie"
 
     @pytest.mark.asyncio
+    async def test_live_tv_sessions_ignored(self, processor, db, sample_emby_session_data):
+        proc, tracker = processor
+        data = dict(sample_emby_session_data)
+        data["NowPlayingItem"] = {**data["NowPlayingItem"], "Type": "TvChannel"}
+        session = self._make_session(data)
+
+        await proc.process_sessions([session])
+        assert len(tracker.get_all_sessions()) == 0
+
+        await proc.process_sessions([])
+        assert len(await history_db.get_history(db)) == 0
+
+    @pytest.mark.asyncio
     async def test_idle_sessions_ignored(self, processor):
         proc, tracker = processor
         idle = self._make_session({

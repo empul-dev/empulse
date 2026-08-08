@@ -1,7 +1,12 @@
 import json
+import re
+
 import httpx
 
 from empulse.notifications.url_validator import validate_outbound_url
+
+# Only these placeholders are ever expanded (E-5: fixed whitelist).
+_PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
 
 
 async def send_webhook(config: dict, event_type: str, data: dict):
@@ -27,9 +32,10 @@ async def send_webhook(config: dict, event_type: str, data: dict):
     # Build body - support template placeholders
     body_template = config.get("body")
     if body_template and isinstance(body_template, str):
-        body = _apply_template(body_template, event_type, data)
         content_type = headers.get("Content-Type", "application/json")
-        if "json" in content_type:
+        json_mode = "json" in content_type
+        body = _apply_template(body_template, event_type, data, json_mode=json_mode)
+        if json_mode:
             try:
                 # Validate it's valid JSON
                 json.loads(body)
@@ -63,21 +69,38 @@ async def send_webhook(config: dict, event_type: str, data: dict):
             r.raise_for_status()
 
 
-def _apply_template(template: str, event_type: str, data: dict) -> str:
-    replacements = {
-        "{event}": event_type,
-        "{user}": data.get("user_name", ""),
-        "{title}": data.get("item_name", ""),
-        "{series}": data.get("series_name", ""),
-        "{type}": data.get("item_type", ""),
-        "{play_method}": data.get("play_method", ""),
-        "{client}": data.get("client", ""),
-        "{device}": data.get("device_name", ""),
-        "{duration}": str(data.get("duration_seconds", 0)),
-        "{percent}": str(data.get("percent_complete", 0)),
-        "{ip}": data.get("ip_address", ""),
+def _apply_template(
+    template: str, event_type: str, data: dict, *, json_mode: bool = False
+) -> str:
+    """Expand {placeholder} tokens from a fixed whitelist in a single pass.
+
+    Single pass (one re.sub) means substituted values are never re-scanned, so a
+    user-controlled value like a username of "{ip}" cannot expand into another
+    field (E-5 template confusion). In json_mode each value is JSON-escaped so a
+    value containing '"' can't break out of its JSON string.
+    """
+    values = {
+        "event": event_type,
+        "user": data.get("user_name", ""),
+        "title": data.get("item_name", ""),
+        "series": data.get("series_name", ""),
+        "type": data.get("item_type", ""),
+        "play_method": data.get("play_method", ""),
+        "client": data.get("client", ""),
+        "device": data.get("device_name", ""),
+        "duration": data.get("duration_seconds", 0),
+        "percent": data.get("percent_complete", 0),
+        "ip": data.get("ip_address", ""),
     }
-    result = template
-    for key, value in replacements.items():
-        result = result.replace(key, str(value) if value is not None else "")
-    return result
+
+    def _sub(m: re.Match) -> str:
+        key = m.group(1)
+        if key not in values:
+            return m.group(0)  # leave unknown placeholders untouched
+        val = values[key]
+        val = "" if val is None else str(val)
+        if json_mode:
+            val = json.dumps(val)[1:-1]  # escape without the surrounding quotes
+        return val
+
+    return _PLACEHOLDER_RE.sub(_sub, template)
