@@ -51,6 +51,17 @@
     </div>
     {% endif %}
 
+    {% if tc.get('reasons') %}
+    <div class="stream-section-label">Transcode Reason{{ 's' if tc.get('reasons') | length > 1 else '' }}</div>
+    <div class="stream-row transcode-reasons">
+        <span class="stream-val" style="grid-column: 1 / -1">
+            {% for reason in tc.get('reasons') %}
+            <span class="transcode-reason-badge">{{ reason | fmt_transcode_reason }}</span>
+            {% endfor %}
+        </span>
+    </div>
+    {% endif %}
+
     {% if video %}
     <div class="stream-section-label">Video
         <span class="stream-decision">{{ record.video_decision or 'direct play' }}</span>

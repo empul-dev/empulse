@@ -11,6 +11,7 @@ from html import escape
 
 import aiosqlite
 
+from empulse.crypto import decrypt_secret, encrypt_secret
 from empulse.db import stats as stats_db
 
 logger = logging.getLogger("empulse.newsletter")
@@ -24,9 +25,11 @@ async def get_newsletter_config(db: aiosqlite.Connection) -> dict | None:
 
 async def save_newsletter_config(db: aiosqlite.Connection, data: dict):
     existing = await get_newsletter_config(db)
-    # Preserve existing password if masked placeholder is sent back
+    # Preserve existing (encrypted) password if masked placeholder is sent back
     if data.get("smtp_pass") == "***" and existing:
         data = {**data, "smtp_pass": existing.get("smtp_pass", "")}
+    else:
+        data = {**data, "smtp_pass": encrypt_secret(data.get("smtp_pass", ""))}
     if existing:
         await db.execute(
             "UPDATE newsletter_config SET enabled=?, schedule=?, day_of_week=?, hour=?, "
@@ -594,7 +597,7 @@ async def send_newsletter(db: aiosqlite.Connection, config: dict, emby_client=No
             smtp_host,
             int(config.get("smtp_port", 587)),
             config.get("smtp_user", ""),
-            config.get("smtp_pass", ""),
+            decrypt_secret(config.get("smtp_pass", "")),
             bool(config.get("smtp_tls", 1)),
             msg["From"],
             recipients,

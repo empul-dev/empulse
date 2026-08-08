@@ -76,6 +76,7 @@ class ActivityProcessor:
                 "audio_channels": tc.audio_channels,
                 "is_video_direct": tc.is_video_direct,
                 "is_audio_direct": tc.is_audio_direct,
+                "reasons": tc.transcode_reasons,
             }
 
         return json.dumps(info) if info else "{}"

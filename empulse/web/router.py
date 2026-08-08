@@ -15,6 +15,7 @@ from empulse.models import UserInfo, HistoryRecord
 from empulse.web.auth import (
     create_session_token, hash_token, COOKIE_NAME, SESSION_MAX_AGE,
 )
+from empulse.web.deps import require_self_or_admin
 
 logger = logging.getLogger("empulse.router")
 
@@ -48,6 +49,8 @@ async def users_page(request: Request):
 
 @router.get("/users/{user_id}")
 async def user_detail(request: Request, user_id: str):
+    if (forbidden := require_self_or_admin(request, user_id)) is not None:
+        return forbidden
     db = get_db()
     user_data = await users_db.get_user(db, user_id)
     if not user_data:
@@ -430,7 +433,7 @@ async def login_submit(
 
     await db.commit()
 
-    login_limiter.reset(client_ip)
+    login_limiter.reset(client_ip, username)
     response = RedirectResponse("/", status_code=302)
     response.set_cookie(
         COOKIE_NAME, token,

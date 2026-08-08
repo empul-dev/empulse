@@ -3,7 +3,6 @@
 
 {% block content %}
 <div class="section-header">
-    <h2>Graphs</h2>
     <div class="stat-controls">
         <div class="toggle-group" id="graph-metric-toggle">
             <button class="toggle-btn active" data-value="plays">Play Count</button>
@@ -77,10 +76,10 @@
     <div class="charts-grid">
         <div class="chart-card wide">
             <div class="chart-header">
-                <span class="chart-title">Plays per Month</span>
-                <span class="chart-desc">Monthly play totals over the past 12 months.</span>
+                <span class="chart-title">Monthly Totals</span>
+                <span class="chart-desc">Calendar-month totals within the selected range.</span>
             </div>
-            <div class="chart-body chart-body-tall"><canvas id="g-monthly" role="img" aria-label="Plays per Month chart"></canvas></div>
+            <div class="chart-body chart-body-tall"><canvas id="g-monthly" role="img" aria-label="Monthly Totals chart"></canvas></div>
         </div>
     </div>
 
@@ -476,7 +475,7 @@ function loadGraphs() {
     });
 
     // --- 4. Monthly ---
-    fetch('/api/charts/plays-per-month?months=12').then(function(r) { return r.json(); }).then(function(data) {
+    fetch('/api/charts/plays-per-month?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
         destroy('monthly');
         var monthlyValues = data.map(pickVal);
         var monthlyTrend = linearRegression(monthlyValues);
@@ -970,15 +969,18 @@ function loadGraphs() {
             var label = document.createElement('span');
             label.className = 'comp-label';
             label.textContent = lbl;
+            var main = document.createElement('div');
+            main.className = 'comp-main';
             var value = document.createElement('span');
             value.className = 'comp-value';
             value.textContent = val + (u || '');
             var dt = document.createElement('span');
             dt.className = 'comp-delta ' + cls(curr, prev);
             dt.textContent = delta(curr, prev);
+            main.appendChild(value);
+            main.appendChild(dt);
             card.appendChild(label);
-            card.appendChild(value);
-            card.appendChild(dt);
+            card.appendChild(main);
             return card;
         }
         el.replaceChildren(

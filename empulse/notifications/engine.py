@@ -3,6 +3,8 @@ import logging
 import time
 from datetime import datetime, timezone
 
+from empulse.notifications._redact import scrub
+from empulse.notifications.secrets import decrypt_channel_config
 
 logger = logging.getLogger("empulse.notifications")
 
@@ -89,6 +91,7 @@ class NotificationEngine:
             config = json.loads(channel.get("config", "{}"))
         except (json.JSONDecodeError, TypeError):
             config = {}
+        config = decrypt_channel_config(channel_type, config)
 
         summary = self._build_summary(event_type, data)
         error = None
@@ -114,8 +117,8 @@ class NotificationEngine:
                 logger.warning(f"Unknown channel type: {channel_type}")
                 return
         except Exception as e:
-            logger.error(f"Notification failed for channel {channel.get('name')}: {e}")
-            error = str(e)[:500]
+            error = scrub(str(e)[:500])
+            logger.error(scrub(f"Notification failed for channel {channel.get('name')}: {e}"))
             status = "failed"
 
         await self._log(channel["id"], event_type, summary, status, error)
@@ -154,6 +157,7 @@ class NotificationEngine:
             config = json.loads(channel.get("config", "{}"))
         except (json.JSONDecodeError, TypeError):
             return False, "Invalid channel config"
+        config = decrypt_channel_config(channel_type, config)
 
         test_data = {
             "user_name": "Test User",
@@ -186,4 +190,4 @@ class NotificationEngine:
                 return False, f"Unknown channel type: {channel_type}"
             return True, "Test notification sent"
         except Exception as e:
-            return False, str(e)
+            return False, scrub(str(e))

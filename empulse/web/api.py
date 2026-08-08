@@ -15,6 +15,8 @@ from empulse.database import get_db
 from empulse.db import history as history_db, stats as stats_db, users as users_db
 from empulse.formatting import DEFAULT_DISPLAY, get_tz_offset_hours
 from empulse.models import SessionInfo, HistoryRecord
+from empulse.notifications import secrets as notification_secrets
+from empulse.web.deps import require_self_or_admin, scoped_user_filter
 from empulse.web.poster_cache import POSTER_WIDTH
 from empulse.web.unwatched import fetch_unwatched_items
 
@@ -78,14 +80,8 @@ logger = logging.getLogger("empulse.api")
 router = APIRouter()
 
 VALID_ID = re.compile(r"^[a-zA-Z0-9_-]+$")
-MASKED_SECRET = "***"
-CHANNEL_SECRET_FIELDS = {
-    "discord": {"url"},
-    "webhook": {"url", "headers"},
-    "email": {"smtp_pass"},
-    "telegram": {"bot_token"},
-    "ntfy": {"auth"},
-}
+MASKED_SECRET = notification_secrets.MASKED_SECRET
+CHANNEL_SECRET_FIELDS = notification_secrets.CHANNEL_SECRET_FIELDS
 
 
 def _get_tz_offset(request: Request) -> float:
@@ -119,7 +115,9 @@ def _redact_channel(channel: dict) -> dict:
     return redacted
 
 
-def _preserve_channel_secrets(channel_type: str, new_config: dict, existing_config: dict) -> dict:
+def _preserve_channel_secrets(
+    channel_type: str, new_config: dict, existing_config: dict
+) -> dict:
     merged = dict(new_config)
     for field in CHANNEL_SECRET_FIELDS.get(channel_type, set()):
         if merged.get(field) == MASKED_SECRET:
@@ -314,6 +312,7 @@ async def history_table(
     search = search[:256]
     per_page = 50
     offset = (page - 1) * per_page
+    user_id = scoped_user_filter(request, user_id) or ""
 
     rows = await history_db.get_history(
         db,
@@ -371,6 +370,8 @@ async def stream_info(request: Request, history_id: int):
     row = await history_db.get_history_by_id(db, history_id)
     if not row:
         return '<p class="empty-state">Record not found</p>'
+    if (forbidden := require_self_or_admin(request, row.get("user_id") or "")) is not None:
+        return forbidden
 
     record = HistoryRecord(**row)
     try:
@@ -394,6 +395,8 @@ async def history_detail(request: Request, history_id: int):
     row = await history_db.get_history_by_id(db, history_id)
     if not row:
         return '<p class="empty-state">Record not found</p>'
+    if (forbidden := require_self_or_admin(request, row.get("user_id") or "")) is not None:
+        return forbidden
 
     record = HistoryRecord(**row)
     try:
@@ -439,6 +442,7 @@ EXPORT_MAX_ROWS = 10_000
 
 @router.get("/export/history")
 async def export_history(
+    request: Request,
     format: str = "csv",
     user_id: str = "",
     item_type: str = "",
@@ -447,6 +451,7 @@ async def export_history(
 ):
     db = get_db()
     search = search[:256]
+    user_id = scoped_user_filter(request, user_id) or ""
     rows = await history_db.get_history(
         db,
         limit=EXPORT_MAX_ROWS,
@@ -630,6 +635,8 @@ async def chart_plays_by_platform(days: int = 30):
 
 @router.get("/charts/user/{user_id}/daily-plays")
 async def chart_user_daily_plays(request: Request, user_id: str, days: int = 30):
+    if (forbidden := require_self_or_admin(request, user_id)) is not None:
+        return forbidden
     days = _clamp_days(days)
     db = get_db()
     rows = await stats_db.get_user_plays_per_day(
@@ -640,7 +647,9 @@ async def chart_user_daily_plays(request: Request, user_id: str, days: int = 30)
 
 
 @router.get("/charts/user/{user_id}/by-type")
-async def chart_user_by_type(user_id: str, days: int = 30):
+async def chart_user_by_type(request: Request, user_id: str, days: int = 30):
+    if (forbidden := require_self_or_admin(request, user_id)) is not None:
+        return forbidden
     days = _clamp_days(days)
     db = get_db()
     rows = await stats_db.get_user_plays_by_type(db, user_id, days=days)
@@ -784,10 +793,12 @@ async def chart_plays_by_hour(request: Request, days: int = 30):
 
 
 @router.get("/charts/plays-per-month")
-async def chart_plays_per_month(months: int = 12):
-    months = max(1, min(months, 36))
+async def chart_plays_per_month(days: int | None = None, months: int = 12):
     db = get_db()
-    rows = await stats_db.get_plays_per_month(db, months=months)
+    if days is not None:
+        rows = await stats_db.get_plays_per_month(db, days=_clamp_days(days))
+    else:
+        rows = await stats_db.get_plays_per_month(db, months=max(1, min(months, 36)))
     return JSONResponse(rows)
 
 
@@ -849,7 +860,9 @@ async def update_check(request: Request):
         try:
             await update_checker.check_once()
         except Exception:
-            logger.warning("Manual update check failed: %s", update_checker.info.last_error)
+            logger.warning(
+                "Manual update check failed: %s", update_checker.info.last_error
+            )
     return _render_update_status(request)
 
 
@@ -922,13 +935,16 @@ async def create_notification_channel(request: Request):
     from datetime import datetime, timezone
 
     now = datetime.now(timezone.utc).isoformat()
+    encrypted_config = notification_secrets.encrypt_channel_config(
+        channel_type, _parse_json_dict(data.get("config", {}))
+    )
     await db.execute(
         "INSERT INTO notification_channels (name, channel_type, config, triggers, conditions, enabled, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
         [
             data.get("name", ""),
             data.get("channel_type", ""),
-            json.dumps(data.get("config", {})),
+            json.dumps(encrypted_config),
             json.dumps(data.get("triggers", [])),
             json.dumps(data.get("conditions", {})),
             1 if data.get("enabled", True) else 0,
@@ -968,12 +984,13 @@ async def update_notification_channel(request: Request, channel_id: int):
         _parse_json_dict(data.get("config", {})),
         existing_config,
     )
+    encrypted_config = notification_secrets.encrypt_channel_config(channel_type, merged_config)
     await db.execute(
         "UPDATE notification_channels SET name=?, channel_type=?, config=?, triggers=?, conditions=?, enabled=? WHERE id=?",
         [
             str(data.get("name", ""))[:100],
             channel_type,
-            json.dumps(merged_config),
+            json.dumps(encrypted_config),
             json.dumps(data.get("triggers", [])),
             json.dumps(data.get("conditions", {})),
             1 if data.get("enabled", True) else 0,

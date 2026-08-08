@@ -7,6 +7,7 @@ server-rendered HTML and chart labels.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -150,6 +151,49 @@ def get_hour_label(hour: int, settings: dict) -> str:
             return "12PM"
         return f"{hour - 12}PM"
     return f"{hour:02d}:00"
+
+
+# ── Transcode reason labels ─────────────────────────────────────────────────
+
+# Known Emby TranscodeReasons values, mapped to a readable label. Anything not
+# in this dict falls back to splitting the PascalCase code into words.
+_TRANSCODE_REASON_LABELS = {
+    "ContainerNotSupported": "Container not supported",
+    "VideoCodecNotSupported": "Video codec not supported",
+    "AudioCodecNotSupported": "Audio codec not supported",
+    "SubtitleCodecNotSupported": "Subtitle codec not supported",
+    "ContainerBitrateExceedsLimit": "Bitrate exceeds limit",
+    "AudioBitrateNotSupported": "Audio bitrate not supported",
+    "AudioChannelsNotSupported": "Audio channel count not supported",
+    "VideoResolutionNotSupported": "Video resolution not supported",
+    "VideoBitDepthNotSupported": "Video bit depth not supported",
+    "VideoFramerateNotSupported": "Video framerate not supported",
+    "VideoLevelNotSupported": "Video level not supported",
+    "VideoProfileNotSupported": "Video profile not supported",
+    "VideoRangeTypeNotSupported": "Video range (HDR/SDR) not supported",
+    "RefFramesNotSupported": "Reference frame count not supported",
+    "AnamorphicVideoNotSupported": "Anamorphic video not supported",
+    "InterlacedVideoNotSupported": "Interlaced video not supported",
+    "SecondaryAudioNotSupported": "Secondary audio not supported",
+    "DirectPlayError": "Direct play error",
+    "UnknownVideoStreamInfo": "Unknown video stream info",
+    "UnknownAudioStreamInfo": "Unknown audio stream info",
+    "AudioIsExternal": "External audio track",
+}
+
+_PASCAL_CASE_SPLIT = re.compile(r"(?<!^)(?=[A-Z])")
+
+
+def format_transcode_reason(reason: str) -> str:
+    """Humanize an Emby TranscodeReasons code, e.g. ``VideoBitrateNotSupported``
+    -> ``Video bitrate not supported``. Unknown codes fall back to splitting
+    the PascalCase into words rather than showing the raw code."""
+    if not reason:
+        return ""
+    if reason in _TRANSCODE_REASON_LABELS:
+        return _TRANSCODE_REASON_LABELS[reason]
+    words = _PASCAL_CASE_SPLIT.split(reason)
+    return " ".join(words[:1] + [w.lower() for w in words[1:]])
 
 
 # ── Curated timezone list ──────────────────────────────────────────────────

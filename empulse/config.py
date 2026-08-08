@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     secret_key: str = ""
     disable_update_check: bool = False
     update_check_interval: int = 43200
+    api_rate_limit_per_minute: int = 120
 
     model_config = {"env_file_encoding": "utf-8"}
 

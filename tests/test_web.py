@@ -8,14 +8,21 @@ from httpx import AsyncClient, ASGITransport
 from empulse.app import create_app
 from empulse.db import history as history_db, libraries as libraries_db
 from empulse.update_checker import UpdateInfo
-from empulse.web.auth import create_session_token, hash_token, COOKIE_NAME, SESSION_MAX_AGE
+from empulse.web.auth import (
+    create_session_token,
+    hash_token,
+    COOKIE_NAME,
+    SESSION_MAX_AGE,
+)
 
 
 @pytest_asyncio.fixture
 async def client():
     """Create a test client with mocked DB and an authenticated admin session."""
-    with patch("empulse.app.init_db", new_callable=AsyncMock), \
-         patch("empulse.app.settings") as mock_settings:
+    with (
+        patch("empulse.app.init_db", new_callable=AsyncMock),
+        patch("empulse.app.settings") as mock_settings,
+    ):
         mock_settings.emby_api_key = ""
         mock_settings.emby_url = "http://localhost:8096"
         mock_settings.poll_interval = 10
@@ -43,15 +50,22 @@ async def client():
             """INSERT INTO login_sessions
                (token_hash, emby_user_id, username, role, created_at, expires_at)
                VALUES (?, ?, ?, ?, ?, ?)""",
-            [hash_token(token), None, "TestAdmin", "admin",
-             now.isoformat(), expires.isoformat()],
+            [
+                hash_token(token),
+                None,
+                "TestAdmin",
+                "admin",
+                now.isoformat(),
+                expires.isoformat(),
+            ],
         )
         await db.commit()
 
-        with patch("empulse.web.router.get_db", return_value=db), \
-             patch("empulse.web.api.get_db", return_value=db), \
-             patch("empulse.database.get_db", return_value=db):
-
+        with (
+            patch("empulse.web.router.get_db", return_value=db),
+            patch("empulse.web.api.get_db", return_value=db),
+            patch("empulse.database.get_db", return_value=db),
+        ):
             transport = ASGITransport(app=app)
             async with AsyncClient(
                 transport=transport,
@@ -95,43 +109,69 @@ class TestPageRoutes:
     @pytest.mark.asyncio
     async def test_unwatched_page(self, client):
         db = client._test_db
-        await libraries_db.upsert_library(db, {
-            "emby_library_id": "tv-lib-1",
-            "name": "TV Shows",
-            "library_type": "tvshows",
-            "item_count": 50,
-        })
-        await libraries_db.upsert_library(db, {
-            "emby_library_id": "movie-lib-1",
-            "name": "Movies",
-            "library_type": "movies",
-            "item_count": 80,
-        })
+        await libraries_db.upsert_library(
+            db,
+            {
+                "emby_library_id": "tv-lib-1",
+                "name": "TV Shows",
+                "library_type": "tvshows",
+                "item_count": 50,
+            },
+        )
+        await libraries_db.upsert_library(
+            db,
+            {
+                "emby_library_id": "movie-lib-1",
+                "name": "Movies",
+                "library_type": "movies",
+                "item_count": 80,
+            },
+        )
 
-        r = await client.get("/unwatched?library_id=tv-lib-1&sort=year_desc&page_size=25")
+        r = await client.get(
+            "/unwatched?library_id=tv-lib-1&sort=year_desc&page_size=25"
+        )
 
         assert r.status_code == 200
         assert "Unwatched" in r.text
         assert "/api/unwatched" in r.text
         assert "TV Shows" in r.text
         assert "Movies" in r.text
-        assert "/api/unwatched-table?page=1&amp;page_size=25&amp;search=&amp;sort=year_desc&amp;library_id=tv-lib-1" in r.text
+        assert (
+            "/api/unwatched-table?page=1&amp;page_size=25&amp;search=&amp;sort=year_desc&amp;library_id=tv-lib-1"
+            in r.text
+        )
         assert "All libraries" in r.text
 
     @pytest.mark.asyncio
     async def test_user_detail_page(self, client):
         from empulse.db import users as users_db
+
         db = client._test_db
-        await users_db.upsert_user(db, {
-            "emby_user_id": "u1", "username": "Alice",
-            "is_admin": 0, "thumb_url": None, "last_seen": None,
-        })
-        await history_db.insert_history(db, {
-            "session_key": "ud1", "user_id": "u1", "user_name": "Alice",
-            "item_id": "m1", "item_name": "Test Movie", "item_type": "Movie",
-            "started_at": "2024-01-15T20:00:00", "stopped_at": "2024-01-15T22:00:00",
-            "duration_seconds": 7200,
-        })
+        await users_db.upsert_user(
+            db,
+            {
+                "emby_user_id": "u1",
+                "username": "Alice",
+                "is_admin": 0,
+                "thumb_url": None,
+                "last_seen": None,
+            },
+        )
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "ud1",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_id": "m1",
+                "item_name": "Test Movie",
+                "item_type": "Movie",
+                "started_at": "2024-01-15T20:00:00",
+                "stopped_at": "2024-01-15T22:00:00",
+                "duration_seconds": 7200,
+            },
+        )
         r = await client.get("/users/u1")
         assert r.status_code == 200
         assert "Alice" in r.text
@@ -165,6 +205,203 @@ class TestPageRoutes:
         assert "Check for Updates" in r.text
 
 
+async def _create_viewer_session(db, user_id: str, username: str) -> str:
+    """Insert a viewer login session directly (mirrors the admin session set
+    up by the `client` fixture) and return the raw token, so tests can send
+    it as an override cookie for individual requests."""
+    from empulse.db import users as users_db
+
+    await users_db.upsert_user(
+        db,
+        {
+            "emby_user_id": user_id,
+            "username": username,
+            "is_admin": 0,
+            "thumb_url": None,
+            "last_seen": None,
+        },
+    )
+    await users_db.set_user_enabled(db, user_id, True)
+
+    token = create_session_token("testsecret", user_id, "viewer")
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(seconds=SESSION_MAX_AGE)
+    await db.execute(
+        """INSERT INTO login_sessions
+           (token_hash, emby_user_id, username, role, created_at, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        [hash_token(token), user_id, username, "viewer", now.isoformat(), expires.isoformat()],
+    )
+    await db.commit()
+    return token
+
+
+class TestUserScopedHistoryAccess:
+    """E-1: non-admin viewers can only see their own history/user data."""
+
+    async def _seed_two_users(self, db):
+        from empulse.db import users as users_db
+
+        await users_db.upsert_user(
+            db,
+            {"emby_user_id": "u1", "username": "Alice", "is_admin": 0, "thumb_url": None, "last_seen": None},
+        )
+        await users_db.upsert_user(
+            db,
+            {"emby_user_id": "u2", "username": "Bob", "is_admin": 0, "thumb_url": None, "last_seen": None},
+        )
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "s-u1", "user_id": "u1", "user_name": "Alice",
+                "item_id": "m1", "item_name": "Alice Movie", "item_type": "Movie",
+                "started_at": "2024-01-15T20:00:00", "stopped_at": "2024-01-15T22:00:00",
+                "duration_seconds": 7200,
+            },
+        )
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "s-u2", "user_id": "u2", "user_name": "Bob",
+                "item_id": "m2", "item_name": "Bob Movie", "item_type": "Movie",
+                "started_at": "2024-01-16T20:00:00", "stopped_at": "2024-01-16T22:00:00",
+                "duration_seconds": 7200,
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_viewer_can_see_own_user_page(self, client):
+        db = client._test_db
+        await self._seed_two_users(db)
+        token = await _create_viewer_session(db, "u1", "Alice")
+
+        client.cookies.set(COOKIE_NAME, token)
+        r = await client.get("/users/u1")
+        assert r.status_code == 200
+        assert "Alice" in r.text
+
+    @pytest.mark.asyncio
+    async def test_viewer_gets_403_on_other_users_page(self, client):
+        db = client._test_db
+        await self._seed_two_users(db)
+        token = await _create_viewer_session(db, "u1", "Alice")
+
+        client.cookies.set(COOKIE_NAME, token)
+        r = await client.get("/users/u2")
+        assert r.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_admin_unaffected_by_user_scoping(self, client):
+        db = client._test_db
+        await self._seed_two_users(db)
+
+        r = await client.get("/users/u2")  # default client cookie = admin
+        assert r.status_code == 200
+        assert "Bob" in r.text
+
+    @pytest.mark.asyncio
+    async def test_history_table_scopes_to_self_for_viewer(self, client):
+        db = client._test_db
+        await self._seed_two_users(db)
+        token = await _create_viewer_session(db, "u1", "Alice")
+
+        # Even explicitly requesting another user's data, a viewer only ever
+        # sees their own — the filter is silently overridden, not rejected.
+        client.cookies.set(COOKIE_NAME, token)
+        r = await client.get("/api/history-table?user_id=u2")
+        assert r.status_code == 200
+        assert "Alice Movie" in r.text
+        assert "Bob Movie" not in r.text
+
+    @pytest.mark.asyncio
+    async def test_history_table_shows_all_for_admin(self, client):
+        db = client._test_db
+        await self._seed_two_users(db)
+
+        r = await client.get("/api/history-table")
+        assert r.status_code == 200
+        assert "Alice Movie" in r.text
+        assert "Bob Movie" in r.text
+
+    @pytest.mark.asyncio
+    async def test_history_detail_forbidden_for_other_users_record(self, client):
+        db = client._test_db
+        await self._seed_two_users(db)
+        token = await _create_viewer_session(db, "u1", "Alice")
+
+        cursor = await db.execute("SELECT id FROM history WHERE user_id = 'u2'")
+        row = await cursor.fetchone()
+        history_id = row["id"]
+
+        client.cookies.set(COOKIE_NAME, token)
+        r = await client.get(f"/api/history-detail/{history_id}")
+        assert r.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_user_daily_plays_chart_forbidden_for_other_user(self, client):
+        db = client._test_db
+        await self._seed_two_users(db)
+        token = await _create_viewer_session(db, "u1", "Alice")
+
+        client.cookies.set(COOKIE_NAME, token)
+        r = await client.get("/api/charts/user/u2/daily-plays")
+        assert r.status_code == 403
+
+
+class TestApiRateLimit:
+    """D-1: authenticated /api/* usage is rate limited per user."""
+
+    @pytest.mark.asyncio
+    async def test_exceeding_limit_returns_429(self, client):
+        from empulse.web.rate_limit import api_limiter
+
+        api_limiter.limit = 3
+        try:
+            for _ in range(3):
+                r = await client.get("/api/now-playing")
+                assert r.status_code == 200
+            r = await client.get("/api/now-playing")
+            assert r.status_code == 429
+            assert r.headers.get("retry-after") == "60"
+        finally:
+            api_limiter.limit = 120
+
+    @pytest.mark.asyncio
+    async def test_users_have_independent_buckets(self, client):
+        from empulse.db import users as users_db
+        from empulse.web.rate_limit import api_limiter
+
+        await users_db.upsert_user(
+            client._test_db,
+            {"emby_user_id": "u1", "username": "Alice", "is_admin": 0, "thumb_url": None, "last_seen": None},
+        )
+        await users_db.set_user_enabled(client._test_db, "u1", True)
+        viewer_token = await _create_viewer_session(client._test_db, "u1", "Alice")
+
+        api_limiter.limit = 1
+        try:
+            r = await client.get("/api/now-playing")  # admin's 1 request
+            assert r.status_code == 200
+
+            client.cookies.set(COOKIE_NAME, viewer_token)
+            r = await client.get("/api/now-playing")  # viewer has their own budget
+            assert r.status_code == 200
+        finally:
+            api_limiter.limit = 120
+
+    @pytest.mark.asyncio
+    async def test_non_api_routes_unaffected(self, client):
+        from empulse.web.rate_limit import api_limiter
+
+        api_limiter.limit = 1
+        try:
+            for _ in range(5):
+                r = await client.get("/")
+                assert r.status_code == 200
+        finally:
+            api_limiter.limit = 120
+
+
 class TestAPIRoutes:
     @pytest.mark.asyncio
     async def test_now_playing_empty(self, client):
@@ -182,69 +419,83 @@ class TestAPIRoutes:
     async def test_stats_cards_show_links_use_series_id(self, client):
         db = client._test_db
         today = datetime.now(timezone.utc).date().isoformat()
-        await history_db.insert_history(db, {
-            "session_key": "show-old",
-            "user_id": "u1",
-            "user_name": "Alice",
-            "item_id": "25450",
-            "item_name": "Pilot",
-            "item_type": "Episode",
-            "series_name": "The Pitt",
-            "series_id": "",
-            "started_at": f"{today}T20:00:00",
-            "stopped_at": f"{today}T20:30:00",
-            "duration_seconds": 1800,
-        })
-        await history_db.insert_history(db, {
-            "session_key": "show-new",
-            "user_id": "u2",
-            "user_name": "Bob",
-            "item_id": "25451",
-            "item_name": "Episode 2",
-            "item_type": "Episode",
-            "series_name": "The Pitt",
-            "series_id": "35974",
-            "started_at": f"{today}T21:00:00",
-            "stopped_at": f"{today}T21:30:00",
-            "duration_seconds": 1800,
-        })
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "show-old",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_id": "25450",
+                "item_name": "Pilot",
+                "item_type": "Episode",
+                "series_name": "The Pitt",
+                "series_id": "",
+                "started_at": f"{today}T20:00:00",
+                "stopped_at": f"{today}T20:30:00",
+                "duration_seconds": 1800,
+            },
+        )
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "show-new",
+                "user_id": "u2",
+                "user_name": "Bob",
+                "item_id": "25451",
+                "item_name": "Episode 2",
+                "item_type": "Episode",
+                "series_name": "The Pitt",
+                "series_id": "35974",
+                "started_at": f"{today}T21:00:00",
+                "stopped_at": f"{today}T21:30:00",
+                "duration_seconds": 1800,
+            },
+        )
 
         r = await client.get("/api/stats-cards?days=365")
 
         assert r.status_code == 200
-        assert '/item/35974?type=series&name=The%20Pitt' in r.text
-        assert '/item/25450?type=series&name=The%20Pitt' not in r.text
+        assert "/item/35974?type=series&name=The%20Pitt" in r.text
+        assert "/item/25450?type=series&name=The%20Pitt" not in r.text
 
     @pytest.mark.asyncio
-    async def test_stats_cards_include_hover_metadata_for_users_libraries_platforms(self, client):
+    async def test_stats_cards_include_hover_metadata_for_users_libraries_platforms(
+        self, client
+    ):
         db = client._test_db
         today = datetime.now(timezone.utc).date().isoformat()
-        await history_db.insert_history(db, {
-            "session_key": "hover-users",
-            "user_id": "u1",
-            "user_name": "Alice",
-            "item_id": "m1",
-            "item_name": "Movie One",
-            "item_type": "Movie",
-            "client": "Emby Web",
-            "started_at": f"{today}T20:00:00",
-            "stopped_at": f"{today}T21:00:00",
-            "duration_seconds": 3600,
-        })
-        await history_db.insert_history(db, {
-            "session_key": "hover-tv",
-            "user_id": "u2",
-            "user_name": "Bob",
-            "item_id": "e1",
-            "item_name": "Episode One",
-            "item_type": "Episode",
-            "series_name": "Show",
-            "series_id": "s1",
-            "client": "Emby for LG",
-            "started_at": f"{today}T22:00:00",
-            "stopped_at": f"{today}T23:00:00",
-            "duration_seconds": 3600,
-        })
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "hover-users",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_id": "m1",
+                "item_name": "Movie One",
+                "item_type": "Movie",
+                "client": "Emby Web",
+                "started_at": f"{today}T20:00:00",
+                "stopped_at": f"{today}T21:00:00",
+                "duration_seconds": 3600,
+            },
+        )
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "hover-tv",
+                "user_id": "u2",
+                "user_name": "Bob",
+                "item_id": "e1",
+                "item_name": "Episode One",
+                "item_type": "Episode",
+                "series_name": "Show",
+                "series_id": "s1",
+                "client": "Emby for LG",
+                "started_at": f"{today}T22:00:00",
+                "stopped_at": f"{today}T23:00:00",
+                "duration_seconds": 3600,
+            },
+        )
 
         r = await client.get("/api/stats-cards?days=365")
 
@@ -270,23 +521,26 @@ class TestAPIRoutes:
     async def test_history_table_with_records(self, client):
         """History table renders rows with expand chevrons."""
         db = client._test_db
-        await history_db.insert_history(db, {
-            "session_key": "s1",
-            "user_id": "u1",
-            "user_name": "Alice",
-            "item_id": "m1",
-            "item_name": "Test Movie",
-            "item_type": "Movie",
-            "year": 2024,
-            "client": "Emby Web",
-            "device_name": "Chrome",
-            "play_method": "DirectPlay",
-            "started_at": "2024-01-15T20:00:00",
-            "stopped_at": "2024-01-15T22:00:00",
-            "duration_seconds": 7200,
-            "percent_complete": 95.0,
-            "watched": 1,
-        })
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "s1",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_id": "m1",
+                "item_name": "Test Movie",
+                "item_type": "Movie",
+                "year": 2024,
+                "client": "Emby Web",
+                "device_name": "Chrome",
+                "play_method": "DirectPlay",
+                "started_at": "2024-01-15T20:00:00",
+                "stopped_at": "2024-01-15T22:00:00",
+                "duration_seconds": 7200,
+                "percent_complete": 95.0,
+                "watched": 1,
+            },
+        )
         r = await client.get("/api/history-table")
         assert r.status_code == 200
         assert "expand-chevron" in r.text
@@ -296,28 +550,65 @@ class TestAPIRoutes:
         assert "history-row" in r.text
 
     @pytest.mark.asyncio
+    async def test_stream_info_shows_transcode_reasons(self, client):
+        db = client._test_db
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "s-reasons",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_id": "m1",
+                "item_name": "Test Movie",
+                "item_type": "Movie",
+                "play_method": "Transcode",
+                "started_at": "2024-01-15T20:00:00",
+                "stopped_at": "2024-01-15T22:00:00",
+                "duration_seconds": 7200,
+                "stream_info": json.dumps({
+                    "video": {"codec": "HEVC", "height": 2160},
+                    "transcode": {
+                        "video_codec": "H264",
+                        "reasons": ["VideoCodecNotSupported", "ContainerNotSupported"],
+                    },
+                }),
+            },
+        )
+        cursor = await db.execute("SELECT id FROM history WHERE session_key = 's-reasons'")
+        history_id = (await cursor.fetchone())["id"]
+
+        r = await client.get(f"/api/stream-info/{history_id}")
+        assert r.status_code == 200
+        assert "Transcode Reasons" in r.text
+        assert "Video codec not supported" in r.text
+        assert "Container not supported" in r.text
+
+    @pytest.mark.asyncio
     async def test_history_table_episode_links_to_series_page(self, client):
         db = client._test_db
-        await history_db.insert_history(db, {
-            "session_key": "ep-series-link",
-            "user_id": "u1",
-            "user_name": "Alice",
-            "item_id": "29865",
-            "item_name": "Episode 5",
-            "item_type": "Episode",
-            "series_name": "Lead Children",
-            "series_id": "38131",
-            "season_number": 1,
-            "episode_number": 5,
-            "started_at": "2024-01-15T20:00:00",
-            "stopped_at": "2024-01-15T21:00:00",
-            "duration_seconds": 3600,
-        })
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "ep-series-link",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_id": "29865",
+                "item_name": "Episode 5",
+                "item_type": "Episode",
+                "series_name": "Lead Children",
+                "series_id": "38131",
+                "season_number": 1,
+                "episode_number": 5,
+                "started_at": "2024-01-15T20:00:00",
+                "stopped_at": "2024-01-15T21:00:00",
+                "duration_seconds": 3600,
+            },
+        )
 
         r = await client.get("/api/history-table")
 
         assert r.status_code == 200
-        assert '/item/38131?type=series&amp;name=Lead%20Children' in r.text
+        assert "/item/38131?type=series&amp;name=Lead%20Children" in r.text
 
     @pytest.mark.asyncio
     async def test_history_detail_not_found(self, client):
@@ -330,25 +621,30 @@ class TestAPIRoutes:
     async def test_history_detail_basic(self, client):
         """History detail renders basic info for record without stream_info."""
         db = client._test_db
-        await history_db.insert_history(db, {
-            "session_key": "s2",
-            "user_id": "u1",
-            "user_name": "Alice",
-            "item_id": "m2",
-            "item_name": "Another Movie",
-            "item_type": "Movie",
-            "year": 2023,
-            "client": "Emby Web",
-            "device_name": "Firefox",
-            "play_method": "DirectPlay",
-            "video_decision": "Direct Play",
-            "audio_decision": "Direct Play",
-            "started_at": "2024-01-16T20:00:00",
-            "stopped_at": "2024-01-16T22:00:00",
-            "duration_seconds": 7200,
-        })
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "s2",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_id": "m2",
+                "item_name": "Another Movie",
+                "item_type": "Movie",
+                "year": 2023,
+                "client": "Emby Web",
+                "device_name": "Firefox",
+                "play_method": "DirectPlay",
+                "video_decision": "Direct Play",
+                "audio_decision": "Direct Play",
+                "started_at": "2024-01-16T20:00:00",
+                "stopped_at": "2024-01-16T22:00:00",
+                "duration_seconds": 7200,
+            },
+        )
         # Get the inserted record's id
-        cursor = await db.execute("SELECT id FROM history WHERE item_name = 'Another Movie'")
+        cursor = await db.execute(
+            "SELECT id FROM history WHERE item_name = 'Another Movie'"
+        )
         row = await cursor.fetchone()
         r = await client.get(f"/api/history-detail/{row[0]}")
         assert r.status_code == 200
@@ -361,30 +657,46 @@ class TestAPIRoutes:
     async def test_history_detail_with_stream_info(self, client):
         """History detail renders full stream info from JSON."""
         db = client._test_db
-        stream_info = json.dumps({
-            "video": {"codec": "HEVC", "width": 1920, "height": 1080, "bitrate": 5000000},
-            "audio": {"codec": "AAC", "channels": 6, "language": "english"},
-            "media": {"container": "MKV", "bitrate": 5500000, "resolution": "1080p"},
-            "transcode": {"video_codec": "H264", "width": 1280, "height": 720},
-        })
-        await history_db.insert_history(db, {
-            "session_key": "s3",
-            "user_id": "u2",
-            "user_name": "Bob",
-            "item_id": "m3",
-            "item_name": "Streamed Movie",
-            "item_type": "Movie",
-            "client": "Infuse",
-            "device_name": "Apple TV",
-            "play_method": "Transcode",
-            "video_decision": "Transcode",
-            "audio_decision": "Direct Play",
-            "stream_info": stream_info,
-            "started_at": "2024-01-17T19:00:00",
-            "stopped_at": "2024-01-17T21:00:00",
-            "duration_seconds": 7200,
-        })
-        cursor = await db.execute("SELECT id FROM history WHERE item_name = 'Streamed Movie'")
+        stream_info = json.dumps(
+            {
+                "video": {
+                    "codec": "HEVC",
+                    "width": 1920,
+                    "height": 1080,
+                    "bitrate": 5000000,
+                },
+                "audio": {"codec": "AAC", "channels": 6, "language": "english"},
+                "media": {
+                    "container": "MKV",
+                    "bitrate": 5500000,
+                    "resolution": "1080p",
+                },
+                "transcode": {"video_codec": "H264", "width": 1280, "height": 720},
+            }
+        )
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "s3",
+                "user_id": "u2",
+                "user_name": "Bob",
+                "item_id": "m3",
+                "item_name": "Streamed Movie",
+                "item_type": "Movie",
+                "client": "Infuse",
+                "device_name": "Apple TV",
+                "play_method": "Transcode",
+                "video_decision": "Transcode",
+                "audio_decision": "Direct Play",
+                "stream_info": stream_info,
+                "started_at": "2024-01-17T19:00:00",
+                "stopped_at": "2024-01-17T21:00:00",
+                "duration_seconds": 7200,
+            },
+        )
+        cursor = await db.execute(
+            "SELECT id FROM history WHERE item_name = 'Streamed Movie'"
+        )
         row = await cursor.fetchone()
         r = await client.get(f"/api/history-detail/{row[0]}")
         assert r.status_code == 200
@@ -398,16 +710,19 @@ class TestAPIRoutes:
     @pytest.mark.asyncio
     async def test_export_history_csv(self, client):
         db = client._test_db
-        await history_db.insert_history(db, {
-            "session_key": "exp1",
-            "user_id": "u1",
-            "user_name": "Alice",
-            "item_name": "Export Movie",
-            "item_type": "Movie",
-            "started_at": "2024-01-01T12:00:00",
-            "stopped_at": "2024-01-01T14:00:00",
-            "duration_seconds": 7200,
-        })
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "exp1",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_name": "Export Movie",
+                "item_type": "Movie",
+                "started_at": "2024-01-01T12:00:00",
+                "stopped_at": "2024-01-01T14:00:00",
+                "duration_seconds": 7200,
+            },
+        )
         r = await client.get("/api/export/history?format=csv")
         assert r.status_code == 200
         assert "text/csv" in r.headers["content-type"]
@@ -418,16 +733,19 @@ class TestAPIRoutes:
     @pytest.mark.asyncio
     async def test_export_history_json(self, client):
         db = client._test_db
-        await history_db.insert_history(db, {
-            "session_key": "exp2",
-            "user_id": "u2",
-            "user_name": "Bob",
-            "item_name": "JSON Movie",
-            "item_type": "Movie",
-            "started_at": "2024-02-01T12:00:00",
-            "stopped_at": "2024-02-01T14:00:00",
-            "duration_seconds": 7200,
-        })
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "exp2",
+                "user_id": "u2",
+                "user_name": "Bob",
+                "item_name": "JSON Movie",
+                "item_type": "Movie",
+                "started_at": "2024-02-01T12:00:00",
+                "stopped_at": "2024-02-01T14:00:00",
+                "duration_seconds": 7200,
+            },
+        )
         r = await client.get("/api/export/history?format=json")
         assert r.status_code == 200
         assert "application/json" in r.headers["content-type"]
@@ -438,16 +756,30 @@ class TestAPIRoutes:
     @pytest.mark.asyncio
     async def test_export_history_filtered(self, client):
         db = client._test_db
-        await history_db.insert_history(db, {
-            "session_key": "expf1", "user_id": "u1", "user_name": "Alice",
-            "item_name": "Movie A", "item_type": "Movie",
-            "started_at": "2024-03-01T12:00:00", "stopped_at": "2024-03-01T14:00:00",
-        })
-        await history_db.insert_history(db, {
-            "session_key": "expf2", "user_id": "u2", "user_name": "Bob",
-            "item_name": "Episode B", "item_type": "Episode",
-            "started_at": "2024-03-02T12:00:00", "stopped_at": "2024-03-02T14:00:00",
-        })
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "expf1",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_name": "Movie A",
+                "item_type": "Movie",
+                "started_at": "2024-03-01T12:00:00",
+                "stopped_at": "2024-03-01T14:00:00",
+            },
+        )
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "expf2",
+                "user_id": "u2",
+                "user_name": "Bob",
+                "item_name": "Episode B",
+                "item_type": "Episode",
+                "started_at": "2024-03-02T12:00:00",
+                "stopped_at": "2024-03-02T14:00:00",
+            },
+        )
         r = await client.get("/api/export/history?format=csv&item_type=Movie")
         assert r.status_code == 200
         assert "Movie A" in r.text
@@ -456,14 +788,19 @@ class TestAPIRoutes:
     @pytest.mark.asyncio
     async def test_delete_history(self, client):
         db = client._test_db
-        await history_db.insert_history(db, {
-            "session_key": "del1",
-            "user_id": "u1",
-            "item_name": "To Delete",
-            "started_at": "2024-01-01T12:00:00",
-            "stopped_at": "2024-01-01T14:00:00",
-        })
-        cursor = await db.execute("SELECT id FROM history WHERE item_name = 'To Delete'")
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "del1",
+                "user_id": "u1",
+                "item_name": "To Delete",
+                "started_at": "2024-01-01T12:00:00",
+                "stopped_at": "2024-01-01T14:00:00",
+            },
+        )
+        cursor = await db.execute(
+            "SELECT id FROM history WHERE item_name = 'To Delete'"
+        )
         row = await cursor.fetchone()
         r = await client.delete(f"/api/history/{row[0]}")
         assert r.status_code == 204
@@ -484,13 +821,20 @@ class TestAPIRoutes:
     @pytest.mark.asyncio
     async def test_chart_daily_plays_with_data(self, client):
         from datetime import date
+
         db = client._test_db
         today = date.today().isoformat()
-        await history_db.insert_history(db, {
-            "session_key": "chart1", "user_id": "u1", "item_type": "Movie",
-            "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
-            "duration_seconds": 7200,
-        })
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "chart1",
+                "user_id": "u1",
+                "item_type": "Movie",
+                "started_at": f"{today}T12:00:00",
+                "stopped_at": f"{today}T14:00:00",
+                "duration_seconds": 7200,
+            },
+        )
         r = await client.get("/api/charts/daily-plays?days=7")
         assert r.status_code == 200
         data = r.json()
@@ -537,8 +881,8 @@ class TestAPIRoutes:
     async def test_graphs_page(self, client):
         r = await client.get("/graphs")
         assert r.status_code == 200
-        assert "Graphs" in r.text
         assert "g-daily-stacked" in r.text
+        assert "<h2>Graphs</h2>" not in r.text
 
     @pytest.mark.asyncio
     async def test_item_detail_series_request_resolves_from_episode_id(self, client):
@@ -593,6 +937,50 @@ class TestAPIRoutes:
         assert isinstance(r.json(), list)
 
     @pytest.mark.asyncio
+    async def test_chart_plays_per_month_respects_days_filter(self, client):
+        db = client._test_db
+        now = datetime.now(timezone.utc)
+        recent = (now - timedelta(days=10)).date().isoformat()
+        older = (now - timedelta(days=75)).date().isoformat()
+
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "month-recent",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_id": "movie-recent",
+                "item_name": "Recent Movie",
+                "item_type": "Movie",
+                "started_at": f"{recent}T20:00:00",
+                "stopped_at": f"{recent}T22:00:00",
+                "duration_seconds": 7200,
+            },
+        )
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "month-older",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_id": "movie-older",
+                "item_name": "Older Movie",
+                "item_type": "Movie",
+                "started_at": f"{older}T20:00:00",
+                "stopped_at": f"{older}T22:00:00",
+                "duration_seconds": 7200,
+            },
+        )
+
+        recent_only = await client.get("/api/charts/plays-per-month?days=30")
+        assert recent_only.status_code == 200
+        assert sum(row["plays"] for row in recent_only.json()) == 1
+
+        extended = await client.get("/api/charts/plays-per-month?days=120")
+        assert extended.status_code == 200
+        assert sum(row["plays"] for row in extended.json()) == 2
+
+    @pytest.mark.asyncio
     async def test_chart_plays_by_date_stacked(self, client):
         r = await client.get("/api/charts/plays-by-date-stacked?days=30")
         assert r.status_code == 200
@@ -629,6 +1017,40 @@ class TestAPIRoutes:
         assert isinstance(r.json(), list)
 
     @pytest.mark.asyncio
+    async def test_chart_period_comparison_uses_selected_window(self, client):
+        db = client._test_db
+        now = datetime.now(timezone.utc)
+        current = (now - timedelta(days=5)).date().isoformat()
+        previous = (now - timedelta(days=25)).date().isoformat()
+        older = (now - timedelta(days=50)).date().isoformat()
+
+        for session_key, day in [
+            ("period-current", current),
+            ("period-previous", previous),
+            ("period-older", older),
+        ]:
+            await history_db.insert_history(
+                db,
+                {
+                    "session_key": session_key,
+                    "user_id": "u1",
+                    "user_name": "Alice",
+                    "item_id": session_key,
+                    "item_name": session_key,
+                    "item_type": "Movie",
+                    "started_at": f"{day}T20:00:00",
+                    "stopped_at": f"{day}T22:00:00",
+                    "duration_seconds": 7200,
+                },
+            )
+
+        r = await client.get("/api/charts/period-comparison?days=20")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["current"]["plays"] == 1
+        assert data["previous"]["plays"] == 1
+
+    @pytest.mark.asyncio
     async def test_recently_added_no_emby(self, client):
         r = await client.get("/api/recently-added")
         assert r.status_code == 200
@@ -638,41 +1060,46 @@ class TestAPIRoutes:
     async def test_recently_added_episode_uses_series_poster_and_link(self, client):
         class StubEmbyClient:
             async def get_recently_added(self, limit=10, item_type=""):
-                return [{
-                    "Id": "ep123",
-                    "Name": "Episode 5",
-                    "Type": "Episode",
-                    "SeriesId": "series456",
-                    "SeriesName": "Lead Children",
-                    "ProductionYear": 2026,
-                    "DateCreated": "2026-03-10T08:00:00Z",
-                }]
+                return [
+                    {
+                        "Id": "ep123",
+                        "Name": "Episode 5",
+                        "Type": "Episode",
+                        "SeriesId": "series456",
+                        "SeriesName": "Lead Children",
+                        "ProductionYear": 2026,
+                        "DateCreated": "2026-03-10T08:00:00Z",
+                    }
+                ]
 
         client._test_app.state.emby_client = StubEmbyClient()
 
         r = await client.get("/api/recently-added")
 
         assert r.status_code == 200
-        assert '/item/series456?type=series&amp;name=Lead%20Children' in r.text
-        assert '/api/img/series456' in r.text
-        assert '/api/img/ep123' not in r.text
+        assert "/item/series456?type=series&amp;name=Lead%20Children" in r.text
+        assert "/api/img/series456" in r.text
+        assert "/api/img/ep123" not in r.text
 
     @pytest.mark.asyncio
     async def test_unwatched_api_filters_watched_shows(self, client):
         db = client._test_db
         today = datetime.now(timezone.utc).date().isoformat()
-        await history_db.insert_history(db, {
-            "session_key": "watched-show",
-            "user_id": "u1",
-            "user_name": "Alice",
-            "item_id": "ep1",
-            "item_name": "Pilot",
-            "item_type": "Episode",
-            "series_name": "Severance",
-            "series_id": "series-1",
-            "started_at": f"{today}T20:00:00",
-            "stopped_at": f"{today}T21:00:00",
-        })
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "watched-show",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_id": "ep1",
+                "item_name": "Pilot",
+                "item_type": "Episode",
+                "series_name": "Severance",
+                "series_id": "series-1",
+                "started_at": f"{today}T20:00:00",
+                "stopped_at": f"{today}T21:00:00",
+            },
+        )
 
         class StubEmbyClient:
             async def get_catalog_page(
@@ -750,7 +1177,9 @@ class TestAPIRoutes:
         assert "No playback history yet." not in r.text
 
     @pytest.mark.asyncio
-    async def test_unwatched_api_deduplicates_same_title_with_multiple_ids(self, client):
+    async def test_unwatched_api_deduplicates_same_title_with_multiple_ids(
+        self, client
+    ):
         class StubEmbyClient:
             async def get_catalog_page(
                 self,
@@ -798,18 +1227,21 @@ class TestAPIRoutes:
     async def test_unwatched_api_filters_seen_titles_with_normalized_name(self, client):
         db = client._test_db
         today = datetime.now(timezone.utc).date().isoformat()
-        await history_db.insert_history(db, {
-            "session_key": "seen-series-normalized",
-            "user_id": "u1",
-            "user_name": "Alice",
-            "item_id": "ep1",
-            "item_name": "Episode 1",
-            "item_type": "Episode",
-            "series_name": "S.W.A.T.",
-            "series_id": "series-1",
-            "started_at": f"{today}T20:00:00",
-            "stopped_at": f"{today}T21:00:00",
-        })
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "seen-series-normalized",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_id": "ep1",
+                "item_name": "Episode 1",
+                "item_type": "Episode",
+                "series_name": "S.W.A.T.",
+                "series_id": "series-1",
+                "started_at": f"{today}T20:00:00",
+                "stopped_at": f"{today}T21:00:00",
+            },
+        )
 
         class StubEmbyClient:
             async def get_catalog_page(
@@ -841,14 +1273,19 @@ class TestAPIRoutes:
         assert data["total"] == 0
 
     @pytest.mark.asyncio
-    async def test_unwatched_api_supports_pagination_sort_and_library_filter(self, client):
+    async def test_unwatched_api_supports_pagination_sort_and_library_filter(
+        self, client
+    ):
         db = client._test_db
-        await libraries_db.upsert_library(db, {
-            "emby_library_id": "tv-lib-2",
-            "name": "Drama",
-            "library_type": "tvshows",
-            "item_count": 3,
-        })
+        await libraries_db.upsert_library(
+            db,
+            {
+                "emby_library_id": "tv-lib-2",
+                "name": "Drama",
+                "library_type": "tvshows",
+                "item_count": 3,
+            },
+        )
 
         class StubEmbyClient:
             async def get_catalog_page(
@@ -905,25 +1342,33 @@ class TestAPIRoutes:
         assert data["items"][0]["name"] == "Bodies"
 
     @pytest.mark.asyncio
-    async def test_unwatched_movies_library_uses_movie_catalog_and_empty_label(self, client):
+    async def test_unwatched_movies_library_uses_movie_catalog_and_empty_label(
+        self, client
+    ):
         db = client._test_db
-        await libraries_db.upsert_library(db, {
-            "emby_library_id": "movie-lib-2",
-            "name": "Films",
-            "library_type": "movies",
-            "item_count": 1,
-        })
+        await libraries_db.upsert_library(
+            db,
+            {
+                "emby_library_id": "movie-lib-2",
+                "name": "Films",
+                "library_type": "movies",
+                "item_count": 1,
+            },
+        )
         today = datetime.now(timezone.utc).date().isoformat()
-        await history_db.insert_history(db, {
-            "session_key": "watched-movie",
-            "user_id": "u1",
-            "user_name": "Alice",
-            "item_id": "movie-1",
-            "item_name": "Arrival",
-            "item_type": "Movie",
-            "started_at": f"{today}T20:00:00",
-            "stopped_at": f"{today}T22:00:00",
-        })
+        await history_db.insert_history(
+            db,
+            {
+                "session_key": "watched-movie",
+                "user_id": "u1",
+                "user_name": "Alice",
+                "item_id": "movie-1",
+                "item_name": "Arrival",
+                "item_type": "Movie",
+                "started_at": f"{today}T20:00:00",
+                "stopped_at": f"{today}T22:00:00",
+            },
+        )
 
         class StubEmbyClient:
             async def get_catalog_page(
@@ -983,14 +1428,17 @@ class TestAPIRoutes:
     @pytest.mark.asyncio
     async def test_notification_channels_crud(self, client):
         # Create
-        r = await client.post("/api/notification-channels", json={
-            "name": "Test Discord",
-            "channel_type": "discord",
-            "config": {"url": "https://discord.com/api/webhooks/test"},
-            "triggers": ["playback_start", "playback_stop"],
-            "conditions": {},
-            "enabled": True,
-        })
+        r = await client.post(
+            "/api/notification-channels",
+            json={
+                "name": "Test Discord",
+                "channel_type": "discord",
+                "config": {"url": "https://discord.com/api/webhooks/test"},
+                "triggers": ["playback_start", "playback_stop"],
+                "conditions": {},
+                "enabled": True,
+            },
+        )
         assert r.status_code == 201
 
         # List
@@ -1002,14 +1450,17 @@ class TestAPIRoutes:
         assert channels[0]["name"] == "Test Discord"
 
         # Update
-        r = await client.put(f"/api/notification-channels/{ch_id}", json={
-            "name": "Updated Discord",
-            "channel_type": "discord",
-            "config": {"url": "https://discord.com/api/webhooks/test"},
-            "triggers": ["playback_start"],
-            "conditions": {},
-            "enabled": True,
-        })
+        r = await client.put(
+            f"/api/notification-channels/{ch_id}",
+            json={
+                "name": "Updated Discord",
+                "channel_type": "discord",
+                "config": {"url": "https://discord.com/api/webhooks/test"},
+                "triggers": ["playback_start"],
+                "conditions": {},
+                "enabled": True,
+            },
+        )
         assert r.status_code == 200
 
         # Delete
@@ -1018,9 +1469,16 @@ class TestAPIRoutes:
 
     @pytest.mark.asyncio
     async def test_notification_channels_not_found(self, client):
-        r = await client.put("/api/notification-channels/99999", json={
-            "name": "X", "channel_type": "discord", "config": {}, "triggers": [], "conditions": {},
-        })
+        r = await client.put(
+            "/api/notification-channels/99999",
+            json={
+                "name": "X",
+                "channel_type": "discord",
+                "config": {},
+                "triggers": [],
+                "conditions": {},
+            },
+        )
         assert r.status_code == 404
         r = await client.delete("/api/notification-channels/99999")
         assert r.status_code == 404
@@ -1047,22 +1505,25 @@ class TestAPIRoutes:
         assert r.json() == {}
 
         # Save config
-        r = await client.post("/api/newsletter/config", json={
-            "enabled": True,
-            "schedule": "weekly",
-            "day_of_week": 1,
-            "hour": 10,
-            "recently_added_days": 7,
-            "recently_added_limit": 15,
-            "include_stats": True,
-            "smtp_host": "smtp.example.com",
-            "smtp_port": 587,
-            "smtp_user": "user@example.com",
-            "smtp_pass": "pass",
-            "smtp_tls": True,
-            "from_addr": "empulse@example.com",
-            "to_addrs": "admin@example.com",
-        })
+        r = await client.post(
+            "/api/newsletter/config",
+            json={
+                "enabled": True,
+                "schedule": "weekly",
+                "day_of_week": 1,
+                "hour": 10,
+                "recently_added_days": 7,
+                "recently_added_limit": 15,
+                "include_stats": True,
+                "smtp_host": "smtp.example.com",
+                "smtp_port": 587,
+                "smtp_user": "user@example.com",
+                "smtp_pass": "pass",
+                "smtp_tls": True,
+                "from_addr": "empulse@example.com",
+                "to_addrs": "admin@example.com",
+            },
+        )
         assert r.status_code == 200
 
         # Read back
@@ -1074,22 +1535,25 @@ class TestAPIRoutes:
         assert config["smtp_host"] == "smtp.example.com"
 
         # Update
-        r = await client.post("/api/newsletter/config", json={
-            "enabled": False,
-            "schedule": "daily",
-            "day_of_week": 0,
-            "hour": 8,
-            "recently_added_days": 3,
-            "recently_added_limit": 10,
-            "include_stats": False,
-            "smtp_host": "mail.example.com",
-            "smtp_port": 465,
-            "smtp_user": "",
-            "smtp_pass": "",
-            "smtp_tls": False,
-            "from_addr": "",
-            "to_addrs": "",
-        })
+        r = await client.post(
+            "/api/newsletter/config",
+            json={
+                "enabled": False,
+                "schedule": "daily",
+                "day_of_week": 0,
+                "hour": 8,
+                "recently_added_days": 3,
+                "recently_added_limit": 10,
+                "include_stats": False,
+                "smtp_host": "mail.example.com",
+                "smtp_port": 465,
+                "smtp_user": "",
+                "smtp_pass": "",
+                "smtp_tls": False,
+                "from_addr": "",
+                "to_addrs": "",
+            },
+        )
         assert r.status_code == 200
         r = await client.get("/api/newsletter/config")
         assert r.json()["schedule"] == "daily"

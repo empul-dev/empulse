@@ -1422,6 +1422,21 @@ table a {
     color: var(--danger);
 }
 
+.stream-row.transcode-reasons {
+    padding: 0.4rem 1rem;
+}
+
+.transcode-reason-badge {
+    display: inline-block;
+    font-size: 0.78em;
+    padding: 0.2em 0.6em;
+    margin: 0.15em 0.3em 0.15em 0;
+    border-radius: 4px;
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--danger);
+    font-weight: 500;
+}
+
 /* === Title Link === */
 .title-link {
     text-decoration: none !important;
@@ -3536,36 +3551,60 @@ img[loading="lazy"] {
 /* === Period Comparison Cards === */
 .period-comparison-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
     margin-bottom: 1.5rem;
 }
 .comp-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
-    text-align: center;
+    border-radius: 14px;
+    padding: 1rem 1.25rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    text-align: left;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
 }
 .comp-label {
+    display: block;
     font-size: 0.8rem;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    margin-bottom: 0.4rem;
+    letter-spacing: 0.06em;
+}
+.comp-main {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.85rem;
+    flex-wrap: wrap;
 }
 .comp-value {
     font-size: 1.6rem;
     font-weight: 700;
     color: var(--text-primary);
+    line-height: 1;
 }
 .comp-delta {
-    font-size: 0.85rem;
-    margin-top: 0.3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.9rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
     font-weight: 600;
+    background: rgba(255, 255, 255, 0.04);
 }
-.trend-up { color: #4caf50; }
-.trend-down { color: #ef5350; }
+.trend-up {
+    color: #7adf72;
+    background: rgba(82, 181, 75, 0.14);
+}
+.trend-down {
+    color: #ff8a80;
+    background: rgba(239, 83, 80, 0.14);
+}
 .trend-neutral { color: var(--text-secondary); }
 
 /* === Chart Export Button === */

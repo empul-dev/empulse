@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.8
+
+- Security (Wave 1 of the STRIDE action plan):
+  - Restricted per-user history views, exports, and charts to admins and the owning user (previously any logged-in viewer could see any user's watch history).
+  - Added real account-level login lockout with escalating durations (15m → 1h → 24h), independent of source IP.
+  - Added per-user rate limiting on authenticated API requests.
+  - Notification channel secrets (webhook URLs/headers, SMTP password, bot tokens) are now encrypted at rest, with automatic migration of existing plaintext secrets.
+  - Notification failure logs are now scrubbed of tokens/secrets before being written.
+- Added capture and display of Emby's `TranscodeReasons` — the Stream Info modal now shows a human-readable reason (e.g. "Video codec not supported") whenever a session transcodes, instead of requiring a log dive.
+
 ## 0.2.2
 
 - Redesigned the newsletter email into a richer poster-based layout for movies and TV shows.
