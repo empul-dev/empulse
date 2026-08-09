@@ -2,13 +2,15 @@ import aiosqlite
 
 
 async def upsert_library(db: aiosqlite.Connection, data: dict):
+    data.setdefault("child_count", None)
     await db.execute(
-        """INSERT INTO libraries (emby_library_id, name, library_type, item_count)
-           VALUES (:emby_library_id, :name, :library_type, :item_count)
+        """INSERT INTO libraries (emby_library_id, name, library_type, item_count, child_count)
+           VALUES (:emby_library_id, :name, :library_type, :item_count, :child_count)
            ON CONFLICT(emby_library_id) DO UPDATE SET
              name = excluded.name,
              library_type = excluded.library_type,
-             item_count = excluded.item_count""",
+             item_count = excluded.item_count,
+             child_count = excluded.child_count""",
         data,
     )
     await db.commit()

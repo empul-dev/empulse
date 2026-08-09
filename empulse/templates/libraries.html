@@ -24,7 +24,12 @@
         <div class="library-type-info">
             <div class="library-type-name">{{ lib.name }}</div>
             <div class="library-type-meta">
+                {% if lib.library_type == 'tvshows' and lib.child_count is not none %}
+                <span class="library-type-count">{{ lib.item_count }}</span> series
+                / <span class="library-type-count">{{ lib.child_count }}</span> episodes
+                {% else %}
                 <span class="library-type-count">{{ lib.item_count }}</span> items
+                {% endif %}
                 <span class="library-type-badge">{{ lib.library_type }}</span>
             </div>
         </div>

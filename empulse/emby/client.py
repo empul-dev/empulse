@@ -10,6 +10,14 @@ from empulse.emby.models import EmbySessionInfo, EmbyUser, EmbyLibrary
 
 logger = logging.getLogger("empulse.emby")
 
+# (primary_item_type, child_item_type, display_label, empty_unit) per Emby collection type.
+LIBRARY_ITEM_TYPES = {
+    "movies": ("Movie", "Movie", "Movies", "movie"),
+    "tvshows": ("Series", "Episode", "TV Shows", "series"),
+    "music": ("Audio", "Audio", "Music", "track"),
+}
+DEFAULT_ITEM_TYPES = "Movie,Series,Audio"
+
 _LINK_LOCAL_NETS = [
     ipaddress.ip_network("169.254.0.0/16"),  # IPv4 link-local / cloud metadata
     ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
@@ -113,11 +121,13 @@ class EmbyClient:
         data = r.json()
         return [EmbyLibrary(**lib) for lib in data]
 
-    async def get_library_item_count(self, library_id: str) -> int:
-        r = await self._client.get(
-            f"{self.base_url}/Items",
-            params={"ParentId": library_id, "Recursive": "true", "Limit": 0},
-        )
+    async def get_library_item_count(self, library_id: str, item_types: str = "") -> int:
+        """Count items in a library. Without item_types the recursive count includes
+        seasons/extras/box-sets; pass e.g. "Movie" or "Series" for a real count."""
+        params = {"ParentId": library_id, "Recursive": "true", "Limit": 0}
+        if item_types:
+            params["IncludeItemTypes"] = item_types
+        r = await self._client.get(f"{self.base_url}/Items", params=params)
         r.raise_for_status()
         return r.json().get("TotalRecordCount", 0)
 

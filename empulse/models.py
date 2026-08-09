@@ -339,3 +339,4 @@ class LibraryInfo(BaseModel):
     name: str | None = None
     library_type: str | None = None
     item_count: int = 0
+    child_count: int | None = None

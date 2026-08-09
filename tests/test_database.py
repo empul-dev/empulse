@@ -376,6 +376,16 @@ class TestLibrariesCRUD:
         assert libs[0]["item_count"] == 200
 
     @pytest.mark.asyncio
+    async def test_upsert_stores_child_count(self, db):
+        await libraries_db.upsert_library(db, {
+            "emby_library_id": "tv1", "name": "TV shows",
+            "library_type": "tvshows", "item_count": 587, "child_count": 12577,
+        })
+        libs = await libraries_db.get_all_libraries(db)
+        assert libs[0]["item_count"] == 587
+        assert libs[0]["child_count"] == 12577
+
+    @pytest.mark.asyncio
     async def test_server_info(self, db):
         await libraries_db.upsert_server_info(db, {
             "server_name": "My Emby",

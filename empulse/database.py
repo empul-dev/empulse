@@ -101,7 +101,8 @@ CREATE TABLE IF NOT EXISTS libraries (
     emby_library_id TEXT UNIQUE NOT NULL,
     name TEXT,
     library_type TEXT,
-    item_count INTEGER DEFAULT 0
+    item_count INTEGER DEFAULT 0,
+    child_count INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS server_info (
@@ -218,6 +219,13 @@ async def _migrate(db: aiosqlite.Connection):
             "ALTER TABLE history ADD COLUMN pause_events TEXT DEFAULT '[]'"
         )
         logger.info("Migration: added pause_events column to history")
+
+    # Add child_count to libraries (episode count for TV, NULL otherwise)
+    cursor = await db.execute("PRAGMA table_info(libraries)")
+    lib_cols = {row[1] for row in await cursor.fetchall()}
+    if "child_count" not in lib_cols:
+        await db.execute("ALTER TABLE libraries ADD COLUMN child_count INTEGER")
+        logger.info("Migration: added child_count column to libraries")
 
     # Ensure login_sessions table exists (for pre-existing DBs)
     await db.execute("""

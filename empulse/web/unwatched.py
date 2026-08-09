@@ -6,6 +6,7 @@ from fastapi import Request
 
 from empulse import database
 from empulse.db import libraries as libraries_db, stats as stats_db
+from empulse.emby.client import LIBRARY_ITEM_TYPES, DEFAULT_ITEM_TYPES
 
 logger = logging.getLogger("empulse.unwatched")
 
@@ -13,12 +14,6 @@ DEFAULT_PAGE_SIZE = 48
 MAX_PAGE_SIZE = 100
 CATALOG_PAGE_SIZE = 200
 VALID_SORTS = {"name_asc", "name_desc", "year_desc", "year_asc", "added_desc"}
-LIBRARY_ITEM_TYPES = {
-    "movies": ("Movie", "Movie", "Movies", "movie"),
-    "tvshows": ("Series", "Episode", "TV Shows", "series"),
-    "music": ("Audio", "Audio", "Music", "track"),
-}
-DEFAULT_ITEM_TYPES = "Movie,Series,Audio"
 
 
 def _normalize_page(page: int) -> int:

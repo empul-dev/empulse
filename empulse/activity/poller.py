@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from empulse.config import settings
-from empulse.emby.client import EmbyClient
+from empulse.emby.client import EmbyClient, LIBRARY_ITEM_TYPES
 from empulse.activity.processor import ActivityProcessor
 from empulse.web.websocket import BrowserWSManager
 
@@ -90,12 +90,21 @@ class SessionPoller:
             # Sync libraries
             libs = await self.client.get_libraries()
             for lib in libs:
-                count = await self.client.get_library_item_count(lib.id)
+                mapping = LIBRARY_ITEM_TYPES.get(lib.collection_type or "")
+                primary_type = mapping[0] if mapping else ""
+                child_type = mapping[1] if mapping else ""
+                count = await self.client.get_library_item_count(lib.id, primary_type)
+                child_count = (
+                    await self.client.get_library_item_count(lib.id, child_type)
+                    if child_type and child_type != primary_type
+                    else None
+                )
                 await libraries_db.upsert_library(db, {
                     "emby_library_id": lib.id,
                     "name": lib.name,
                     "library_type": lib.collection_type or "unknown",
                     "item_count": count,
+                    "child_count": child_count,
                 })
 
             logger.info(f"Metadata synced: {len(emby_users)} users, {len(libs)} libraries")
