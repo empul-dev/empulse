@@ -8,6 +8,13 @@ logger = logging.getLogger("empulse.db")
 
 _db: aiosqlite.Connection | None = None
 
+# Minimum watched seconds for a history row to count as a real "play". Trivial
+# rows (false starts, samples) stay in the history table but are excluded from
+# all stat/count queries via the counted_plays view. ponytail: 600s (10 min)
+# matches the user's "9-min sample isn't a play"; lower it if short-runtime
+# items (music videos, anime shorts) legitimately get dropped from counts.
+MIN_PLAY_SECONDS = 600
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -167,7 +174,10 @@ CREATE TABLE IF NOT EXISTS display_settings (
     week_start TEXT DEFAULT 'monday',
     timezone TEXT DEFAULT 'UTC'
 );
-"""
+""" + (
+    "CREATE VIEW IF NOT EXISTS counted_plays AS "
+    f"SELECT * FROM history WHERE duration_seconds >= {MIN_PLAY_SECONDS};\n"
+)
 
 
 async def init_db():
@@ -245,6 +255,15 @@ async def _migrate(db: aiosqlite.Connection):
             timezone TEXT DEFAULT 'UTC'
         )
     """)
+
+    # Recreate the counted_plays view (drop+create so tuning MIN_PLAY_SECONDS
+    # takes effect on restart). Stats/count queries read from this; the history
+    # table keeps every row so the history page still shows sub-threshold plays.
+    await db.execute("DROP VIEW IF EXISTS counted_plays")
+    await db.execute(
+        "CREATE VIEW counted_plays AS SELECT * FROM history "
+        f"WHERE duration_seconds >= {MIN_PLAY_SECONDS}"
+    )
 
     # Cleanup expired login sessions
     from datetime import datetime, timezone

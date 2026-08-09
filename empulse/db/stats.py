@@ -16,13 +16,13 @@ def _tz_modifier(offset: float) -> str:
 
 
 async def get_total_plays(db: aiosqlite.Connection) -> int:
-    cursor = await db.execute("SELECT COUNT(*) FROM history")
+    cursor = await db.execute("SELECT COUNT(*) FROM counted_plays")
     row = await cursor.fetchone()
     return row[0]
 
 
 async def get_total_duration(db: aiosqlite.Connection) -> int:
-    cursor = await db.execute("SELECT COALESCE(SUM(duration_seconds), 0) FROM history")
+    cursor = await db.execute("SELECT COALESCE(SUM(duration_seconds), 0) FROM counted_plays")
     row = await cursor.fetchone()
     return row[0]
 
@@ -34,7 +34,7 @@ async def get_top_users(
     cursor = await db.execute(
         f"""SELECT user_id, user_name, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY user_id
            ORDER BY {order} DESC LIMIT ?""",
@@ -52,7 +52,7 @@ async def get_most_watched_movies(
         f"""SELECT item_id, item_name, year, COUNT(*) as plays,
                   COUNT(DISTINCT user_id) as users,
                   SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE item_type = 'Movie' AND started_at >= datetime('now', ?)
            GROUP BY item_id
            ORDER BY {order} DESC LIMIT ?""",
@@ -68,7 +68,7 @@ async def get_most_popular_movies(
     cursor = await db.execute(
         """SELECT item_id, item_name, year, COUNT(DISTINCT user_id) as users,
                   COUNT(*) as plays
-           FROM history
+           FROM counted_plays
            WHERE item_type = 'Movie' AND started_at >= datetime('now', ?)
            GROUP BY item_id
            ORDER BY users DESC, plays DESC LIMIT ?""",
@@ -89,7 +89,7 @@ async def get_most_watched_shows(
                   COALESCE(
                       (
                           SELECT h2.series_id
-                          FROM history h2
+                          FROM counted_plays h2
                           WHERE h2.item_type = 'Episode'
                             AND h2.series_name = h.series_name
                             AND NULLIF(h2.series_id, '') IS NOT NULL
@@ -98,7 +98,7 @@ async def get_most_watched_shows(
                       ),
                       MIN(h.item_id)
                   ) as poster_id
-           FROM history h
+           FROM counted_plays h
            WHERE h.item_type = 'Episode' AND h.series_name IS NOT NULL
                  AND started_at >= datetime('now', ?)
            GROUP BY h.series_name
@@ -118,7 +118,7 @@ async def get_most_popular_shows(
                   COALESCE(
                       (
                           SELECT h2.series_id
-                          FROM history h2
+                          FROM counted_plays h2
                           WHERE h2.item_type = 'Episode'
                             AND h2.series_name = h.series_name
                             AND NULLIF(h2.series_id, '') IS NOT NULL
@@ -127,7 +127,7 @@ async def get_most_popular_shows(
                       ),
                       MIN(h.item_id)
                   ) as poster_id
-           FROM history h
+           FROM counted_plays h
            WHERE h.item_type = 'Episode' AND h.series_name IS NOT NULL
                  AND started_at >= datetime('now', ?)
            GROUP BY h.series_name
@@ -142,7 +142,7 @@ async def get_recently_watched(db: aiosqlite.Connection, limit: int = 5) -> list
     cursor = await db.execute(
         """SELECT item_id, item_name, series_name, series_id, season_number, episode_number,
                   item_type, year, user_name, started_at
-           FROM history
+           FROM counted_plays
            ORDER BY started_at DESC LIMIT ?""",
         [limit],
     )
@@ -194,7 +194,7 @@ async def get_most_active_platforms(
     cursor = await db.execute(
         """SELECT client, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY client
            ORDER BY plays DESC LIMIT ?""",
@@ -210,7 +210,7 @@ async def get_most_active_libraries(
     cursor = await db.execute(
         """SELECT item_type, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY item_type
            ORDER BY plays DESC LIMIT ?""",
@@ -227,7 +227,7 @@ async def get_plays_per_day(
     cursor = await db.execute(
         f"""SELECT DATE(started_at, '{mod}') as date, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY DATE(started_at, '{mod}')
            ORDER BY date""",
@@ -241,7 +241,7 @@ async def get_plays_by_type(db: aiosqlite.Connection, days: int = 30) -> list[di
     cursor = await db.execute(
         """SELECT item_type, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY item_type ORDER BY plays DESC""",
         [f"-{days} days"],
@@ -255,7 +255,7 @@ async def get_user_stats(db: aiosqlite.Connection, user_id: str) -> dict:
         """SELECT COUNT(*) as total_plays,
                   COALESCE(SUM(duration_seconds), 0) as total_duration,
                   MAX(started_at) as last_play
-           FROM history WHERE user_id = ?""",
+           FROM counted_plays WHERE user_id = ?""",
         [user_id],
     )
     row = await cursor.fetchone()
@@ -273,7 +273,7 @@ async def get_item_stats(db: aiosqlite.Connection, item_id: str) -> dict:
     ]:
         cursor = await db.execute(
             """SELECT COUNT(*) as plays, COALESCE(SUM(duration_seconds), 0) as duration
-               FROM history WHERE item_id = ? AND started_at >= datetime('now', ?)""",
+               FROM counted_plays WHERE item_id = ? AND started_at >= datetime('now', ?)""",
             [item_id, days_expr],
         )
         row = await cursor.fetchone()
@@ -286,7 +286,7 @@ async def get_item_user_stats(db: aiosqlite.Connection, item_id: str) -> list[di
     cursor = await db.execute(
         """SELECT user_id, user_name, COUNT(*) as plays,
                   COALESCE(SUM(duration_seconds), 0) as total_duration
-           FROM history WHERE item_id = ?
+           FROM counted_plays WHERE item_id = ?
            GROUP BY user_id ORDER BY plays DESC""",
         [item_id],
     )
@@ -305,7 +305,7 @@ async def get_series_stats(db: aiosqlite.Connection, series_name: str) -> dict:
     ]:
         cursor = await db.execute(
             """SELECT COUNT(*) as plays, COALESCE(SUM(duration_seconds), 0) as duration
-               FROM history WHERE series_name = ? AND started_at >= datetime('now', ?)""",
+               FROM counted_plays WHERE series_name = ? AND started_at >= datetime('now', ?)""",
             [series_name, days_expr],
         )
         row = await cursor.fetchone()
@@ -320,7 +320,7 @@ async def get_series_user_stats(
     cursor = await db.execute(
         """SELECT user_id, user_name, COUNT(*) as plays,
                   COALESCE(SUM(duration_seconds), 0) as total_duration
-           FROM history WHERE series_name = ?
+           FROM counted_plays WHERE series_name = ?
            GROUP BY user_id ORDER BY plays DESC""",
         [series_name],
     )
@@ -335,7 +335,7 @@ async def get_user_plays_per_day(
     cursor = await db.execute(
         f"""SELECT DATE(started_at, '{mod}') as date, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE user_id = ? AND started_at >= datetime('now', ?)
            GROUP BY DATE(started_at, '{mod}')
            ORDER BY date""",
@@ -350,7 +350,7 @@ async def get_user_plays_by_type(
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT item_type, COUNT(*) as plays
-           FROM history
+           FROM counted_plays
            WHERE user_id = ? AND started_at >= datetime('now', ?)
            GROUP BY item_type ORDER BY plays DESC""",
         [user_id, f"-{days} days"],
@@ -368,7 +368,7 @@ async def get_user_most_watched(
                COALESCE(
                    (
                        SELECT h2.series_id
-                       FROM history h2
+                       FROM counted_plays h2
                        WHERE h2.user_id = h.user_id
                          AND h2.item_type = 'Episode'
                          AND h2.series_name = h.series_name
@@ -380,7 +380,7 @@ async def get_user_most_watched(
                ) as poster_id,
                COUNT(*) as plays,
                SUM(duration_seconds) as total_duration
-           FROM history h
+           FROM counted_plays h
            WHERE h.user_id = ? AND h.started_at >= datetime('now', ?)
            GROUP BY COALESCE(h.series_name, h.item_name)
            ORDER BY plays DESC LIMIT ?""",
@@ -403,7 +403,7 @@ async def get_library_stats(
             """SELECT COUNT(*) as plays,
                       COALESCE(SUM(duration_seconds), 0) as duration,
                       COUNT(DISTINCT user_id) as users
-               FROM history WHERE item_type = ? AND started_at >= datetime('now', ?)""",
+               FROM counted_plays WHERE item_type = ? AND started_at >= datetime('now', ?)""",
             [item_type, days_expr],
         )
         row = await cursor.fetchone()
@@ -420,7 +420,7 @@ async def get_library_top_items(
                       COALESCE(
                           (
                               SELECT h2.series_id
-                              FROM history h2
+                              FROM counted_plays h2
                               WHERE h2.item_type = 'Episode'
                                 AND h2.series_name = h.series_name
                                 AND NULLIF(h2.series_id, '') IS NOT NULL
@@ -432,7 +432,7 @@ async def get_library_top_items(
                       COUNT(*) as plays,
                       SUM(duration_seconds) as total_duration,
                       COUNT(DISTINCT user_id) as users
-               FROM history h
+               FROM counted_plays h
                WHERE h.item_type = ? AND h.started_at >= datetime('now', ?)
                GROUP BY h.series_name
                ORDER BY plays DESC LIMIT ?""",
@@ -444,7 +444,7 @@ async def get_library_top_items(
                       COUNT(*) as plays,
                       SUM(duration_seconds) as total_duration,
                       COUNT(DISTINCT user_id) as users
-               FROM history
+               FROM counted_plays
                WHERE item_type = ? AND started_at >= datetime('now', ?)
                GROUP BY item_id
                ORDER BY plays DESC LIMIT ?""",
@@ -460,7 +460,7 @@ async def get_library_top_users(
     cursor = await db.execute(
         """SELECT user_id, user_name, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE item_type = ? AND started_at >= datetime('now', ?)
            GROUP BY user_id
            ORDER BY plays DESC LIMIT ?""",
@@ -480,7 +480,7 @@ async def get_library_plays_per_day(
     cursor = await db.execute(
         f"""SELECT DATE(started_at, '{mod}') as date, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE item_type = ? AND started_at >= datetime('now', ?)
            GROUP BY DATE(started_at, '{mod}')
            ORDER BY date""",
@@ -497,7 +497,7 @@ async def get_plays_by_day_of_week(
     cursor = await db.execute(
         f"""SELECT CAST(strftime('%w', started_at, '{mod}') AS INTEGER) as dow,
                   COUNT(*) as plays, SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY dow ORDER BY dow""",
         [f"-{days} days"],
@@ -513,7 +513,7 @@ async def get_plays_by_hour(
     cursor = await db.execute(
         f"""SELECT CAST(strftime('%H', started_at, '{mod}') AS INTEGER) as hour,
                   COUNT(*) as plays, SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY hour ORDER BY hour""",
         [f"-{days} days"],
@@ -534,7 +534,7 @@ async def get_plays_per_month(
     cursor = await db.execute(
         """SELECT strftime('%Y-%m', started_at) as month,
                   COUNT(*) as plays, COALESCE(SUM(duration_seconds), 0) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY month ORDER BY month""",
         [window],
@@ -550,7 +550,7 @@ async def get_plays_by_date_stacked(
     cursor = await db.execute(
         f"""SELECT DATE(started_at, '{mod}') as date, item_type,
                   COUNT(*) as plays, SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY date, item_type
            ORDER BY date""",
@@ -567,7 +567,7 @@ async def get_plays_by_stream_type(
     cursor = await db.execute(
         f"""SELECT DATE(started_at, '{mod}') as date, play_method,
                   COUNT(*) as plays
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY date, play_method
            ORDER BY date""",
@@ -591,7 +591,7 @@ async def get_source_resolution_distribution(
                    ELSE 'Unknown'
                END as resolution,
                COUNT(*) as plays
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY resolution
            ORDER BY plays DESC""",
@@ -604,7 +604,7 @@ async def get_source_resolution_distribution(
 async def get_transcode_ratio(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
     cursor = await db.execute(
         """SELECT play_method, COUNT(*) as plays
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?) AND play_method IS NOT NULL
            GROUP BY play_method ORDER BY plays DESC""",
         [f"-{days} days"],
@@ -618,7 +618,7 @@ async def get_top_platforms_with_stream_type(
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT client, play_method, COUNT(*) as plays
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?) AND client IS NOT NULL
            GROUP BY client, play_method
            ORDER BY plays DESC""",
@@ -633,7 +633,7 @@ async def get_top_users_with_stream_type(
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT user_id, user_name, play_method, COUNT(*) as plays
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY user_id, play_method
            ORDER BY plays DESC""",
@@ -656,7 +656,7 @@ async def get_completion_breakdown(
                    ELSE '0-25%'
                END as range,
                COUNT(*) as plays
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY range
            ORDER BY
@@ -679,7 +679,7 @@ async def get_period_comparison(db: aiosqlite.Connection, days: int = 30) -> dic
                   COALESCE(SUM(duration_seconds), 0) as total_duration,
                   COUNT(DISTINCT user_id) as unique_users,
                   COUNT(DISTINCT item_id) as unique_items
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)""",
         [f"-{days} days"],
     )
@@ -690,7 +690,7 @@ async def get_period_comparison(db: aiosqlite.Connection, days: int = 30) -> dic
                   COALESCE(SUM(duration_seconds), 0) as total_duration,
                   COUNT(DISTINCT user_id) as unique_users,
                   COUNT(DISTINCT item_id) as unique_items
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?) AND started_at < datetime('now', ?)""",
         [f"-{days * 2} days", f"-{days} days"],
     )
@@ -707,7 +707,7 @@ async def get_bandwidth_stats(
         f"""SELECT DATE(started_at, '{mod}') as date,
                   AVG(json_extract(stream_info, '$.media.bitrate')) as avg_bitrate,
                   COUNT(*) as plays
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
                  AND json_extract(stream_info, '$.media.bitrate') IS NOT NULL
                  AND json_extract(stream_info, '$.media.bitrate') > 0
@@ -729,7 +729,7 @@ async def get_watch_heatmap(
                   CAST(strftime('%H', started_at, '{mod}') AS INTEGER) as hour,
                   COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
-           FROM history
+           FROM counted_plays
            WHERE started_at >= datetime('now', ?)
            GROUP BY dow, hour
            ORDER BY dow, hour""",
