@@ -265,6 +265,16 @@ async def _migrate(db: aiosqlite.Connection):
         f"WHERE duration_seconds >= {MIN_PLAY_SECONDS}"
     )
 
+    # Null out implausible stored transcode framerates (Emby sometimes reports
+    # absurd values like 5792 fps). New captures are clamped in the processor;
+    # this cleans historical rows so the UI falls back to the source framerate.
+    # Idempotent: matches 0 rows once cleaned.
+    await db.execute(
+        "UPDATE history "
+        "SET stream_info = json_set(stream_info, '$.transcode.framerate', null) "
+        "WHERE json_extract(stream_info, '$.transcode.framerate') > 240"
+    )
+
     # Cleanup expired login sessions
     from datetime import datetime, timezone
 

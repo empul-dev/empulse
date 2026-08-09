@@ -550,7 +550,7 @@ class TestAPIRoutes:
         assert "history-row" in r.text
 
     @pytest.mark.asyncio
-    async def test_stream_info_shows_transcode_reasons(self, client):
+    async def test_history_detail_shows_transcode_reasons(self, client):
         db = client._test_db
         await history_db.insert_history(
             db,
@@ -577,7 +577,7 @@ class TestAPIRoutes:
         cursor = await db.execute("SELECT id FROM history WHERE session_key = 's-reasons'")
         history_id = (await cursor.fetchone())["id"]
 
-        r = await client.get(f"/api/stream-info/{history_id}")
+        r = await client.get(f"/api/history-detail/{history_id}")
         assert r.status_code == 200
         # Emby reasons still render (now as summary badges), plus a derived
         # per-stream badge for the codec change.

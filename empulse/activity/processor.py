@@ -77,7 +77,10 @@ class ActivityProcessor:
                 "audio_bitrate": tc.audio_bitrate,
                 "width": tc.width,
                 "height": tc.height,
-                "framerate": tc.framerate,
+                # ponytail: Emby's TranscodingInfo.Framerate is unreliable and
+                # sometimes reports absurd values (e.g. 5792 fps). Drop anything
+                # implausible so the UI falls back to the source framerate.
+                "framerate": tc.framerate if tc.framerate and tc.framerate <= 240 else None,
                 "audio_channels": tc.audio_channels,
                 "is_video_direct": tc.is_video_direct,
                 "is_audio_direct": tc.is_audio_direct,

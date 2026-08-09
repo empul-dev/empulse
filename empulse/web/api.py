@@ -364,31 +364,6 @@ async def history_table(
     )
 
 
-@router.get("/stream-info/{history_id}")
-async def stream_info(request: Request, history_id: int):
-    db = get_db()
-    row = await history_db.get_history_by_id(db, history_id)
-    if not row:
-        return '<p class="empty-state">Record not found</p>'
-    if (forbidden := require_self_or_admin(request, row.get("user_id") or "")) is not None:
-        return forbidden
-
-    record = HistoryRecord(**row)
-    try:
-        info = json.loads(record.stream_info) if record.stream_info else {}
-    except (json.JSONDecodeError, TypeError):
-        info = {}
-
-    return templates.TemplateResponse(
-        request,
-        "partials/stream_info.html",
-        {
-            "record": record,
-            "info": info,
-        },
-    )
-
-
 @router.get("/history-detail/{history_id}")
 async def history_detail(request: Request, history_id: int):
     db = get_db()

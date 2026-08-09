@@ -240,6 +240,33 @@ class TestHistoryCRUD:
         deleted = await history_db.delete_history(db, 99999)
         assert deleted is False
 
+    @pytest.mark.asyncio
+    async def test_migrate_nulls_garbage_framerate(self, db):
+        from empulse.database import _migrate
+
+        # Garbage fps (>240) gets nulled; plausible fps is left intact.
+        bad = {"video": {"framerate": 24.0}, "transcode": {"framerate": 5792.0}}
+        ok = {"video": {"framerate": 24.0}, "transcode": {"framerate": 24.0}}
+        id_bad = await history_db.insert_history_returning_id(db, {
+            "session_key": "b", "user_id": "u", "user_name": "A", "item_id": "i",
+            "item_name": "Bad", "item_type": "Movie", "started_at": "2024-01-01T00:00:00",
+            "stopped_at": "2024-01-01T01:00:00", "duration_seconds": 3600,
+            "stream_info": json.dumps(bad),
+        })
+        id_ok = await history_db.insert_history_returning_id(db, {
+            "session_key": "g", "user_id": "u", "user_name": "A", "item_id": "i",
+            "item_name": "Ok", "item_type": "Movie", "started_at": "2024-01-01T00:00:00",
+            "stopped_at": "2024-01-01T01:00:00", "duration_seconds": 3600,
+            "stream_info": json.dumps(ok),
+        })
+
+        await _migrate(db)
+
+        got_bad = json.loads((await history_db.get_history_by_id(db, id_bad))["stream_info"])
+        got_ok = json.loads((await history_db.get_history_by_id(db, id_ok))["stream_info"])
+        assert got_bad["transcode"]["framerate"] is None
+        assert got_ok["transcode"]["framerate"] == 24.0
+
 
 class TestUsersCRUD:
     @pytest.mark.asyncio

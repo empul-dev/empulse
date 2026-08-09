@@ -59,6 +59,18 @@
                 <div class="detail-stream-header">
                     <span class="play-method-badge {% if record.play_method == 'Transcode' %}transcode{% elif record.play_method == 'DirectPlay' %}direct-play{% elif record.play_method == 'DirectStream' %}direct-stream{% endif %}">{{ record.play_method or 'Unknown' }}</span>
                 </div>
+                {% set summary = info | transcode_summary %}
+                {% if summary or tc.get('reasons') %}
+                {# Why this transcoded: Emby's own reasons, plus derived source->stream changes. #}
+                <div class="stream-summary">
+                    {% for s in summary %}
+                    <span class="stream-summary-badge {{ s.kind }}">{{ s.text }}</span>
+                    {% endfor %}
+                    {% for reason in tc.get('reasons') or [] %}
+                    <span class="stream-summary-badge transcode">{{ reason | fmt_transcode_reason }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
                 <table class="detail-stream-tbl">
                     {% if media.get('container') %}
                     <tr>
