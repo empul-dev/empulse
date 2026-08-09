@@ -299,17 +299,24 @@ class TestUsersCRUD:
         assert user["username"] == "Alice Updated"
 
     @pytest.mark.asyncio
-    async def test_update_stats(self, db):
+    async def test_stats_derived_from_history(self, db):
+        # Totals come from counted_plays (history rows >= MIN_PLAY_SECONDS),
+        # not the drift-prone counter columns.
         await users_db.upsert_user(db, {
             "emby_user_id": "u1", "username": "Alice",
             "is_admin": 0, "thumb_url": None, "last_seen": None,
         })
-
-        await users_db.update_user_stats(db, "u1", 3600)
-        await users_db.update_user_stats(db, "u1", 1800)
+        for i, dur in enumerate([3600, 1800, 60]):  # 60s is below the 600s cutoff
+            await history_db.insert_history(db, {
+                "session_key": f"s{i}", "user_id": "u1", "user_name": "Alice",
+                "item_name": f"Item{i}",
+                "started_at": f"2024-01-0{i+1}T12:00:00",
+                "stopped_at": f"2024-01-0{i+1}T14:00:00",
+                "duration_seconds": dur,
+            })
 
         user = await users_db.get_user(db, "u1")
-        assert user["total_plays"] == 2
+        assert user["total_plays"] == 2          # 60s play excluded
         assert user["total_duration"] == 5400
 
     @pytest.mark.asyncio
@@ -319,8 +326,14 @@ class TestUsersCRUD:
                 "emby_user_id": name.lower(), "username": name,
                 "is_admin": 0, "thumb_url": None, "last_seen": None,
             })
-            for _ in range(plays):
-                await users_db.update_user_stats(db, name.lower(), 60)
+            for i in range(plays):
+                await history_db.insert_history(db, {
+                    "session_key": f"{name}-{i}", "user_id": name.lower(),
+                    "user_name": name, "item_name": f"Item{i}",
+                    "started_at": "2024-01-01T12:00:00",
+                    "stopped_at": "2024-01-01T14:00:00",
+                    "duration_seconds": 3600,
+                })
 
         users = await users_db.get_all_users(db)
         assert len(users) == 3

@@ -43,13 +43,31 @@ async def update_user_stats(db: aiosqlite.Connection, user_id: str, duration: in
     await db.commit()
 
 
+# Derive total_plays/total_duration from counted_plays (the single source of
+# truth) rather than the stored counter columns, which drift and can accumulate
+# absurd values (e.g. pre-cap zombie sessions). ponytail: counter columns left
+# in place but no longer read.
+_USER_SELECT = """
+    SELECT u.id, u.emby_user_id, u.username, u.is_admin, u.enabled,
+           u.thumb_url, u.last_seen,
+           COALESCE(cp.plays, 0) AS total_plays,
+           COALESCE(cp.duration, 0) AS total_duration
+    FROM users u
+    LEFT JOIN (SELECT user_id, COUNT(*) AS plays, SUM(duration_seconds) AS duration
+               FROM counted_plays GROUP BY user_id) cp
+      ON cp.user_id = u.emby_user_id
+"""
+
+
 async def get_all_users(db: aiosqlite.Connection) -> list[dict]:
-    cursor = await db.execute("SELECT * FROM users ORDER BY total_plays DESC")
+    cursor = await db.execute(_USER_SELECT + " ORDER BY total_plays DESC")
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_user(db: aiosqlite.Connection, emby_user_id: str) -> dict | None:
-    cursor = await db.execute("SELECT * FROM users WHERE emby_user_id = ?", [emby_user_id])
+    cursor = await db.execute(
+        _USER_SELECT + " WHERE u.emby_user_id = ?", [emby_user_id]
+    )
     row = await cursor.fetchone()
     return dict(row) if row else None

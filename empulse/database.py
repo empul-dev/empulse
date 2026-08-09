@@ -275,6 +275,17 @@ async def _migrate(db: aiosqlite.Connection):
         "WHERE json_extract(stream_info, '$.transcode.framerate') > 240"
     )
 
+    # Clamp historically inflated playback durations. Before the accumulated-total
+    # cap in the processor, a repeatedly re-merged session could grow to many times
+    # the item's runtime (seen: 470x -> 82694-day user totals). Clamp any row that
+    # exceeds 1.5x its runtime to 1.5x. Idempotent: matches 0 rows once cleaned.
+    await db.execute(
+        "UPDATE history "
+        "SET duration_seconds = CAST(runtime_ticks / 10000000.0 * 1.5 AS INTEGER) "
+        "WHERE runtime_ticks > 0 "
+        "  AND duration_seconds > runtime_ticks / 10000000.0 * 1.5"
+    )
+
     # Cleanup expired login sessions
     from datetime import datetime, timezone
 

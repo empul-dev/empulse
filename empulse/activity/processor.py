@@ -229,19 +229,22 @@ class ActivityProcessor:
         # wall-clock catches re-watches of the same segment.
         session_duration = max(tick_duration, wall_actual)
 
-        # ponytail: cap one session at ~1.5x the item's runtime so a lingering
-        # "zombie" session (Emby keeps reporting it active for days) can't record
-        # absurd wall-clock durations (e.g. 71h). 1.5x leaves room for rewinds and
-        # re-watched segments; raise the factor if legit long sessions get clipped.
         runtime_seconds = session.get("runtime_ticks", 0) // 10_000_000
-        if runtime_seconds > 0:
-            session_duration = min(session_duration, int(runtime_seconds * 1.5))
 
         # Add base values from a prior merged record
         base_duration = session.get("base_duration", 0)
         base_paused = session.get("base_paused", 0)
         total_duration = base_duration + session_duration
         total_paused = base_paused + paused_seconds
+
+        # ponytail: cap the ACCUMULATED total at ~1.5x the item's runtime. Each
+        # resume merges into the same record (base_duration = prior total), so
+        # capping only the per-session portion let a repeatedly re-merged session
+        # grow unbounded (seen: 470x runtime). 1.5x leaves room for rewinds and
+        # re-watched segments; a genuine re-watch opens a NEW record via rewatch
+        # detection in _start_history, so it isn't clipped here.
+        if runtime_seconds > 0:
+            total_duration = min(total_duration, int(runtime_seconds * 1.5))
 
         runtime = session.get("runtime_ticks", 0)
         progress = session.get("progress_ticks", 0)
