@@ -21,6 +21,7 @@ from empulse.formatting import (
     format_date_short,
     format_last_seen,
     format_transcode_reason,
+    derive_transcode_summary,
 )
 
 logger = logging.getLogger("empulse")
@@ -70,6 +71,7 @@ templates.env.filters["fmt_datetime"] = format_datetime
 templates.env.filters["fmt_date_short"] = format_date_short
 templates.env.filters["fmt_last_seen"] = format_last_seen
 templates.env.filters["fmt_transcode_reason"] = format_transcode_reason
+templates.env.filters["transcode_summary"] = derive_transcode_summary
 
 
 @asynccontextmanager

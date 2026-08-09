@@ -19,6 +19,20 @@
     {% if has_detail %}
     {# Full stream info from JSON #}
 
+    {% set summary = info | transcode_summary %}
+    {% if summary or tc.get('reasons') %}
+    {# At-a-glance: what actually changed source -> stream. Derived when Emby
+       reports no reasons; Emby's own reasons appended when present. #}
+    <div class="stream-summary">
+        {% for s in summary %}
+        <span class="stream-summary-badge {{ s.kind }}">{{ s.text }}</span>
+        {% endfor %}
+        {% for reason in tc.get('reasons') %}
+        <span class="stream-summary-badge transcode">{{ reason | fmt_transcode_reason }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     {% if media.get('bitrate') or media.get('resolution') %}
     <div class="stream-section-label">Media</div>
     {% if media.get('bitrate') %}
@@ -48,17 +62,6 @@
         <span class="stream-val">{{ media.get('container', '') }}</span>
         <span class="stream-arrow">&rarr;</span>
         <span class="stream-val">{{ tc.get('container') or media.get('container', '') }}</span>
-    </div>
-    {% endif %}
-
-    {% if tc.get('reasons') %}
-    <div class="stream-section-label">Transcode Reason{{ 's' if tc.get('reasons') | length > 1 else '' }}</div>
-    <div class="stream-row transcode-reasons">
-        <span class="stream-val" style="grid-column: 1 / -1">
-            {% for reason in tc.get('reasons') %}
-            <span class="transcode-reason-badge">{{ reason | fmt_transcode_reason }}</span>
-            {% endfor %}
-        </span>
     </div>
     {% endif %}
 

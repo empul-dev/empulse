@@ -9,6 +9,7 @@ from empulse.formatting import (
     format_datetime,
     format_last_seen,
     format_transcode_reason,
+    derive_transcode_summary,
     get_dow_labels,
     get_dow_order,
     get_hour_label,
@@ -210,3 +211,46 @@ def test_format_transcode_reason_unknown_code_falls_back_to_split():
 
 def test_format_transcode_reason_empty():
     assert format_transcode_reason("") == ""
+
+
+# ── Derived transcode summary ───────────────────────────────────────────────
+
+
+def test_derive_summary_audio_only_no_reasons():
+    # The image case: video direct-streams, audio transcodes but every param is
+    # identical and Emby gave no reasons -> honest "compatibility / track".
+    info = {
+        "video": {"codec": "HEVC", "bitrate": 7601000, "height": 800},
+        "audio": {"codec": "EAC3", "channels": 6, "bitrate": 768000},
+        "media": {"container": "MKV"},
+        "transcode": {
+            "container": "MKV", "video_codec": "HEVC", "audio_codec": "EAC3",
+            "audio_channels": 6, "audio_bitrate": 768000, "height": 800,
+            "is_video_direct": True, "is_audio_direct": False, "reasons": [],
+        },
+    }
+    out = derive_transcode_summary(info)
+    assert {"kind": "direct", "text": "Video: Direct Stream"} in out
+    assert {"kind": "transcode", "text": "Audio: compatibility / track"} in out
+
+
+def test_derive_summary_full_transcode():
+    info = {
+        "video": {"codec": "HEVC", "bitrate": 10000000, "height": 1080},
+        "audio": {"codec": "DTS", "channels": 6, "bitrate": 1500000},
+        "media": {"container": "MKV"},
+        "transcode": {
+            "container": "MP4", "video_codec": "H264", "audio_codec": "AAC",
+            "video_bitrate": 4000000, "height": 720, "audio_channels": 2,
+            "audio_bitrate": 256000, "is_video_direct": False,
+            "is_audio_direct": False, "reasons": [],
+        },
+    }
+    texts = [x["text"] for x in derive_transcode_summary(info)]
+    assert "Remux MKV → MP4" in texts
+    assert "Video: HEVC → H264, Downscale 1080p → 720p, Bitrate 10000 → 4000 kbps" in texts
+    assert "Audio: DTS → AAC, Downmix 6 → 2ch, Bitrate 1500 → 256 kbps" in texts
+
+
+def test_derive_summary_no_transcode_is_empty():
+    assert derive_transcode_summary({"video": {"codec": "H264"}}) == []

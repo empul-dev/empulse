@@ -196,6 +196,66 @@ def format_transcode_reason(reason: str) -> str:
     return " ".join(words[:1] + [w.lower() for w in words[1:]])
 
 
+def derive_transcode_summary(info: dict) -> list[dict]:
+    """At-a-glance summary of what actually changed source -> stream, derived
+    from the captured stream info. Fills the gap when Emby reports no
+    TranscodeReasons: each stream gets one badge saying direct vs. what changed.
+    Returns [{"kind": "direct"|"transcode", "text": str}]."""
+    video = info.get("video") or {}
+    audio = info.get("audio") or {}
+    media = info.get("media") or {}
+    tc = info.get("transcode") or {}
+    out: list[dict] = []
+    if not tc:
+        return out
+
+    src_c = (media.get("container") or "").upper()
+    dst_c = (tc.get("container") or "").upper()
+    if src_c and dst_c and src_c != dst_c:
+        out.append({"kind": "transcode", "text": f"Remux {src_c} → {dst_c}"})
+
+    if video:
+        if tc.get("is_video_direct"):
+            out.append({"kind": "direct", "text": "Video: Direct Stream"})
+        else:
+            changes = []
+            sc = (video.get("codec") or "").upper()
+            dc = (tc.get("video_codec") or "").upper()
+            if sc and dc and sc != dc:
+                changes.append(f"{sc} → {dc}")
+            sh, dh = video.get("height"), tc.get("height")
+            if sh and dh and dh < sh:
+                changes.append(f"Downscale {sh}p → {dh}p")
+            sb, db = video.get("bitrate"), tc.get("video_bitrate")
+            if sb and db and db < sb:
+                changes.append(f"Bitrate {sb // 1000} → {db // 1000} kbps")
+            text = "Video: " + (", ".join(changes) if changes else "Transcode")
+            out.append({"kind": "transcode", "text": text})
+
+    if audio:
+        if tc.get("is_audio_direct"):
+            out.append({"kind": "direct", "text": "Audio: Direct"})
+        else:
+            changes = []
+            sc = (audio.get("codec") or "").upper()
+            dc = (tc.get("audio_codec") or "").upper()
+            if sc and dc and sc != dc:
+                changes.append(f"{sc} → {dc}")
+            sch, dch = audio.get("channels"), tc.get("audio_channels")
+            if sch and dch and dch != sch:
+                changes.append(f"Downmix {sch} → {dch}ch")
+            sb, db = audio.get("bitrate"), tc.get("audio_bitrate")
+            if sb and db and db < sb:
+                changes.append(f"Bitrate {sb // 1000} → {db // 1000} kbps")
+            # Same codec/channels/bitrate but still transcoding -> Emby did it for
+            # container/track/compatibility reasons it didn't spell out.
+            if not changes:
+                changes.append("compatibility / track")
+            out.append({"kind": "transcode", "text": "Audio: " + ", ".join(changes)})
+
+    return out
+
+
 # ── Curated timezone list ──────────────────────────────────────────────────
 
 COMMON_TIMEZONES = [

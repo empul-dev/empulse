@@ -83,6 +83,20 @@ class ActivityProcessor:
                 "is_audio_direct": tc.is_audio_direct,
                 "reasons": tc.transcode_reasons,
             }
+            # ponytail: only log the mystery case — transcoding but Emby gave no
+            # reason. Direct-play sessions and reason-tagged ones don't need noise.
+            if not tc.transcode_reasons:
+                logger.info(
+                    "Transcode without reasons for %s: video_direct=%s audio_direct=%s "
+                    "container=%s->%s vcodec->%s acodec->%s",
+                    item.name if item else "?",
+                    tc.is_video_direct,
+                    tc.is_audio_direct,
+                    (item.container or "").upper() if item else None,
+                    (tc.container or "").upper() if tc.container else None,
+                    (tc.video_codec or "").upper() if tc.video_codec else None,
+                    (tc.audio_codec or "").upper() if tc.audio_codec else None,
+                )
 
         return json.dumps(info) if info else "{}"
 

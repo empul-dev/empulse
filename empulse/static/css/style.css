@@ -1432,19 +1432,29 @@ table a {
     color: var(--danger);
 }
 
-.stream-row.transcode-reasons {
-    padding: 0.4rem 1rem;
+/* At-a-glance transcode summary band at the top of the stream-info modal */
+.stream-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.6rem 1rem 0.8rem;
 }
 
-.transcode-reason-badge {
-    display: inline-block;
-    font-size: 0.78em;
-    padding: 0.2em 0.6em;
-    margin: 0.15em 0.3em 0.15em 0;
-    border-radius: 4px;
-    background: rgba(239, 68, 68, 0.12);
+.stream-summary-badge {
+    font-size: 0.82em;
+    padding: 0.3em 0.7em;
+    border-radius: 5px;
+    font-weight: 600;
+}
+
+.stream-summary-badge.direct {
+    background: rgba(34, 197, 94, 0.14);
+    color: var(--success, #22c55e);
+}
+
+.stream-summary-badge.transcode {
+    background: rgba(239, 68, 68, 0.14);
     color: var(--danger);
-    font-weight: 500;
 }
 
 /* === Title Link === */

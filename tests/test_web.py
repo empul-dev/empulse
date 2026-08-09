@@ -579,9 +579,11 @@ class TestAPIRoutes:
 
         r = await client.get(f"/api/stream-info/{history_id}")
         assert r.status_code == 200
-        assert "Transcode Reasons" in r.text
+        # Emby reasons still render (now as summary badges), plus a derived
+        # per-stream badge for the codec change.
         assert "Video codec not supported" in r.text
         assert "Container not supported" in r.text
+        assert "Video: HEVC → H264" in r.text
 
     @pytest.mark.asyncio
     async def test_history_table_episode_links_to_series_page(self, client):
