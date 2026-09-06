@@ -1,6 +1,6 @@
 # Empulse
 
-Activity monitoring dashboard for [Emby](https://emby.media) media servers. Track who's watching what, view playback history, graphs, and manage notifications.
+Activity monitoring dashboard for [Emby](https://emby.media) media servers. Track who's watching what, view playback history and graphs, and schedule email newsletters.
 
 ![Empulse Dashboard](docs/screenshot.png)
 
@@ -130,9 +130,9 @@ All settings are via environment variables (in `.env` or `docker-compose.yml`):
 
 ## Secrets & Key Rotation
 
-Notification channel credentials (webhook URLs/headers, SMTP passwords, Telegram bot tokens, etc.) are encrypted at rest, using a key derived from `SECRET_KEY`. This means:
+The newsletter SMTP password is encrypted at rest using a key derived from `SECRET_KEY`.
 
-- Rotating `SECRET_KEY` (deleting `.empulse_secret` or changing the env var) invalidates previously-encrypted secrets — after rotating, re-enter credentials for any notification channels and the newsletter SMTP password.
+- Rotating `SECRET_KEY` by deleting `.empulse_secret` or changing the environment variable invalidates the stored SMTP password. Re-enter it after rotating the key.
 - Session tokens are also signed with `SECRET_KEY`, so rotating it logs everyone out as well.
 
 ## Features
@@ -143,7 +143,6 @@ Notification channel credentials (webhook URLs/headers, SMTP passwords, Telegram
 - **Graphs** -- Daily/monthly play counts, watch heatmap, completion rates, bandwidth stats
 - **Users / Libraries** -- Per-user and per-library statistics
 - **Re-watch Detection** -- Tracks when content is watched again
-- **Notifications** -- Discord, Telegram, email, ntfy, and webhook alerts
 - **Newsletter** -- Scheduled email digests of recent activity
 
 ## Updating

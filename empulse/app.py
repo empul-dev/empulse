@@ -119,11 +119,6 @@ async def _lifespan(app: FastAPI):
     update_checker_task = None
 
     try:
-        from empulse.notifications.engine import NotificationEngine
-
-        notification_engine = NotificationEngine(get_db)
-        app.state.notification_engine = notification_engine
-
         if not settings.disable_update_check:
             from empulse.update_checker import UpdateChecker
 
@@ -141,7 +136,6 @@ async def _lifespan(app: FastAPI):
             emby_client = auth_emby_client  # Reuse the already-created client
             state_tracker = SessionStateTracker()
             processor = ActivityProcessor(state_tracker, get_db)
-            processor.notification_engine = notification_engine
             poller = SessionPoller(emby_client, processor, ws_manager)
 
             app.state.emby_client = emby_client
@@ -160,7 +154,7 @@ async def _lifespan(app: FastAPI):
 
             from empulse.emby.websocket import EmbyWebSocket
 
-            emby_ws = EmbyWebSocket(poller, emby_client, notification_engine)
+            emby_ws = EmbyWebSocket(poller)
             ws_task = asyncio.create_task(emby_ws.run())
             app.state.emby_ws = emby_ws
             logger.info("Emby WebSocket listener started")

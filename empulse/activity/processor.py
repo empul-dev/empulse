@@ -19,7 +19,6 @@ class ActivityProcessor:
     def __init__(self, state_tracker: SessionStateTracker, db_factory: Callable):
         self.state = state_tracker
         self.get_db = db_factory
-        self.notification_engine = None
         self._pending_updates: list[str] = []
 
     def _build_stream_info(self, s: EmbySessionInfo) -> str:
@@ -170,7 +169,6 @@ class ActivityProcessor:
             session = self.state.remove_session(key)
             if session:
                 await self._finalize_history(session)
-                await self._emit("playback_stop", session)
 
         # New or updated sessions
         for key, emby_session in active.items():
@@ -178,13 +176,6 @@ class ActivityProcessor:
             transition = self.state.update_session(key, data)
             if transition == "new":
                 await self._start_history(key, data)
-                await self._emit("playback_start", data)
-                if data.get("play_method") == "Transcode":
-                    await self._emit("transcode", data)
-            elif transition == "paused":
-                await self._emit("playback_pause", data)
-            elif transition == "resumed":
-                await self._emit("playback_resume", data)
 
             # Queue in-progress history updates (state changes flush immediately)
             if transition in ("updated", "paused", "resumed"):
@@ -192,13 +183,6 @@ class ActivityProcessor:
 
         # Flush all queued updates in a single transaction
         await self._flush_history_updates()
-
-    async def _emit(self, event_type: str, data: dict):
-        if self.notification_engine:
-            try:
-                await self.notification_engine.emit(event_type, data)
-            except Exception as e:
-                logger.error(f"Notification emit error: {e}")
 
     def _calc_progress(self, session: dict) -> dict:
         """Calculate duration/progress stats from a session dict.
@@ -430,9 +414,6 @@ class ActivityProcessor:
             if user_id:
                 await users_db.update_user_stats(db, user_id, stats["_session_duration"])
 
-            if stats["watched"]:
-                await self._emit("watched", session)
-
             logger.info(
                 f"History finalized (id={history_id}): {session.get('user_name')} - "
                 f"{session.get('item_name')} ({stats['duration_seconds']}s, {stats['percent_complete']}%)"
@@ -477,6 +458,3 @@ class ActivityProcessor:
 
             if user_id:
                 await users_db.update_user_stats(db, user_id, stats["duration_seconds"])
-
-            if stats["watched"]:
-                await self._emit("watched", session)

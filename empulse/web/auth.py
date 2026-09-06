@@ -174,7 +174,6 @@ def check_origin(request: Request) -> bool:
 # Routes that require admin role
 ADMIN_PREFIXES = (
     "/settings",
-    "/api/notification-channels",
     "/api/newsletter/",
     "/api/backup",
     "/api/restore",

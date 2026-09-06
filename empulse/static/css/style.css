@@ -1975,7 +1975,7 @@ article header {
     word-break: break-all;
 }
 
-/* Settings link cards (Notifications, Newsletter) */
+/* Settings link cards */
 .settings-link-card {
     cursor: pointer;
     transition: border-color var(--anim-med), box-shadow var(--anim-med);
@@ -2862,14 +2862,9 @@ html[data-theme="light"] .login-poster-wall {
     border-top: 1px solid var(--border);
 }
 
-/* === Notification Status === */
+/* Connection test status */
 .success { color: var(--success); }
 .error { color: var(--danger); }
-
-.channel-actions {
-    display: flex;
-    gap: 0.3rem;
-}
 
 /* === Graph Section Dividers === */
 .graphs-section-divider {

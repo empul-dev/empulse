@@ -15,7 +15,6 @@ from empulse.database import get_db
 from empulse.db import history as history_db, stats as stats_db, users as users_db
 from empulse.formatting import DEFAULT_DISPLAY, get_tz_offset_hours
 from empulse.models import SessionInfo, HistoryRecord
-from empulse.notifications import secrets as notification_secrets
 from empulse.web.deps import admin_only, require_self_or_admin, scoped_user_filter
 from empulse.web.poster_cache import POSTER_WIDTH
 from empulse.web.unwatched import fetch_unwatched_items
@@ -80,8 +79,7 @@ logger = logging.getLogger("empulse.api")
 router = APIRouter()
 
 VALID_ID = re.compile(r"^[a-zA-Z0-9_-]+$")
-MASKED_SECRET = notification_secrets.MASKED_SECRET
-CHANNEL_SECRET_FIELDS = notification_secrets.CHANNEL_SECRET_FIELDS
+MASKED_SECRET = "***"
 
 
 def _get_tz_offset(request: Request) -> float:
@@ -91,38 +89,6 @@ def _get_tz_offset(request: Request) -> float:
 
 def _validate_id(value: str) -> bool:
     return bool(VALID_ID.match(value)) and len(value) <= 64
-
-
-def _parse_json_dict(value: object) -> dict:
-    if isinstance(value, dict):
-        return value
-    if isinstance(value, str):
-        try:
-            parsed = json.loads(value)
-        except (json.JSONDecodeError, TypeError):
-            return {}
-        return parsed if isinstance(parsed, dict) else {}
-    return {}
-
-
-def _redact_channel(channel: dict) -> dict:
-    redacted = dict(channel)
-    config = _parse_json_dict(redacted.get("config", {}))
-    for field in CHANNEL_SECRET_FIELDS.get(redacted.get("channel_type", ""), set()):
-        if field in config and config.get(field):
-            config[field] = MASKED_SECRET
-    redacted["config"] = config
-    return redacted
-
-
-def _preserve_channel_secrets(
-    channel_type: str, new_config: dict, existing_config: dict
-) -> dict:
-    merged = dict(new_config)
-    for field in CHANNEL_SECRET_FIELDS.get(channel_type, set()):
-        if merged.get(field) == MASKED_SECRET:
-            merged[field] = existing_config.get(field, "")
-    return merged
 
 
 @router.get("/now-playing")
@@ -875,151 +841,6 @@ async def chart_watch_heatmap(request: Request, days: int = 30):
         db, days=days, tz_offset_hours=_get_tz_offset(request)
     )
     return JSONResponse(rows)
-
-
-@router.get("/notification-channels", dependencies=[Depends(admin_only)])
-async def list_notification_channels():
-    db = get_db()
-    cursor = await db.execute(
-        "SELECT * FROM notification_channels ORDER BY created_at DESC"
-    )
-    rows = await cursor.fetchall()
-    return JSONResponse([_redact_channel(dict(r)) for r in rows])
-
-
-VALID_CHANNEL_TYPES = {"discord", "webhook", "email", "telegram", "ntfy"}
-
-
-@router.post("/notification-channels", dependencies=[Depends(admin_only)])
-async def create_notification_channel(request: Request):
-    data = await request.json()
-
-    channel_type = data.get("channel_type", "")
-    if channel_type not in VALID_CHANNEL_TYPES:
-        return JSONResponse(
-            {
-                "error": f"Invalid channel type. Must be one of: {', '.join(sorted(VALID_CHANNEL_TYPES))}"
-            },
-            status_code=400,
-        )
-    name = str(data.get("name", ""))[:100]
-    if not name.strip():
-        return JSONResponse({"error": "Channel name is required"}, status_code=400)
-
-    db = get_db()
-    from datetime import datetime, timezone
-
-    now = datetime.now(timezone.utc).isoformat()
-    encrypted_config = notification_secrets.encrypt_channel_config(
-        channel_type, _parse_json_dict(data.get("config", {}))
-    )
-    await db.execute(
-        "INSERT INTO notification_channels (name, channel_type, config, triggers, conditions, enabled, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [
-            data.get("name", ""),
-            data.get("channel_type", ""),
-            json.dumps(encrypted_config),
-            json.dumps(data.get("triggers", [])),
-            json.dumps(data.get("conditions", {})),
-            1 if data.get("enabled", True) else 0,
-            now,
-        ],
-    )
-    await db.commit()
-    engine = getattr(request.app.state, "notification_engine", None)
-    if engine:
-        engine.invalidate_cache()
-    return JSONResponse({"status": "created"}, status_code=201)
-
-
-@router.put("/notification-channels/{channel_id}", dependencies=[Depends(admin_only)])
-async def update_notification_channel(request: Request, channel_id: int):
-    data = await request.json()
-
-    channel_type = data.get("channel_type", "")
-    if channel_type not in VALID_CHANNEL_TYPES:
-        return JSONResponse(
-            {
-                "error": f"Invalid channel type. Must be one of: {', '.join(sorted(VALID_CHANNEL_TYPES))}"
-            },
-            status_code=400,
-        )
-
-    db = get_db()
-    cursor = await db.execute(
-        "SELECT config FROM notification_channels WHERE id = ?", [channel_id]
-    )
-    row = await cursor.fetchone()
-    if not row:
-        return Response(status_code=404)
-    existing_config = _parse_json_dict(row["config"])
-    merged_config = _preserve_channel_secrets(
-        channel_type,
-        _parse_json_dict(data.get("config", {})),
-        existing_config,
-    )
-    encrypted_config = notification_secrets.encrypt_channel_config(channel_type, merged_config)
-    await db.execute(
-        "UPDATE notification_channels SET name=?, channel_type=?, config=?, triggers=?, conditions=?, enabled=? WHERE id=?",
-        [
-            str(data.get("name", ""))[:100],
-            channel_type,
-            json.dumps(encrypted_config),
-            json.dumps(data.get("triggers", [])),
-            json.dumps(data.get("conditions", {})),
-            1 if data.get("enabled", True) else 0,
-            channel_id,
-        ],
-    )
-    await db.commit()
-    engine = getattr(request.app.state, "notification_engine", None)
-    if engine:
-        engine.invalidate_cache()
-    return JSONResponse({"status": "updated"})
-
-
-@router.delete("/notification-channels/{channel_id}", dependencies=[Depends(admin_only)])
-async def delete_notification_channel(request: Request, channel_id: int):
-    db = get_db()
-    cursor = await db.execute(
-        "DELETE FROM notification_channels WHERE id = ?", [channel_id]
-    )
-    await db.commit()
-    if cursor.rowcount == 0:
-        return Response(status_code=404)
-    engine = getattr(request.app.state, "notification_engine", None)
-    if engine:
-        engine.invalidate_cache()
-    return Response(status_code=204)
-
-
-@router.post("/notification-channels/{channel_id}/test", dependencies=[Depends(admin_only)])
-async def test_notification_channel(request: Request, channel_id: int):
-    db = get_db()
-    cursor = await db.execute(
-        "SELECT * FROM notification_channels WHERE id = ?", [channel_id]
-    )
-    row = await cursor.fetchone()
-    if not row:
-        return Response(status_code=404)
-    engine = getattr(request.app.state, "notification_engine", None)
-    if not engine:
-        return JSONResponse(
-            {"success": False, "message": "Notification engine not initialized"}
-        )
-    success, message = await engine.send_test(dict(row))
-    return JSONResponse({"success": success, "message": message})
-
-
-@router.get("/notification-log")
-async def notification_log():
-    db = get_db()
-    cursor = await db.execute(
-        "SELECT * FROM notification_log ORDER BY sent_at DESC LIMIT 50"
-    )
-    rows = await cursor.fetchall()
-    return JSONResponse([dict(r) for r in rows])
 
 
 @router.get("/newsletter/config", dependencies=[Depends(admin_only)])

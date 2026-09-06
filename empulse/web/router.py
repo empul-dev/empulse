@@ -502,16 +502,3 @@ async def settings_newsletter(request: Request):
         "active": "settings",
         "config": config or {},
     })
-
-
-@router.get("/settings/notifications", dependencies=[Depends(admin_only)])
-async def settings_notifications(request: Request):
-    db = get_db()
-    cursor = await db.execute("SELECT * FROM notification_channels ORDER BY created_at DESC")
-    channels = [dict(r) for r in await cursor.fetchall()]
-    cursor = await db.execute("SELECT * FROM notification_log ORDER BY sent_at DESC LIMIT 20")
-    logs = [dict(r) for r in await cursor.fetchall()]
-    return templates.TemplateResponse(request, "settings_notifications.html", {
-        "active": "settings",
-        "channels": channels, "logs": logs,
-    })

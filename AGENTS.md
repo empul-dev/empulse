@@ -8,7 +8,7 @@ This project uses Python as the primary language, with HTML, CSS, and vanilla JS
 
 ## What is Empulse
 
-Activity monitoring dashboard for Emby media servers. Tracks active streams, playback history, per-user/library stats, graphs, and notifications. Python async backend with server-rendered HTML frontend.
+Activity monitoring dashboard for Emby media servers. Tracks active streams, playback history, per-user/library stats, graphs, and scheduled newsletters. Python async backend with server-rendered HTML frontend.
 
 ## Commands
 
@@ -57,7 +57,7 @@ Tests use pytest-asyncio with `asyncio_mode = "auto"` — all async test functio
 
 **Auth:** `web/auth.py` — `AuthMiddleware` with HMAC-signed session tokens, rate limiting (5/5min per IP), CSRF origin checks, role-based access (admin/viewer).
 
-**Notifications:** `notifications/engine.py` dispatches events through configured channels in `notifications/channels/` (Discord, webhook, email, Telegram, ntfy). Channels loaded from DB with 60s TTL cache.
+**Newsletter:** `newsletter.py` builds and sends scheduled email summaries using configuration stored in `newsletter_config`. SMTP passwords are encrypted by `crypto.py`.
 
 **Config:** `config.py` — pydantic-settings loading from env vars / `.env`. Key vars: `EMBY_URL`, `EMBY_API_KEY`, `AUTH_PASSWORD`, `SECRET_KEY`, `POLL_INTERVAL`, `DB_PATH`.
 
@@ -75,7 +75,7 @@ No build step. Server-rendered HTML with lightweight client-side enhancements.
 Three patterns:
 
 1. **htmx partials** (primary) — `hx-get="/api/now-playing"` returns rendered HTML fragments. Triggers: page load, polling intervals, WebSocket-dispatched events.
-2. **fetch → JSON** — Chart data (`/api/charts/*`), notification config, admin actions. JS calls `fetch()`, renders with Chart.js or updates DOM.
+2. **fetch → JSON** — Chart data (`/api/charts/*`), newsletter config, admin actions. JS calls `fetch()`, renders with Chart.js or updates DOM.
 3. **WebSocket push** — Browser connects to `/ws`. Backend broadcasts `{"type": "refresh", "target": "now-playing"}` on activity changes. JS dispatches `refresh-{target}` event on `document.body`, which triggers htmx re-polls.
 
 ### Key Files
@@ -90,7 +90,7 @@ Three patterns:
 | `empulse/web/auth.py` | Auth middleware, tokens, CSRF |
 | `empulse/web/websocket.py` | Browser WebSocket manager |
 | `empulse/activity/processor.py` | State transition detection |
-| `empulse/notifications/engine.py` | Notification dispatcher |
+| `empulse/newsletter.py` | Scheduled email summaries |
 | `empulse/static/js/app.js` | All client-side JS |
 | `empulse/templates/base.html` | Base layout template |
 | `pyproject.toml` | Dependencies, pytest config |
@@ -110,7 +110,7 @@ When making changes, run relevant tests and linters before considering a task co
 
 **Direct handling (no subagent):**
 - Single-file bug fixes (auth, template, CSS)
-- Isolated features (new notification channel, new stats query, new db helper)
+- Isolated features (new stats query, new db helper)
 - Small refactors within one module
 - Changes touching ≤2 files
 
@@ -122,7 +122,7 @@ When making changes, run relevant tests and linters before considering a task co
 **Parallel subagents for cross-cutting changes:**
 - New page/route: one subagent for API + DB queries, another for template + JS
 - New metadata field end-to-end: schema/migrations, processor/models, routes/templates
-- Notification system changes: engine logic vs channel implementations vs tests
+- Newsletter changes: scheduling logic vs email rendering vs tests
 - Any change touching 3+ modules with parallelizable work
 
 **Always use subagents for:**

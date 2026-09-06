@@ -116,17 +116,6 @@ CREATE TABLE IF NOT EXISTS server_info (
     os TEXT
 );
 
-CREATE TABLE IF NOT EXISTS notification_channels (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    channel_type TEXT NOT NULL,
-    config TEXT NOT NULL DEFAULT '{}',
-    triggers TEXT NOT NULL DEFAULT '[]',
-    conditions TEXT NOT NULL DEFAULT '{}',
-    enabled INTEGER DEFAULT 1,
-    created_at TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS newsletter_config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     enabled INTEGER DEFAULT 0,
@@ -144,16 +133,6 @@ CREATE TABLE IF NOT EXISTS newsletter_config (
     from_addr TEXT,
     to_addrs TEXT DEFAULT '',
     last_sent TEXT
-);
-
-CREATE TABLE IF NOT EXISTS notification_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    channel_id INTEGER,
-    event_type TEXT NOT NULL,
-    event_summary TEXT,
-    status TEXT DEFAULT 'sent',
-    error TEXT,
-    sent_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS login_sessions (
@@ -244,7 +223,11 @@ async def init_db() -> None:
 
 
 async def _migrate(db: aiosqlite.Connection):
-    """Add columns/tables that may be missing from older databases."""
+    """Upgrade older databases while preserving retained application data."""
+    # Retired channel settings and delivery logs are no longer used.
+    await db.execute("DROP TABLE IF EXISTS notification_log")
+    await db.execute("DROP TABLE IF EXISTS notification_channels")
+
     cursor = await db.execute("PRAGMA table_info(history)")
     cols = {row[1] for row in await cursor.fetchall()}
     if "stream_info" not in cols:
@@ -346,41 +329,12 @@ async def _migrate(db: aiosqlite.Connection):
     now = datetime.now(timezone.utc).isoformat()
     await db.execute("DELETE FROM login_sessions WHERE expires_at < ?", [now])
 
-    await _encrypt_legacy_secrets(db)
+    await _encrypt_legacy_newsletter_password(db)
 
 
-async def _encrypt_legacy_secrets(db: aiosqlite.Connection):
-    """One-time upgrade pass: encrypt any plaintext notification/newsletter
-    secrets left over from before secrets were encrypted at rest. Safe to run
-    on every boot — encrypt_secret / encrypt_channel_config are idempotent for
-    values that are already encrypted."""
-    import json as _json
-
+async def _encrypt_legacy_newsletter_password(db: aiosqlite.Connection):
+    """Encrypt legacy SMTP passwords; already-encrypted values stay unchanged."""
     from empulse.crypto import encrypt_secret
-    from empulse.notifications.secrets import (
-        CHANNEL_SECRET_FIELDS,
-        encrypt_channel_config,
-    )
-
-    cursor = await db.execute("SELECT id, channel_type, config FROM notification_channels")
-    rows = await cursor.fetchall()
-    for row in rows:
-        channel_type = row["channel_type"]
-        if channel_type not in CHANNEL_SECRET_FIELDS:
-            continue
-        try:
-            config = _json.loads(row["config"] or "{}")
-        except (_json.JSONDecodeError, TypeError):
-            continue
-        if not isinstance(config, dict):
-            continue
-        encrypted = encrypt_channel_config(channel_type, config)
-        if encrypted != config:
-            await db.execute(
-                "UPDATE notification_channels SET config = ? WHERE id = ?",
-                [_json.dumps(encrypted), row["id"]],
-            )
-            logger.info(f"Migration: encrypted secrets for notification channel {row['id']}")
 
     cursor = await db.execute("SELECT smtp_pass FROM newsletter_config WHERE id = 1")
     row = await cursor.fetchone()

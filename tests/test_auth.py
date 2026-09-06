@@ -410,13 +410,7 @@ class TestMiddleware:
                     admin_routes = [
                         ("GET", "/settings"),
                         ("GET", "/settings/newsletter"),
-                        ("GET", "/settings/notifications"),
                         ("POST", "/api/update-check"),
-                        ("GET", "/api/notification-channels"),
-                        ("POST", "/api/notification-channels"),
-                        ("PUT", "/api/notification-channels/1"),
-                        ("DELETE", "/api/notification-channels/1"),
-                        ("POST", "/api/notification-channels/1/test"),
                         ("GET", "/api/newsletter/config"),
                         ("POST", "/api/newsletter/config"),
                         ("GET", "/api/newsletter/preview"),

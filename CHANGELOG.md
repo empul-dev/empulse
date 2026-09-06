@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.19
+
+- Removed notification channels, automatic playback and new-media alerts, their settings and API endpoints. Startup backs up existing databases before removing the old channel configuration and delivery-log tables.
+- Kept the newsletter, its schedule and encrypted SMTP password, playback history, and live dashboard updates.
+
 ## 0.2.18
 
 - Added verified local database backups before release upgrades, including the generated secret key when used. Backups are retained in the persistent data volume.
