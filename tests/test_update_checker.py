@@ -144,14 +144,29 @@ class TestUpdateChecker:
 
 
 class TestGetVersion:
-    def test_returns_installed_version(self):
-        from empulse.app import get_version
+    def test_returns_shipped_source_version(self):
+        import tomllib
+        from pathlib import Path
+        from empulse.version import get_version
 
-        with patch("empulse.app.pkg_version", return_value="0.1.0"):
+        project = Path(__file__).resolve().parent.parent / "pyproject.toml"
+        assert get_version() == tomllib.loads(project.read_text())["project"]["version"]
+
+    def test_returns_installed_version_without_source(self):
+        from empulse.version import get_version
+
+        with (
+            patch("empulse.version.Path.is_file", return_value=False),
+            patch("empulse.version.version", return_value="0.1.0"),
+        ):
             assert get_version() == "0.1.0"
 
-    def test_returns_dev_when_not_installed(self):
-        from empulse.app import get_version, PackageNotFoundError
+    def test_missing_version_refuses_unprotected_startup(self):
+        from empulse.version import get_version, PackageNotFoundError
 
-        with patch("empulse.app.pkg_version", side_effect=PackageNotFoundError("empulse")):
-            assert get_version() == "dev"
+        with (
+            patch("empulse.version.Path.is_file", return_value=False),
+            patch("empulse.version.version", side_effect=PackageNotFoundError),
+            pytest.raises(RuntimeError, match="release version"),
+        ):
+            get_version()

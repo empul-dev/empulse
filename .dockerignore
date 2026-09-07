@@ -13,3 +13,8 @@ __pycache__/
 .empulse_secret
 .emtulli_secret
 share/
+**/backups/
+**/*.before-restore-*/
+**/.*.restore-*
+**/.*.lock
+**/.empulse_secret

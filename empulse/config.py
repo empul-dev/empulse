@@ -1,5 +1,6 @@
 from pathlib import Path
 from dotenv import load_dotenv
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 # Find .env by walking up from this file
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
     empulse_port: int = 8189
     poll_interval: int = 10
     db_path: str = str(_PROJECT_DIR / "empulse.db")
+    backup_retention: int = Field(default=3, ge=1)
     auth_password: str = ""
     secret_key: str = ""
     disable_update_check: bool = False

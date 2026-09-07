@@ -3,7 +3,6 @@ import logging
 import secrets
 import time
 from contextlib import asynccontextmanager
-from importlib.metadata import version as pkg_version, PackageNotFoundError
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -13,7 +12,9 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from empulse.config import settings
-from empulse.database import init_db, get_db
+from empulse.database import init_db, get_db, close_db
+from empulse.backups import database_lock
+from empulse.version import get_version
 from empulse.formatting import (
     format_date,
     format_time,
@@ -27,13 +28,6 @@ from empulse.formatting import (
 logger = logging.getLogger("empulse")
 
 BASE_DIR = Path(__file__).parent
-
-
-def get_version() -> str:
-    try:
-        return pkg_version("empulse")
-    except PackageNotFoundError:
-        return "dev"
 
 
 class EmpulseTemplates(Jinja2Templates):
@@ -76,6 +70,16 @@ templates.env.filters["transcode_summary"] = derive_transcode_summary
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    with database_lock(Path(settings.db_path)):
+        try:
+            async with _lifespan(app):
+                yield
+        finally:
+            await close_db()
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
     from empulse.emby.client import validate_emby_url
 
     validate_emby_url()  # refuse to boot on an unsafe EMBY_URL (A4: S-2, E-4)
@@ -114,94 +118,75 @@ async def lifespan(app: FastAPI):
     poster_cache_task = None
     update_checker_task = None
 
-    from empulse.notifications.engine import NotificationEngine
+    try:
+        from empulse.notifications.engine import NotificationEngine
 
-    notification_engine = NotificationEngine(get_db)
-    app.state.notification_engine = notification_engine
+        notification_engine = NotificationEngine(get_db)
+        app.state.notification_engine = notification_engine
 
-    if not settings.disable_update_check:
-        from empulse.update_checker import UpdateChecker
+        if not settings.disable_update_check:
+            from empulse.update_checker import UpdateChecker
 
-        update_checker = UpdateChecker(get_version(), settings.update_check_interval)
-        app.state.update_checker = update_checker
-        update_checker_task = asyncio.create_task(update_checker.run())
-        logger.info("Update checker started")
+            update_checker = UpdateChecker(get_version(), settings.update_check_interval)
+            app.state.update_checker = update_checker
+            update_checker_task = asyncio.create_task(update_checker.run())
+            logger.info("Update checker started")
 
-    if settings.emby_api_key:
-        from empulse.activity.poller import SessionPoller
-        from empulse.activity.processor import ActivityProcessor
-        from empulse.activity.session_state import SessionStateTracker
-        from empulse.web.websocket import manager as ws_manager
+        if settings.emby_api_key:
+            from empulse.activity.poller import SessionPoller
+            from empulse.activity.processor import ActivityProcessor
+            from empulse.activity.session_state import SessionStateTracker
+            from empulse.web.websocket import manager as ws_manager
 
-        emby_client = auth_emby_client  # Reuse the already-created client
-        state_tracker = SessionStateTracker()
-        processor = ActivityProcessor(state_tracker, get_db)
-        processor.notification_engine = notification_engine
-        poller = SessionPoller(emby_client, processor, ws_manager)
+            emby_client = auth_emby_client  # Reuse the already-created client
+            state_tracker = SessionStateTracker()
+            processor = ActivityProcessor(state_tracker, get_db)
+            processor.notification_engine = notification_engine
+            poller = SessionPoller(emby_client, processor, ws_manager)
 
-        app.state.emby_client = emby_client
-        app.state.poller = poller
-        app.state.ws_manager = ws_manager
-        app.state.state_tracker = state_tracker
+            app.state.emby_client = emby_client
+            app.state.poller = poller
+            app.state.ws_manager = ws_manager
+            app.state.state_tracker = state_tracker
 
-        poller_task = asyncio.create_task(poller.run())
-        logger.info("Session poller started")
+            poller_task = asyncio.create_task(poller.run())
+            logger.info("Session poller started")
 
-        from empulse.newsletter import NewsletterScheduler
+            from empulse.newsletter import NewsletterScheduler
 
-        newsletter_scheduler = NewsletterScheduler(get_db, emby_client)
-        newsletter_task = asyncio.create_task(newsletter_scheduler.run())
-        logger.info("Newsletter scheduler started")
+            newsletter_scheduler = NewsletterScheduler(get_db, emby_client)
+            newsletter_task = asyncio.create_task(newsletter_scheduler.run())
+            logger.info("Newsletter scheduler started")
 
-        from empulse.emby.websocket import EmbyWebSocket
+            from empulse.emby.websocket import EmbyWebSocket
 
-        emby_ws = EmbyWebSocket(poller, emby_client, notification_engine)
-        ws_task = asyncio.create_task(emby_ws.run())
-        app.state.emby_ws = emby_ws
-        logger.info("Emby WebSocket listener started")
+            emby_ws = EmbyWebSocket(poller, emby_client, notification_engine)
+            ws_task = asyncio.create_task(emby_ws.run())
+            app.state.emby_ws = emby_ws
+            logger.info("Emby WebSocket listener started")
 
-        from empulse.web.poster_cache import PosterWallCache
+            from empulse.web.poster_cache import PosterWallCache
 
-        poster_cache = PosterWallCache(emby_client)
-        poster_cache_task = asyncio.create_task(poster_cache.run())
-        app.state.poster_cache = poster_cache
-        logger.info("Poster wall cache started")
-    else:
-        logger.warning("No EMBY_API_KEY configured - polling disabled")
+            poster_cache = PosterWallCache(emby_client)
+            poster_cache_task = asyncio.create_task(poster_cache.run())
+            app.state.poster_cache = poster_cache
+            logger.info("Poster wall cache started")
+        else:
+            logger.warning("No EMBY_API_KEY configured - polling disabled")
 
-    yield
-
-    if poller_task:
-        poller_task.cancel()
-        try:
-            await poller_task
-        except asyncio.CancelledError:
-            pass
-    if ws_task:
-        ws_task.cancel()
-        try:
-            await ws_task
-        except asyncio.CancelledError:
-            pass
-    if newsletter_task:
-        newsletter_task.cancel()
-        try:
-            await newsletter_task
-        except asyncio.CancelledError:
-            pass
-    if poster_cache_task:
-        poster_cache_task.cancel()
-        try:
-            await poster_cache_task
-        except asyncio.CancelledError:
-            pass
-    if update_checker_task:
-        update_checker_task.cancel()
-        try:
-            await update_checker_task
-        except asyncio.CancelledError:
-            pass
-    logger.info("Shutdown complete")
+        yield
+    finally:
+        tasks = [
+            task for task in (
+                poller_task, ws_task, newsletter_task, poster_cache_task,
+                update_checker_task,
+            ) if task is not None
+        ]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await auth_emby_client.close()
+        logger.info("Shutdown complete")
 
 
 def create_app() -> FastAPI:

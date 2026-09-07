@@ -177,3 +177,70 @@ ruff format empulse/
 ## License
 
 MIT
+
+## Automatic update backups
+
+Starting with 0.2.18, Empulse backs up an existing database before the first
+startup with a different release version. This also covers databases from older
+releases that have no version marker. A fresh installation and an ordinary
+restart on the same version do not create a backup. Every release that changes
+startup or database behavior must use a new version number.
+
+Backups are stored beside the database under `backups/<database filename>/`.
+With the supplied Compose configuration this is
+`/app/data/backups/empulse.db/`, inside the persistent data volume. Each
+`update-*` directory contains a verified SQLite snapshot and a manifest with the
+source and target versions. If Empulse uses the generated `.empulse_secret`
+file, it is included too. An externally configured `SECRET_KEY` must be retained
+separately. Backups contain private data and credentials; their directory is
+accessible only to the service user by default.
+
+SQLite's backup API includes committed WAL data. The snapshot must pass checksum
+and integrity checks before schema changes start. If the backup fails, startup
+stops before migration. Schema changes, data migrations and the release marker
+commit together; a migration error rolls them back. Background services start
+only after database initialization succeeds.
+
+Empulse keeps the latest three verified update backups by default. Set
+`BACKUP_RETENTION` to another positive count if needed. Old backups are pruned
+only after successful database initialization. Failed attempts with unchanged data reuse the
+same verified backup. A retry still creates a temporary snapshot to check whether
+an older release changed the data in the meantime. Allow room for the retained
+backups, one temporary database copy, and SQLite's own working files. Invalid
+backups are left for manual inspection rather than counted as usable copies.
+
+### Restore after a failed update
+
+Stop every Empulse container using the volume before restoring. Releases before
+0.2.18 do not honor the new app/restore lock. Use the restore command from 0.2.18
+or later even when the database will be used with an older release.
+
+```bash
+docker compose stop empulse
+docker compose run --rm --no-deps --entrypoint python empulse \
+  -m empulse.restore --db /app/data/empulse.db \
+  /app/data/backups/empulse.db/update-REPLACE-WITH-BACKUP-NAME
+```
+
+The command validates the backup before replacing files, restores a bundled key,
+and removes stale WAL/SHM files. It refuses to run while a cooperating Empulse
+process holds the database lock. If you supplied `SECRET_KEY` externally, keep
+its original value. Previous files are retained in a sibling
+`empulse.db.before-restore-*` directory; these recovery copies are not removed
+by automatic retention and can be deleted after confirming recovery.
+
+Pin the Compose `image` to the version used before the failed update, for example
+`ghcr.io/empul-dev/empulse:0.2.18`, then run `docker compose up -d empulse`.
+The manifest's `source_version` identifies that release. `legacy` means the
+source predates release tracking; use the image version you deployed previously.
+Starting the newer image again would attempt the upgrade again.
+
+If the restore process is interrupted, Empulse refuses to start while
+`.empulse.db.restore-in-progress` exists. Keep all containers stopped. The marker
+points to the rescue directory and `recovery.json`: copy the listed
+`original_files` back into the database directory, remove only listed
+`managed_files` that were not originally present, and remove the marker last.
+This returns to the state before the restore attempt. Then retry the restore.
+
+These local copies protect against failed updates. Back up the data volume to
+another device or storage service as well to recover from volume or disk loss.

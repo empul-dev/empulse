@@ -3,6 +3,8 @@ import logging
 from pathlib import Path
 
 from empulse.config import settings
+from empulse.backups import prepare_backup, prune_backups, read_release, run_io
+from empulse.version import get_version
 
 logger = logging.getLogger("empulse.db")
 
@@ -181,20 +183,64 @@ CREATE TABLE IF NOT EXISTS display_settings (
 )
 
 
-async def init_db():
+async def close_db() -> None:
     global _db
+    if _db is not None:
+        db, _db = _db, None
+        await db.close()
+
+
+async def init_db() -> None:
+    global _db
+    await close_db()
     db_path = Path(settings.db_path)
-    _db = await aiosqlite.connect(str(db_path))
-    _db.row_factory = aiosqlite.Row
-    await _db.execute("PRAGMA journal_mode=WAL")
-    await _db.execute("PRAGMA busy_timeout=5000")
-    await _db.executescript(SCHEMA)
-    # Migrations — add columns that may not exist yet
-    await _migrate(_db)
-    # Clear ephemeral sessions on startup
-    await _db.execute("DELETE FROM sessions")
-    await _db.commit()
-    logger.info(f"Database ready at {db_path}")
+    in_memory = str(db_path) == ":memory:"
+    if not in_memory:
+        db_path = db_path.resolve()
+        marker = db_path.with_name(f".{db_path.name}.restore-in-progress")
+        if marker.exists():
+            raise RuntimeError(f"Interrupted restore requires recovery; see {marker}")
+    release = get_version()
+    needs_backup = False
+    if not in_memory and db_path.exists() and db_path.stat().st_size:
+        previous = await run_io(read_release, db_path)
+        needs_backup = previous != release
+        if needs_backup:
+            # This runs before PRAGMA, schema creation, or any migration writes.
+            await run_io(
+                prepare_backup, db_path, previous, release, settings.secret_key,
+            )
+
+    db = await aiosqlite.connect(str(db_path))
+    db.row_factory = aiosqlite.Row
+    try:
+        await db.execute("PRAGMA journal_mode=WAL")
+        await db.execute("PRAGMA busy_timeout=5000")
+        # executescript commits an existing transaction, so BEGIN belongs inside.
+        await db.executescript("BEGIN IMMEDIATE;\n" + SCHEMA)
+        await _migrate(db)
+        await db.execute("DELETE FROM sessions")
+        await db.execute(
+            "CREATE TABLE IF NOT EXISTS app_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+        )
+        await db.execute(
+            "INSERT INTO app_metadata (key, value) VALUES ('release', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value", [release],
+        )
+        await db.commit()
+    except BaseException:
+        try:
+            await db.rollback()
+        finally:
+            await db.close()
+        raise
+    _db = db
+    if not in_memory:
+        try:
+            await run_io(prune_backups, db_path, settings.backup_retention)
+        except Exception:
+            logger.exception("Could not prune old backups; the verified backup is retained")
+    logger.info("Database ready at %s for release %s", db_path, release)
 
 
 async def _migrate(db: aiosqlite.Connection):
@@ -300,8 +346,6 @@ async def _migrate(db: aiosqlite.Connection):
     now = datetime.now(timezone.utc).isoformat()
     await db.execute("DELETE FROM login_sessions WHERE expires_at < ?", [now])
 
-    await db.commit()
-
     await _encrypt_legacy_secrets(db)
 
 
@@ -347,8 +391,6 @@ async def _encrypt_legacy_secrets(db: aiosqlite.Connection):
                 "UPDATE newsletter_config SET smtp_pass = ? WHERE id = 1", [encrypted_pass]
             )
             logger.info("Migration: encrypted newsletter SMTP password")
-
-    await db.commit()
 
 
 def get_db() -> aiosqlite.Connection:

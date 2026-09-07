@@ -23,3 +23,7 @@ CLAUDE.md
 SPECS.md
 docs/SECURITY-STRIDE.md
 docs/SECURITY-ACTION-PLAN.md
+backups/
+*.before-restore-*/
+.*.restore-*
+.*.lock

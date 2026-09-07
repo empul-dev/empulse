@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.18
+
+- Added verified local database backups before release upgrades, including the generated secret key when used. Backups are retained in the persistent data volume.
+- Added transactional startup migrations and an offline restore command with WAL handling and recovery copies. Failed backups stop the upgrade; failed migrations roll back.
+- Kept notification support in this release so users receive backup protection before its removal in 0.2.19.
+
 ## 0.2.8
 
 - Security (Wave 1 of the STRIDE action plan):
