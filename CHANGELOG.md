@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Security: removed the unused `/api/recent-history` endpoint. It showed every user's latest plays, including IP addresses, to viewer accounts.
+- Security: images under `/api/img/` now require a login. The login page poster wall uses a new `/api/login-posters/` endpoint that only serves already cached posters, so anonymous visitors can no longer browse library artwork by item ID.
+- The settings backup download now uses SQLite's backup API, so it includes recent changes that were still in the write-ahead log.
+- Restoring a database in settings no longer overwrites the open database. The upload is checked, including a trial run of the startup migrations, and applied at the next restart with the same protected restore used by the command line. The previous database is kept in an `empulse.db.before-restore-*` directory.
+- Restore uploads are streamed to disk, limited to 500 MB, and only one can run at a time.
+
 ## 0.2.21
 
 - Users table can be sorted by user, total plays, total duration, or last seen by clicking the column headers.

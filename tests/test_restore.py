@@ -235,3 +235,66 @@ def test_restore_rejects_backup_with_sidecar(tmp_path, suffix):
 
     assert database.read_bytes() == original
     assert not list(tmp_path.glob("empulse.db.before-restore-*"))
+
+
+def make_upload(path: Path, value: str) -> Path:
+    with sqlite3.connect(path) as connection:
+        connection.execute("CREATE TABLE history (title TEXT)")
+        connection.execute("CREATE TABLE users (id TEXT)")
+        connection.execute("CREATE TABLE libraries (id TEXT)")
+        connection.execute("INSERT INTO history VALUES (?)", (value,))
+    return path
+
+
+def test_staged_upload_replaces_live_wal_database_at_startup(tmp_path):
+    from empulse.backups import pending_restore_dir, stage_restore
+    from empulse.restore import apply_pending_restore
+
+    db_path = tmp_path / "empulse.db"
+    make_database(db_path, "live")
+    live = sqlite3.connect(db_path)
+    live.execute("PRAGMA journal_mode=WAL")
+    live.execute("PRAGMA wal_autocheckpoint=0")
+    live.execute("INSERT INTO history VALUES ('only in wal')")
+    live.commit()
+
+    stage_restore(make_upload(tmp_path / "upload.db", "uploaded"), db_path)
+    # Staging must not touch the open database.
+    assert live.execute("SELECT count(*) FROM history").fetchone() == (2,)
+    live.close()
+
+    rescue = apply_pending_restore(db_path)
+
+    assert read_title(db_path) == "uploaded"
+    assert not Path(f"{db_path}-wal").exists()
+    assert not pending_restore_dir(db_path).exists()
+    # The rescue copy keeps everything the live app had committed.
+    with sqlite3.connect(rescue / db_path.name) as old:
+        assert old.execute("SELECT count(*) FROM history").fetchone() == (2,)
+    assert apply_pending_restore(db_path) is None
+
+
+def test_stage_restore_rejects_upload_without_required_tables(tmp_path):
+    from empulse.backups import pending_restore_dir, stage_restore
+
+    db_path = tmp_path / "empulse.db"
+    upload = tmp_path / "upload.db"
+    make_database(upload, "history only")
+
+    with pytest.raises(ValueError, match="missing tables libraries, users"):
+        stage_restore(upload, db_path)
+    assert not pending_restore_dir(db_path).exists()
+
+
+def test_invalid_pending_restore_blocks_start_without_changes(tmp_path):
+    from empulse.backups import pending_restore_dir, stage_restore
+    from empulse.restore import apply_pending_restore
+
+    db_path = tmp_path / "empulse.db"
+    make_database(db_path, "live")
+    stage_restore(make_upload(tmp_path / "upload.db", "uploaded"), db_path)
+    (pending_restore_dir(db_path) / "database.sqlite3").write_bytes(b"tampered")
+
+    with pytest.raises(RuntimeError, match="Pending restore is invalid"):
+        apply_pending_restore(db_path)
+    assert read_title(db_path) == "live"

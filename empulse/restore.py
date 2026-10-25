@@ -12,7 +12,7 @@ import sqlite3
 import sys
 import tempfile
 
-from empulse.backups import database_lock, validate_backup
+from empulse.backups import database_lock, pending_restore_dir, validate_backup
 
 
 def _copy(source: Path, target: Path) -> None:
@@ -129,6 +129,22 @@ def restore_backup(backup_dir: Path, db_path: Path) -> Path:
             marker.unlink()
             _sync_directory(db_path.parent)
             return rescue
+
+
+def apply_pending_restore(db_path: Path) -> Path | None:
+    """Apply a restore uploaded through the web UI, before the app opens the DB."""
+    pending = pending_restore_dir(db_path)
+    if not pending.is_dir() or pending.is_symlink():
+        return None
+    try:
+        rescue = restore_backup(pending, db_path)
+    except (ValueError, sqlite3.Error) as error:
+        raise RuntimeError(
+            f"Pending restore is invalid ({error}). Remove {pending} to start "
+            "without restoring."
+        ) from error
+    shutil.rmtree(pending)
+    return rescue
 
 
 def main(argv: list[str] | None = None) -> int:

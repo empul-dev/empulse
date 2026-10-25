@@ -92,6 +92,24 @@ def _check_integrity(db: sqlite3.Connection) -> None:
         raise RuntimeError("Database integrity check failed")
 
 
+def _write_snapshot(source: sqlite3.Connection, target: Path) -> None:
+    destination = sqlite3.connect(target)
+    try:
+        source.backup(destination)
+        destination.execute("PRAGMA journal_mode=DELETE")
+    finally:
+        destination.close()
+
+
+def export_snapshot(db_path: Path, target: Path) -> None:
+    """Copy the live database, including committed WAL pages, to a standalone file."""
+    source = _read_connection(db_path)
+    try:
+        _write_snapshot(source, target)
+    finally:
+        source.close()
+
+
 def read_release(db_path: Path) -> str | None:
     """Read the release marker without creating or changing the database."""
     db = _read_connection(db_path)
@@ -224,6 +242,65 @@ def prepare_backup(
         _sync_directory(root)
         logger.info("Verified upgrade backup saved at %s", final)
         return final
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
+
+
+RESTORE_REQUIRED_TABLES = {"history", "users", "libraries"}
+
+
+def pending_restore_dir(db_path: Path) -> Path:
+    return backup_root(db_path) / "pending-restore"
+
+
+def stage_restore(upload: Path, db_path: Path) -> None:
+    """Queue an uploaded database for restore_backup() at the next startup.
+
+    The running app holds the database open, so replacing it here would mix
+    the upload with the live WAL. The staged copy uses the update backup format.
+    """
+    root = backup_root(db_path)
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    staging = Path(tempfile.mkdtemp(prefix=".tmp-", dir=root))
+    try:
+        snapshot = staging / "database.sqlite3"
+        source = _read_connection(upload, immutable=True)
+        try:
+            _check_integrity(source)
+            tables = {
+                row[0]
+                for row in source.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            if missing := RESTORE_REQUIRED_TABLES - tables:
+                raise ValueError(f"missing tables {', '.join(sorted(missing))}")
+            _write_snapshot(source, snapshot)
+        finally:
+            source.close()
+        os.chmod(snapshot, 0o600)
+        metadata = {
+            "format": 1,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "source_version": "upload",
+            "target_version": None,
+            "database_sha256": file_hash(snapshot),
+            # Uploads carry no key; the current SECRET_KEY stays in place.
+            "secret_source": "external",
+            "secret_sha256": None,
+        }
+        (staging / "manifest.json").write_text(json.dumps(metadata, indent=2) + "\n")
+        validate_backup(staging)
+        for file in staging.iterdir():
+            with file.open("rb") as stream:
+                os.fsync(stream.fileno())
+        _sync_directory(staging)
+        pending = pending_restore_dir(db_path)
+        if pending.is_dir() and not pending.is_symlink():
+            shutil.rmtree(pending)
+        os.replace(staging, pending)
+        _sync_directory(root)
     finally:
         if staging.exists():
             shutil.rmtree(staging)
