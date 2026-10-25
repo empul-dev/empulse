@@ -1,4 +1,6 @@
+import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -48,8 +50,11 @@ if not settings.secret_key:
             settings.secret_key = _secret_file.read_text().strip()
         if not settings.secret_key:
             settings.secret_key = _secrets.token_hex(32)
-            _secret_file.write_text(settings.secret_key + "\n")
-            _secret_file.chmod(0o600)
+            # Create with 0600 so the key is never readable under the umask default.
+            _fd = os.open(_secret_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(_fd, "w") as _f:
+                _f.write(settings.secret_key + "\n")
+            _secret_file.chmod(0o600)  # an existing empty file keeps its old mode
     except OSError as _e:
         _logging.getLogger("empulse.config").warning(
             "Cannot persist secret key to %s: %s. "
