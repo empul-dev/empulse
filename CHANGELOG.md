@@ -4,6 +4,11 @@
 
 - Removed the newsletter, its schedule, settings page and API endpoints, and the now unused `cryptography` dependency. Startup backs up existing databases before removing the newsletter configuration table, including the stored SMTP password.
 - Kept playback history, statistics, live dashboard updates, and the generated secret key in update backups so restores to earlier releases still work.
+- "Last N days" now means today plus the N-1 days before it, starting at midnight in the display timezone, instead of a rolling N×24 hours. Stat cards, charts and the period comparison now cover the same whole days.
+- Dates, hours and weekdays in charts now use each play's own UTC offset, so plays are grouped correctly across daylight-saving changes. Plays per month are grouped by local month.
+- Every daily chart now shows all days in the range, including days without plays. Previously the stacked, stream-type and bitrate charts skipped them.
+- Added 7d/30d/90d/1y time-range buttons to the dashboard. The selected range and metric are kept when the stat cards refresh.
+- Fixed the login page poster wall showing no posters when its cache was empty.
 
 ## 0.2.19
 
