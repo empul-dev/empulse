@@ -1427,76 +1427,6 @@ class TestAPIRoutes:
         assert "Update available: v0.2.3" in r.text
         assert "Current version: v0.2.1" in r.text
 
-    @pytest.mark.asyncio
-    async def test_notification_channels_crud(self, client):
-        # Create
-        r = await client.post(
-            "/api/notification-channels",
-            json={
-                "name": "Test Discord",
-                "channel_type": "discord",
-                "config": {"url": "https://discord.com/api/webhooks/test"},
-                "triggers": ["playback_start", "playback_stop"],
-                "conditions": {},
-                "enabled": True,
-            },
-        )
-        assert r.status_code == 201
-
-        # List
-        r = await client.get("/api/notification-channels")
-        assert r.status_code == 200
-        channels = r.json()
-        assert len(channels) >= 1
-        ch_id = channels[0]["id"]
-        assert channels[0]["name"] == "Test Discord"
-
-        # Update
-        r = await client.put(
-            f"/api/notification-channels/{ch_id}",
-            json={
-                "name": "Updated Discord",
-                "channel_type": "discord",
-                "config": {"url": "https://discord.com/api/webhooks/test"},
-                "triggers": ["playback_start"],
-                "conditions": {},
-                "enabled": True,
-            },
-        )
-        assert r.status_code == 200
-
-        # Delete
-        r = await client.delete(f"/api/notification-channels/{ch_id}")
-        assert r.status_code == 204
-
-    @pytest.mark.asyncio
-    async def test_notification_channels_not_found(self, client):
-        r = await client.put(
-            "/api/notification-channels/99999",
-            json={
-                "name": "X",
-                "channel_type": "discord",
-                "config": {},
-                "triggers": [],
-                "conditions": {},
-            },
-        )
-        assert r.status_code == 404
-        r = await client.delete("/api/notification-channels/99999")
-        assert r.status_code == 404
-
-    @pytest.mark.asyncio
-    async def test_notification_log(self, client):
-        r = await client.get("/api/notification-log")
-        assert r.status_code == 200
-        assert isinstance(r.json(), list)
-
-    @pytest.mark.asyncio
-    async def test_settings_notifications_page(self, client):
-        r = await client.get("/settings/notifications")
-        assert r.status_code == 200
-        assert "Notification" in r.text
-
     # --- Phase 3: Map, Newsletter, Locations ---
 
     @pytest.mark.asyncio
@@ -1693,3 +1623,21 @@ class TestEmbyUrlValidation:
     def test_unresolvable_host_is_lenient(self):
         # DNS not ready at container start must not block a legit start-up.
         self._run("http://emby-that-does-not-resolve.invalid:8096", resolves_to=None)
+
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("GET", "/settings/notifications"),
+        ("GET", "/api/notification-channels"),
+        ("POST", "/api/notification-channels"),
+        ("PUT", "/api/notification-channels/1"),
+        ("DELETE", "/api/notification-channels/1"),
+        ("POST", "/api/notification-channels/1/test"),
+        ("GET", "/api/notification-log"),
+    ],
+)
+async def test_removed_notification_routes_return_404(client, method, path):
+    response = await client.request(method, path)
+    assert response.status_code == 404

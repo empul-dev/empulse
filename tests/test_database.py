@@ -648,31 +648,7 @@ class TestStats:
 
 
 class TestLegacySecretMigration:
-    """I-1: plaintext notification/newsletter secrets get encrypted on boot."""
-
-    @pytest.mark.asyncio
-    async def test_encrypts_plaintext_channel_secret(self, db):
-        from datetime import datetime, timezone
-
-        from empulse.database import _migrate
-
-        await db.execute(
-            "INSERT INTO notification_channels (name, channel_type, config, triggers, conditions, enabled, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [
-                "Legacy Telegram", "telegram",
-                '{"bot_token": "plaintext-token", "chat_id": "1"}',
-                "[]", "{}", 1, datetime.now(timezone.utc).isoformat(),
-            ],
-        )
-        await db.commit()
-
-        await _migrate(db)
-
-        cursor = await db.execute("SELECT config FROM notification_channels")
-        row = await cursor.fetchone()
-        assert "plaintext-token" not in row["config"]
-        assert "enc:v1:" in row["config"]
+    """I-1: plaintext newsletter passwords get encrypted on boot."""
 
     @pytest.mark.asyncio
     async def test_encrypts_plaintext_newsletter_password(self, db):
@@ -690,29 +666,3 @@ class TestLegacySecretMigration:
         row = await cursor.fetchone()
         assert row["smtp_pass"] != "plaintext-smtp-pass"
         assert row["smtp_pass"].startswith("enc:v1:")
-
-    @pytest.mark.asyncio
-    async def test_migration_is_idempotent_on_already_encrypted_secrets(self, db):
-        from datetime import datetime, timezone
-
-        from empulse.crypto import encrypt_secret
-        from empulse.database import _migrate
-
-        already_encrypted = encrypt_secret("hunter2")
-        await db.execute(
-            "INSERT INTO notification_channels (name, channel_type, config, triggers, conditions, enabled, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [
-                "Already Encrypted", "telegram",
-                json.dumps({"bot_token": already_encrypted, "chat_id": "1"}),
-                "[]", "{}", 1, datetime.now(timezone.utc).isoformat(),
-            ],
-        )
-        await db.commit()
-
-        await _migrate(db)
-
-        cursor = await db.execute("SELECT config FROM notification_channels")
-        row = await cursor.fetchone()
-        stored = json.loads(row["config"])
-        assert stored["bot_token"] == already_encrypted  # unchanged, not double-encrypted

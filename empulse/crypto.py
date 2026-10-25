@@ -1,5 +1,4 @@
-"""Encryption helpers for secrets stored at rest (notification channel
-credentials, newsletter SMTP password).
+"""Encryption helpers for the newsletter SMTP password stored at rest.
 
 The Fernet key is derived from `settings.secret_key` via HKDF-SHA256, so no
 separate key management is required — rotating `SECRET_KEY` rotates this key
@@ -23,6 +22,7 @@ _fernet: Fernet | None = None
 
 
 def _derive_key(secret_key: str) -> bytes:
+    # Keep the original derivation context so existing SMTP passwords decrypt.
     hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"empulse:channel")
     raw = hkdf.derive(secret_key.encode())
     return base64.urlsafe_b64encode(raw)
@@ -59,6 +59,6 @@ def decrypt_secret(value: str | None) -> str:
         return _get_fernet().decrypt(token.encode()).decode()
     except InvalidToken:
         # Fail closed: never hand back the ciphertext, or a SECRET_KEY rotation
-        # would leak enc:v1:… as the literal credential to the channel.
+        # would leak enc:v1:… as the literal SMTP credential.
         logger.warning("Failed to decrypt a stored secret (invalid token) — returning empty")
         return ""

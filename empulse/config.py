@@ -1,4 +1,6 @@
+import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -32,10 +34,6 @@ class Settings(BaseSettings):
     # these only unlock the genuinely risky cases.
     emby_allow_insecure: bool = False  # allow http:// to a public host (key in clear)
     emby_allow_private: bool = False  # allow link-local/metadata (169.254.0.0/16)
-    # "Recently Added" notifications (new_media event via Emby LibraryChanged)
-    new_media_max_age_minutes: int = 120  # skip items whose DateCreated is older (rescans)
-    new_media_debounce_seconds: int = 15  # collect LibraryChanged IDs before fetching
-    new_media_batch_cap: int = 20  # over this many new items -> one aggregated notification
 
     model_config = {"env_file_encoding": "utf-8"}
 
@@ -52,8 +50,11 @@ if not settings.secret_key:
             settings.secret_key = _secret_file.read_text().strip()
         if not settings.secret_key:
             settings.secret_key = _secrets.token_hex(32)
-            _secret_file.write_text(settings.secret_key + "\n")
-            _secret_file.chmod(0o600)
+            # Create with 0600 so the key is never readable under the umask default.
+            _fd = os.open(_secret_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(_fd, "w") as _f:
+                _f.write(settings.secret_key + "\n")
+            _secret_file.chmod(0o600)  # an existing empty file keeps its old mode
     except OSError as _e:
         _logging.getLogger("empulse.config").warning(
             "Cannot persist secret key to %s: %s. "
