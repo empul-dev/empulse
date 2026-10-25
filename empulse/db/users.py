@@ -59,8 +59,23 @@ _USER_SELECT = """
 """
 
 
-async def get_all_users(db: aiosqlite.Connection) -> list[dict]:
-    cursor = await db.execute(_USER_SELECT + " ORDER BY total_plays DESC")
+USER_SORT_COLUMNS = {
+    "user": "u.username COLLATE NOCASE",
+    "plays": "total_plays",
+    "duration": "total_duration",
+    # Normalise: logins store ISO "T…+00:00", playback stores "YYYY-MM-DD HH:MM:SS".
+    "last_seen": "datetime(u.last_seen)",
+}
+
+
+async def get_all_users(
+    db: aiosqlite.Connection, sort_by: str = "plays", sort_order: str = "desc"
+) -> list[dict]:
+    col = USER_SORT_COLUMNS.get(sort_by, USER_SORT_COLUMNS["plays"])
+    direction = "ASC" if sort_order == "asc" else "DESC"
+    cursor = await db.execute(
+        _USER_SELECT + f" ORDER BY {col} {direction}, u.username COLLATE NOCASE"
+    )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 

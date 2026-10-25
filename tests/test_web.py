@@ -103,6 +103,35 @@ class TestPageRoutes:
         assert "Users" in r.text
 
     @pytest.mark.asyncio
+    async def test_users_page_sorts_by_query(self, client):
+        db = client._test_db
+        for uid, name, dur in [("ua", "Alpha", 700), ("ub", "Beta", 9000)]:
+            await db.execute(
+                "INSERT INTO users (emby_user_id, username) VALUES (?, ?)", [uid, name]
+            )
+            await db.execute(
+                "INSERT INTO history (session_key, user_id, user_name, item_name,"
+                " started_at, stopped_at, duration_seconds)"
+                " VALUES (?, ?, ?, 'X', '2024-01-01', '2024-01-01', ?)",
+                [f"s-{uid}", uid, name, dur],
+            )
+        await db.commit()
+
+        r = await client.get("/users?sort_by=duration&sort_order=desc")
+        assert r.status_code == 200
+        assert r.text.index(">Beta<") < r.text.index(">Alpha<")
+        # Active header links to the opposite direction.
+        assert 'href="?sort_by=duration&amp;sort_order=asc"' in r.text
+
+        r = await client.get("/users?sort_by=duration&sort_order=asc")
+        assert r.text.index(">Alpha<") < r.text.index(">Beta<")
+
+        # Bogus params fall back to the default plays-desc header state.
+        r = await client.get("/users?sort_by=bogus&sort_order=x")
+        assert r.status_code == 200
+        assert 'href="?sort_by=plays&amp;sort_order=asc"' in r.text
+
+    @pytest.mark.asyncio
     async def test_libraries_page(self, client):
         r = await client.get("/libraries")
         assert r.status_code == 200

@@ -1,6 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Users — Empulse{% endblock %}
 
+{% macro sort_header(label, col) %}
+{% set is_active = sort_by == col %}
+{% set next_order = 'asc' if (is_active and sort_order == 'desc') else 'desc' %}
+<th class="sortable {% if is_active %}sorted{% endif %}"
+    {% if is_active %}aria-sort="{{ 'ascending' if sort_order == 'asc' else 'descending' }}"{% endif %}>
+    <a href="?sort_by={{ col }}&amp;sort_order={{ next_order }}" class="sort-link">
+        {{ label }}
+        <span class="sort-arrow {% if not is_active %}dim{% endif %}">{% if is_active and sort_order == 'asc' %}&#9650;{% else %}&#9660;{% endif %}</span>
+    </a>
+</th>
+{% endmacro %}
+
 {% block content %}
 <div class="section-header">
     <h2>Users</h2>
@@ -11,10 +23,10 @@
 <table>
     <thead>
         <tr>
-            <th>User</th>
-            <th>Total Plays</th>
-            <th>Total Duration</th>
-            <th>Last Seen</th>
+            {{ sort_header('User', 'user') }}
+            {{ sort_header('Total Plays', 'plays') }}
+            {{ sort_header('Total Duration', 'duration') }}
+            {{ sort_header('Last Seen', 'last_seen') }}
             {% if current_user and current_user.role == 'admin' %}
             <th>Login</th>
             {% endif %}
