@@ -4,6 +4,7 @@
 
 - Graphs: added "Local vs Remote", showing daily plays from the local network vs. outside it and the average bitrate of remote plays. Client IPs are classified on the server and never sent to the browser.
 - Graphs: added "Concurrent Streams", showing the peak number of simultaneous streams per day and how many of them were transcodes.
+- Graphs: added "Transcode Reasons by Client", showing for the eight clients with the most transcodes which Emby transcode reasons caused them.
 - Security: removed the unused `/api/recent-history` endpoint. It showed every user's latest plays, including IP addresses, to viewer accounts.
 - Security: images under `/api/img/` now require a login. The login page poster wall uses a new `/api/login-posters/` endpoint that only serves already cached posters, so anonymous visitors can no longer browse library artwork by item ID.
 - The settings backup download now uses SQLite's backup API, so it includes recent changes that were still in the write-ahead log.
