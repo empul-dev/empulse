@@ -533,12 +533,17 @@ async def user_image_proxy(user_id: str, name: str = Query("")):
 
 
 def _fill_date_gaps(rows: list[dict], days: int, tz_offset_hours: float) -> list[dict]:
-    """Fill missing dates with zeroed entries, ending on today in the display timezone."""
+    """Fill missing dates with zeroed entries, ending on today in the display timezone.
+
+    The SQL window is a rolling days x 24h, which touches days + 1 calendar dates
+    (a partial oldest day and today), so the chart has days + 1 buckets and sums
+    to the same total as the stat cards.
+    """
     today = (datetime.now(timezone.utc) + timedelta(hours=tz_offset_hours)).date()
-    start = today - timedelta(days=days - 1)
+    start = today - timedelta(days=days)
     existing = {r["date"]: r for r in rows}
     result = []
-    for i in range(days):
+    for i in range(days + 1):
         d = (start + timedelta(days=i)).isoformat()
         if d in existing:
             result.append(existing[d])
