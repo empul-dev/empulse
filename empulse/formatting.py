@@ -33,18 +33,6 @@ def convert_tz(iso_str: str, tz_name: str) -> datetime:
     return dt.astimezone(ZoneInfo(tz_name))
 
 
-def get_tz_offset_hours(tz_name: str) -> float:
-    """Return the current UTC offset for *tz_name* in fractional hours.
-
-    Used to build SQLite ``datetime(col, '+N hours')`` modifiers.
-    """
-    now = datetime.now(timezone.utc)
-    offset = now.astimezone(ZoneInfo(tz_name)).utcoffset()
-    if offset is None:
-        return 0.0
-    return offset.total_seconds() / 3600
-
-
 # ── Date formatting ────────────────────────────────────────────────────────
 
 

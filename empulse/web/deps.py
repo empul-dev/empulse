@@ -1,11 +1,31 @@
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from fastapi import HTTPException, Request
 from starlette.responses import Response
 
 from empulse.database import get_db
+from empulse.formatting import DEFAULT_DISPLAY
+from empulse.period import Period
 
 
 def get_database():
     return get_db()
+
+
+def display_tz(request: Request) -> str:
+    """The display timezone, or UTC if it is unset or unknown."""
+    display = getattr(request.app.state, "display_settings", None) or DEFAULT_DISPLAY
+    tz = display.get("timezone") or "UTC"
+    try:
+        ZoneInfo(tz)
+    except (ZoneInfoNotFoundError, ValueError):
+        return "UTC"
+    return tz
+
+
+def get_period(request: Request, days: int = 30) -> Period:
+    """Route dependency: the Period for ``?days=`` in the display timezone."""
+    return Period.last(days, display_tz(request))
 
 
 def forbidden_response(request: Request) -> Response:

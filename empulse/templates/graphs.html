@@ -795,7 +795,8 @@ function loadGraphs() {
     // --- 14. Average Bitrate bar chart ---
     fetch('/api/charts/bandwidth?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
         destroy('bandwidth');
-        if (!data.length) return;
+        // Every day is present (zero-filled); skip the chart when none has a bitrate.
+        if (!data.some(function(r) { return r.plays; })) return;
         gCharts.bandwidth = new Chart(document.getElementById('g-bandwidth'), {
             type: 'bar',
             data: {

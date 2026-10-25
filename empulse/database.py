@@ -4,6 +4,7 @@ from pathlib import Path
 
 from empulse.config import settings
 from empulse.backups import prepare_backup, prune_backups, read_release, run_io
+from empulse.period import register_sql_functions
 from empulse.version import get_version
 
 logger = logging.getLogger("empulse.db")
@@ -174,6 +175,7 @@ async def init_db() -> None:
     db = await aiosqlite.connect(str(db_path))
     db.row_factory = aiosqlite.Row
     try:
+        await register_sql_functions(db)
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA busy_timeout=5000")
         # executescript commits an existing transaction, so BEGIN belongs inside.

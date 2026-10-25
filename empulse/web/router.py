@@ -13,10 +13,11 @@ from empulse.config import settings
 from empulse.database import get_db
 from empulse.db import users as users_db, libraries as libraries_db, history as history_db, stats as stats_db
 from empulse.models import UserInfo, HistoryRecord
+from empulse.period import Period
 from empulse.web.auth import (
     create_session_token, hash_token, COOKIE_NAME, SESSION_MAX_AGE,
 )
-from empulse.web.deps import admin_only, require_self_or_admin
+from empulse.web.deps import admin_only, display_tz, require_self_or_admin
 
 logger = logging.getLogger("empulse.router")
 
@@ -58,7 +59,9 @@ async def user_detail(request: Request, user_id: str):
         user_data = {"emby_user_id": user_id, "username": "Unknown", "total_plays": 0, "total_duration": 0}
     user = UserInfo(**user_data)
     user_stats = await stats_db.get_user_stats(db, user_id)
-    most_watched = await stats_db.get_user_most_watched(db, user_id, limit=10, days=30)
+    most_watched = await stats_db.get_user_most_watched(
+        db, user_id, Period.last(30, display_tz(request)), limit=10
+    )
     history_rows = await history_db.get_history_for_user(db, user_id, limit=50)
     history_list = [HistoryRecord(**r) for r in history_rows]
     return templates.TemplateResponse(request, "user.html", {
@@ -156,10 +159,10 @@ async def item_detail(request: Request, item_id: str, type: str = "", name: str 
     backdrop_id = series_id if is_series and series_id else item_id
 
     if is_series and series_name:
-        global_stats = await stats_db.get_series_stats(db, series_name)
+        global_stats = await stats_db.get_series_stats(db, series_name, display_tz(request))
         user_stats = await stats_db.get_series_user_stats(db, series_name)
     else:
-        global_stats = await stats_db.get_item_stats(db, item_id)
+        global_stats = await stats_db.get_item_stats(db, item_id, display_tz(request))
         user_stats = await stats_db.get_item_user_stats(db, item_id)
 
     # Extract metadata
@@ -291,9 +294,10 @@ async def library_detail(request: Request, item_type: str):
     db = get_db()
     type_labels = {"Movie": "Movies", "Episode": "TV Shows", "Audio": "Music"}
     label = type_labels.get(item_type, item_type)
-    lib_stats = await stats_db.get_library_stats(db, item_type)
-    top_items = await stats_db.get_library_top_items(db, item_type, limit=10, days=30)
-    top_users = await stats_db.get_library_top_users(db, item_type, limit=10, days=30)
+    tz = display_tz(request)
+    lib_stats = await stats_db.get_library_stats(db, item_type, tz)
+    top_items = await stats_db.get_library_top_items(db, item_type, Period.last(30, tz), limit=10)
+    top_users = await stats_db.get_library_top_users(db, item_type, Period.last(30, tz), limit=10)
     return templates.TemplateResponse(request, "library.html", {
         "active": "libraries",
         "item_type": item_type, "label": label,

@@ -36,9 +36,11 @@ async def client():
 
         import aiosqlite
         from empulse.database import SCHEMA
+        from empulse.period import register_sql_functions
 
         db = await aiosqlite.connect(":memory:")
         db.row_factory = aiosqlite.Row
+        await register_sql_functions(db)
         await db.executescript(SCHEMA)
         await db.commit()
 
@@ -817,29 +819,34 @@ class TestAPIRoutes:
         r = await client.get("/api/charts/daily-plays?days=7")
         assert r.status_code == 200
         data = r.json()
-        # 7 x 24h reaches back into an 8th calendar day (partial oldest day)
-        assert len(data) == 8
+        # one row per local day, today included
+        assert len(data) == 7
         assert all(d["plays"] == 0 for d in data)
 
     @pytest.mark.asyncio
-    async def test_chart_daily_plays_includes_partial_oldest_day(self, client):
-        """Every play the stat cards count for N days also appears in the chart."""
+    async def test_chart_daily_plays_covers_whole_local_days(self, client):
+        """The chart counts exactly the plays inside the Period's bounds."""
         from datetime import datetime, timedelta, timezone
 
-        start = datetime.now(timezone.utc) - timedelta(days=7) + timedelta(minutes=1)
-        await history_db.insert_history(
-            client._test_db,
-            {
-                "session_key": "edge",
-                "user_id": "u1",
-                "item_type": "Movie",
-                "started_at": start.isoformat(),
-                "stopped_at": (start + timedelta(hours=1)).isoformat(),
-                "duration_seconds": 3600,
-            },
-        )
-        r = await client.get("/api/charts/daily-plays?days=7")
-        assert sum(d["plays"] for d in r.json()) == 1
+        from empulse.period import Period
+
+        start = datetime.fromisoformat(Period.last(7).bounds[0]).replace(tzinfo=timezone.utc)
+        for key, at in (("in", start), ("out", start - timedelta(seconds=1))):
+            await history_db.insert_history(
+                client._test_db,
+                {
+                    "session_key": key,
+                    "user_id": "u1",
+                    "item_type": "Movie",
+                    "started_at": at.isoformat(),
+                    "stopped_at": (at + timedelta(hours=1)).isoformat(),
+                    "duration_seconds": 3600,
+                },
+            )
+        data = (await client.get("/api/charts/daily-plays?days=7")).json()
+        assert len(data) == 7
+        assert data[0]["plays"] == 1
+        assert sum(d["plays"] for d in data) == 1
 
     @pytest.mark.asyncio
     async def test_chart_daily_plays_with_data(self, client):
@@ -955,7 +962,7 @@ class TestAPIRoutes:
 
     @pytest.mark.asyncio
     async def test_chart_plays_per_month(self, client):
-        r = await client.get("/api/charts/plays-per-month?months=12")
+        r = await client.get("/api/charts/plays-per-month?days=365")
         assert r.status_code == 200
         assert isinstance(r.json(), list)
 
@@ -1597,20 +1604,16 @@ async def test_removed_feature_routes_return_404(client, method, path):
     assert response.status_code == 404
 
 
-def test_fill_date_gaps_ends_on_today_in_display_timezone(monkeypatch):
-    from datetime import datetime, timezone
+def test_get_period_uses_display_timezone_and_falls_back_to_utc():
+    from types import SimpleNamespace
 
-    from empulse.web import api
+    from empulse.web.deps import get_period
 
-    class FixedDatetime(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return datetime(2026, 10, 25, 7, 0, tzinfo=timezone.utc)
+    def request(tz):
+        state = SimpleNamespace(display_settings={"timezone": tz})
+        return SimpleNamespace(app=SimpleNamespace(state=state))
 
-    monkeypatch.setattr(api, "datetime", FixedDatetime)
-    # UTC-10: it is still Oct 24 for the viewer
-    assert [r["date"] for r in api._fill_date_gaps([], 2, -10)] == [
-        "2026-10-22", "2026-10-23", "2026-10-24",
-    ]
-    # UTC+20 would be Oct 26 (exercise the other direction)
-    assert api._fill_date_gaps([], 1, 20)[-1]["date"] == "2026-10-26"
+    assert get_period(request("Europe/Berlin"), days=400).tz == "Europe/Berlin"
+    assert get_period(request("Europe/Berlin"), days=400).days == 365
+    assert get_period(request("Not/AZone"), days=7).tz == "UTC"
+    assert get_period(request("../etc"), days=7).tz == "UTC"
