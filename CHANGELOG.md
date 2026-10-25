@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.21
+
+- Users table can be sorted by user, total plays, total duration, or last seen by clicking the column headers.
+- Updated FastAPI, Uvicorn, websockets, pydantic-settings, aiosqlite, python-dotenv and python-multipart to their current releases.
+- Updated the GitHub Actions used for tests, security scans and Docker image builds.
+
 ## 0.2.20
 
 - Removed the newsletter, its schedule, settings page and API endpoints, and the now unused `cryptography` dependency. Startup backs up existing databases before removing the newsletter configuration table, including the stored SMTP password.
