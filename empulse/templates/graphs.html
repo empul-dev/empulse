@@ -630,6 +630,8 @@ function loadGraphs() {
     fetch('/api/charts/transcode-reasons?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
         destroy('transcodeReasons');
         if (!data.clients.length) return;
+        // No green/gold/red: those mean DirectPlay/DirectStream/Transcode elsewhere on this page.
+        var REASON_PALETTE = ['#29b6f6', '#7e57c2', '#4db6ac', '#ffca28', '#ab47bc', '#5c6bc0'];
         var REASON_COLORS = { Other: '#78909c', Unknown: '#546e7a' };
 
         gCharts.transcodeReasons = new Chart(document.getElementById('g-transcode-reasons'), {
@@ -640,7 +642,7 @@ function loadGraphs() {
                     return {
                         label: reason,
                         data: data.counts[reason],
-                        backgroundColor: soften(REASON_COLORS[reason] || PALETTE[i % PALETTE.length]),
+                        backgroundColor: soften(REASON_COLORS[reason] || REASON_PALETTE[i % REASON_PALETTE.length]),
                         borderRadius: 2
                     };
                 })
