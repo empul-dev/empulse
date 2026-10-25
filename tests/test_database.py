@@ -1,8 +1,13 @@
 import json
+from datetime import datetime, timezone
 
 import pytest
 
 from empulse.db import history as history_db, users as users_db, libraries as libraries_db, stats as stats_db
+from empulse.period import Period
+
+# Covers the fixed 2024-01-01 timestamps used below.
+JAN_2024 = Period.last(7, now=datetime(2024, 1, 2, tzinfo=timezone.utc))
 
 
 class TestHistoryCRUD:
@@ -435,7 +440,7 @@ class TestStats:
                 "duration_seconds": 1800,
             })
 
-        top = await stats_db.get_top_users(db, limit=10, days=99999)
+        top = await stats_db.get_top_users(db, limit=10, period=JAN_2024)
         assert len(top) == 2
         assert top[0]["user_name"] == "Alice"
         assert top[0]["plays"] == 5
@@ -458,7 +463,7 @@ class TestStats:
             "duration_seconds": 7200,
         })
 
-        by_type = await stats_db.get_plays_by_type(db, days=99999)
+        by_type = await stats_db.get_plays_by_type(db, period=JAN_2024)
         types = {r["item_type"]: r["plays"] for r in by_type}
         assert types["Episode"] == 2
         assert types["Movie"] == 1
@@ -473,7 +478,7 @@ class TestStats:
             "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
             "duration_seconds": 7200,
         })
-        rows = await stats_db.get_user_plays_per_day(db, "u1", days=7)
+        rows = await stats_db.get_user_plays_per_day(db, "u1", period=Period.last(7))
         assert any(r["plays"] == 1 for r in rows)
 
     @pytest.mark.asyncio
@@ -487,7 +492,7 @@ class TestStats:
                 "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
                 "duration_seconds": 7200,
             })
-        top = await stats_db.get_user_most_watched(db, "u1", limit=5, days=99999)
+        top = await stats_db.get_user_most_watched(db, "u1", limit=5, period=Period.last(365))
         assert len(top) >= 1
         assert top[0]["title"] == "Popular Movie"
         assert top[0]["plays"] == 3
@@ -524,10 +529,10 @@ class TestStats:
             "duration_seconds": 1800,
         })
 
-        watched = await stats_db.get_most_watched_shows(db, limit=5, days=99999)
-        popular = await stats_db.get_most_popular_shows(db, limit=5, days=99999)
-        user_top = await stats_db.get_user_most_watched(db, "u2", limit=5, days=99999)
-        library_top = await stats_db.get_library_top_items(db, "Episode", limit=5, days=99999)
+        watched = await stats_db.get_most_watched_shows(db, limit=5, period=Period.last(365))
+        popular = await stats_db.get_most_popular_shows(db, limit=5, period=Period.last(365))
+        user_top = await stats_db.get_user_most_watched(db, "u2", limit=5, period=Period.last(365))
+        library_top = await stats_db.get_library_top_items(db, "Episode", limit=5, period=Period.last(365))
 
         assert watched[0]["poster_id"] == "35974"
         assert popular[0]["poster_id"] == "35974"
@@ -580,7 +585,7 @@ class TestStats:
                 "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
                 "duration_seconds": 7200,
             })
-        top = await stats_db.get_library_top_items(db, "Movie", limit=5, days=99999)
+        top = await stats_db.get_library_top_items(db, "Movie", limit=5, period=Period.last(365))
         assert len(top) >= 1
         assert top[0]["title"] == "Top Movie"
 
@@ -598,7 +603,7 @@ class TestStats:
             "started_at": f"{today}T15:00:00", "stopped_at": f"{today}T16:00:00",
             "duration_seconds": 3600,
         })
-        rows = await stats_db.get_user_plays_by_type(db, "u1", days=99999)
+        rows = await stats_db.get_user_plays_by_type(db, "u1", period=Period.last(365))
         types = {r["item_type"]: r["plays"] for r in rows}
         assert types["Movie"] == 1
         assert types["Episode"] == 1
@@ -627,7 +632,7 @@ class TestStats:
             "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
             "duration_seconds": 7200,
         })
-        rows = await stats_db.get_library_plays_per_day(db, "Movie", days=7)
+        rows = await stats_db.get_library_plays_per_day(db, "Movie", period=Period.last(7))
         assert any(r["plays"] == 1 for r in rows)
 
     @pytest.mark.asyncio
@@ -641,28 +646,7 @@ class TestStats:
                 "started_at": f"{today}T12:00:00", "stopped_at": f"{today}T14:00:00",
                 "duration_seconds": 7200,
             })
-        top = await stats_db.get_library_top_users(db, "Movie", limit=5, days=99999)
+        top = await stats_db.get_library_top_users(db, "Movie", limit=5, period=Period.last(365))
         assert len(top) >= 1
         assert top[0]["user_name"] == "Alice"
         assert top[0]["plays"] == 5
-
-
-class TestLegacySecretMigration:
-    """I-1: plaintext newsletter passwords get encrypted on boot."""
-
-    @pytest.mark.asyncio
-    async def test_encrypts_plaintext_newsletter_password(self, db):
-        from empulse.database import _migrate
-
-        await db.execute(
-            "INSERT INTO newsletter_config (id, smtp_pass) VALUES (1, ?)",
-            ["plaintext-smtp-pass"],
-        )
-        await db.commit()
-
-        await _migrate(db)
-
-        cursor = await db.execute("SELECT smtp_pass FROM newsletter_config WHERE id = 1")
-        row = await cursor.fetchone()
-        assert row["smtp_pass"] != "plaintext-smtp-pass"
-        assert row["smtp_pass"].startswith("enc:v1:")

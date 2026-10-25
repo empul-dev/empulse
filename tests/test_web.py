@@ -36,9 +36,11 @@ async def client():
 
         import aiosqlite
         from empulse.database import SCHEMA
+        from empulse.period import register_sql_functions
 
         db = await aiosqlite.connect(":memory:")
         db.row_factory = aiosqlite.Row
+        await register_sql_functions(db)
         await db.executescript(SCHEMA)
         await db.commit()
 
@@ -817,8 +819,34 @@ class TestAPIRoutes:
         r = await client.get("/api/charts/daily-plays?days=7")
         assert r.status_code == 200
         data = r.json()
+        # one row per local day, today included
         assert len(data) == 7
         assert all(d["plays"] == 0 for d in data)
+
+    @pytest.mark.asyncio
+    async def test_chart_daily_plays_covers_whole_local_days(self, client):
+        """The chart counts exactly the plays inside the Period's bounds."""
+        from datetime import datetime, timedelta, timezone
+
+        from empulse.period import Period
+
+        start = datetime.fromisoformat(Period.last(7).bounds[0]).replace(tzinfo=timezone.utc)
+        for key, at in (("in", start), ("out", start - timedelta(seconds=1))):
+            await history_db.insert_history(
+                client._test_db,
+                {
+                    "session_key": key,
+                    "user_id": "u1",
+                    "item_type": "Movie",
+                    "started_at": at.isoformat(),
+                    "stopped_at": (at + timedelta(hours=1)).isoformat(),
+                    "duration_seconds": 3600,
+                },
+            )
+        data = (await client.get("/api/charts/daily-plays?days=7")).json()
+        assert len(data) == 7
+        assert data[0]["plays"] == 1
+        assert sum(d["plays"] for d in data) == 1
 
     @pytest.mark.asyncio
     async def test_chart_daily_plays_with_data(self, client):
@@ -934,7 +962,7 @@ class TestAPIRoutes:
 
     @pytest.mark.asyncio
     async def test_chart_plays_per_month(self, client):
-        r = await client.get("/api/charts/plays-per-month?months=12")
+        r = await client.get("/api/charts/plays-per-month?days=365")
         assert r.status_code == 200
         assert isinstance(r.json(), list)
 
@@ -1427,85 +1455,13 @@ class TestAPIRoutes:
         assert "Update available: v0.2.3" in r.text
         assert "Current version: v0.2.1" in r.text
 
-    # --- Phase 3: Map, Newsletter, Locations ---
+    # --- Phase 3: Map, Locations ---
 
     @pytest.mark.asyncio
-    async def test_newsletter_config_crud(self, client):
-        # Initially empty
-        r = await client.get("/api/newsletter/config")
+    async def test_settings_page_has_no_newsletter(self, client):
+        r = await client.get("/settings")
         assert r.status_code == 200
-        assert r.json() == {}
-
-        # Save config
-        r = await client.post(
-            "/api/newsletter/config",
-            json={
-                "enabled": True,
-                "schedule": "weekly",
-                "day_of_week": 1,
-                "hour": 10,
-                "recently_added_days": 7,
-                "recently_added_limit": 15,
-                "include_stats": True,
-                "smtp_host": "smtp.example.com",
-                "smtp_port": 587,
-                "smtp_user": "user@example.com",
-                "smtp_pass": "pass",
-                "smtp_tls": True,
-                "from_addr": "empulse@example.com",
-                "to_addrs": "admin@example.com",
-            },
-        )
-        assert r.status_code == 200
-
-        # Read back
-        r = await client.get("/api/newsletter/config")
-        assert r.status_code == 200
-        config = r.json()
-        assert config["enabled"] == 1
-        assert config["schedule"] == "weekly"
-        assert config["smtp_host"] == "smtp.example.com"
-
-        # Update
-        r = await client.post(
-            "/api/newsletter/config",
-            json={
-                "enabled": False,
-                "schedule": "daily",
-                "day_of_week": 0,
-                "hour": 8,
-                "recently_added_days": 3,
-                "recently_added_limit": 10,
-                "include_stats": False,
-                "smtp_host": "mail.example.com",
-                "smtp_port": 465,
-                "smtp_user": "",
-                "smtp_pass": "",
-                "smtp_tls": False,
-                "from_addr": "",
-                "to_addrs": "",
-            },
-        )
-        assert r.status_code == 200
-        r = await client.get("/api/newsletter/config")
-        assert r.json()["schedule"] == "daily"
-
-    @pytest.mark.asyncio
-    async def test_newsletter_preview(self, client):
-        r = await client.get("/api/newsletter/preview")
-        assert r.status_code == 200
-        assert "Empulse Newsletter" in r.text
-
-    @pytest.mark.asyncio
-    async def test_newsletter_send_not_configured(self, client):
-        r = await client.post("/api/newsletter/send")
-        assert r.status_code == 400
-
-    @pytest.mark.asyncio
-    async def test_settings_newsletter_page(self, client):
-        r = await client.get("/settings/newsletter")
-        assert r.status_code == 200
-        assert "Newsletter" in r.text
+        assert "newsletter" not in r.text.lower()
 
     @pytest.mark.asyncio
     async def test_static_css(self, client):
@@ -1636,9 +1592,14 @@ class TestEmbyUrlValidation:
         ("DELETE", "/api/notification-channels/1"),
         ("POST", "/api/notification-channels/1/test"),
         ("GET", "/api/notification-log"),
+        ("GET", "/settings/newsletter"),
+        ("GET", "/api/newsletter/config"),
+        ("POST", "/api/newsletter/config"),
+        ("GET", "/api/newsletter/preview"),
+        ("POST", "/api/newsletter/send"),
     ],
 )
-async def test_removed_notification_routes_return_404(client, method, path):
+async def test_removed_feature_routes_return_404(client, method, path):
     response = await client.request(method, path)
     assert response.status_code == 404
 
@@ -1672,3 +1633,18 @@ class TestRandomPosters:
         assert seen["params"]["SortBy"] == "Random"
         assert seen["params"]["Limit"] == "5"
         await emby._client.aclose()
+
+
+def test_get_period_uses_display_timezone_and_falls_back_to_utc():
+    from types import SimpleNamespace
+
+    from empulse.web.deps import get_period
+
+    def request(tz):
+        state = SimpleNamespace(display_settings={"timezone": tz})
+        return SimpleNamespace(app=SimpleNamespace(state=state))
+
+    assert get_period(request("Europe/Berlin"), days=400).tz == "Europe/Berlin"
+    assert get_period(request("Europe/Berlin"), days=400).days == 365
+    assert get_period(request("Not/AZone"), days=7).tz == "UTC"
+    assert get_period(request("../etc"), days=7).tz == "UTC"

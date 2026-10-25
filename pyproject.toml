@@ -1,6 +1,6 @@
 [project]
 name = "empulse"
-version = "0.2.19"
+version = "0.2.20"
 description = "Activity monitoring for Emby Server"
 requires-python = ">=3.11"
 dependencies = [
@@ -13,7 +13,7 @@ dependencies = [
     "jinja2~=3.1",
     "python-dotenv~=1.0",
     "python-multipart~=0.0.18",
-    "cryptography~=50.0",
+    "tzdata",  # zoneinfo fallback when the OS lacks tz data (e.g. US/* on Ubuntu 24.04)
 ]
 
 [project.optional-dependencies]

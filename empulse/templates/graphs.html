@@ -229,7 +229,7 @@ function soften(hex) {
     return 'rgba(' + r + ',' + g + ',' + b + ',0.7)';
 }
 
-function getDays() { return parseInt(document.getElementById('graph-days').value) || 30; }
+function getDays() { return C.clampDays(document.getElementById('graph-days')); }
 function destroy(key) { if (gCharts[key]) { gCharts[key].destroy(); gCharts[key] = null; } }
 
 function getGraphMetric() {
@@ -795,7 +795,8 @@ function loadGraphs() {
     // --- 14. Average Bitrate bar chart ---
     fetch('/api/charts/bandwidth?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
         destroy('bandwidth');
-        if (!data.length) return;
+        // Every day is present (zero-filled); skip the chart when none has a bitrate.
+        if (!data.some(function(r) { return r.plays; })) return;
         gCharts.bandwidth = new Chart(document.getElementById('g-bandwidth'), {
             type: 'bar',
             data: {

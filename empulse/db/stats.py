@@ -1,4 +1,8 @@
+from datetime import datetime, timedelta, timezone
+
 import aiosqlite
+
+from empulse.period import Period
 
 
 def _safe_order(metric: str) -> str:
@@ -6,13 +10,42 @@ def _safe_order(metric: str) -> str:
     return "plays" if metric == "plays" else "total_duration"
 
 
-def _tz_modifier(offset: float) -> str:
-    """Build a SQLite datetime modifier string from a timezone offset in hours.
+# A started_at upper bound later than any stored timestamp.
+_OPEN_END = "9999"
 
-    Examples: 0.0 → '+0.0 hours', -5.0 → '-5.0 hours', 5.5 → '+5.5 hours'
+
+async def _totals_by_window(
+    db: aiosqlite.Connection,
+    column: str,
+    value: str,
+    tz: str,
+    labels: tuple[str, ...],
+    select: str,
+) -> dict:
+    """Totals for rows where *column* = *value*, per fixed window label.
+
+    last_24h is a rolling 24 hours; last_7d/last_30d are Periods; all_time is unbounded.
+    *column* and *select* are trusted SQL from this module, never user input.
     """
-    sign = "+" if offset >= 0 else ""
-    return f"{sign}{offset} hours"
+    now = datetime.now(timezone.utc)
+    windows = {
+        "last_24h": (
+            (now - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S"),
+            _OPEN_END,
+        ),
+        "last_7d": Period.last(7, tz, now).bounds,
+        "last_30d": Period.last(30, tz, now).bounds,
+        "all_time": ("", _OPEN_END),
+    }
+    result = {}
+    for label in labels:
+        cursor = await db.execute(
+            f"SELECT {select} FROM counted_plays "
+            f"WHERE {column} = ? AND started_at >= ? AND started_at < ?",
+            [value, *windows[label]],
+        )
+        result[label] = dict(await cursor.fetchone())
+    return result
 
 
 async def get_total_plays(db: aiosqlite.Connection) -> int:
@@ -22,30 +55,32 @@ async def get_total_plays(db: aiosqlite.Connection) -> int:
 
 
 async def get_total_duration(db: aiosqlite.Connection) -> int:
-    cursor = await db.execute("SELECT COALESCE(SUM(duration_seconds), 0) FROM counted_plays")
+    cursor = await db.execute(
+        "SELECT COALESCE(SUM(duration_seconds), 0) FROM counted_plays"
+    )
     row = await cursor.fetchone()
     return row[0]
 
 
 async def get_top_users(
-    db: aiosqlite.Connection, limit: int = 5, days: int = 30, metric: str = "plays"
+    db: aiosqlite.Connection, period: Period, limit: int = 5, metric: str = "plays"
 ) -> list[dict]:
     order = _safe_order(metric)
     cursor = await db.execute(
         f"""SELECT user_id, user_name, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY user_id
            ORDER BY {order} DESC LIMIT ?""",
-        [f"-{days} days", limit],
+        [*period.bounds, limit],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_most_watched_movies(
-    db: aiosqlite.Connection, limit: int = 5, days: int = 30, metric: str = "plays"
+    db: aiosqlite.Connection, period: Period, limit: int = 5, metric: str = "plays"
 ) -> list[dict]:
     order = _safe_order(metric)
     cursor = await db.execute(
@@ -53,33 +88,33 @@ async def get_most_watched_movies(
                   COUNT(DISTINCT user_id) as users,
                   SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE item_type = 'Movie' AND started_at >= datetime('now', ?)
+           WHERE item_type = 'Movie' AND started_at >= ? AND started_at < ?
            GROUP BY item_id
            ORDER BY {order} DESC LIMIT ?""",
-        [f"-{days} days", limit],
+        [*period.bounds, limit],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_most_popular_movies(
-    db: aiosqlite.Connection, limit: int = 5, days: int = 30
+    db: aiosqlite.Connection, period: Period, limit: int = 5
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT item_id, item_name, year, COUNT(DISTINCT user_id) as users,
                   COUNT(*) as plays
            FROM counted_plays
-           WHERE item_type = 'Movie' AND started_at >= datetime('now', ?)
+           WHERE item_type = 'Movie' AND started_at >= ? AND started_at < ?
            GROUP BY item_id
            ORDER BY users DESC, plays DESC LIMIT ?""",
-        [f"-{days} days", limit],
+        [*period.bounds, limit],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_most_watched_shows(
-    db: aiosqlite.Connection, limit: int = 5, days: int = 30, metric: str = "plays"
+    db: aiosqlite.Connection, period: Period, limit: int = 5, metric: str = "plays"
 ) -> list[dict]:
     order = _safe_order(metric)
     cursor = await db.execute(
@@ -100,17 +135,17 @@ async def get_most_watched_shows(
                   ) as poster_id
            FROM counted_plays h
            WHERE h.item_type = 'Episode' AND h.series_name IS NOT NULL
-                 AND started_at >= datetime('now', ?)
+                 AND started_at >= ? AND started_at < ?
            GROUP BY h.series_name
            ORDER BY {order} DESC LIMIT ?""",
-        [f"-{days} days", limit],
+        [*period.bounds, limit],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_most_popular_shows(
-    db: aiosqlite.Connection, limit: int = 5, days: int = 30
+    db: aiosqlite.Connection, period: Period, limit: int = 5
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT h.series_name, COUNT(DISTINCT user_id) as users,
@@ -129,10 +164,10 @@ async def get_most_popular_shows(
                   ) as poster_id
            FROM counted_plays h
            WHERE h.item_type = 'Episode' AND h.series_name IS NOT NULL
-                 AND started_at >= datetime('now', ?)
+                 AND started_at >= ? AND started_at < ?
            GROUP BY h.series_name
            ORDER BY users DESC, plays DESC LIMIT ?""",
-        [f"-{days} days", limit],
+        [*period.bounds, limit],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
@@ -189,62 +224,59 @@ async def get_watched_item_keys(
 
 
 async def get_most_active_platforms(
-    db: aiosqlite.Connection, limit: int = 5, days: int = 30
+    db: aiosqlite.Connection, period: Period, limit: int = 5
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT client, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY client
            ORDER BY plays DESC LIMIT ?""",
-        [f"-{days} days", limit],
+        [*period.bounds, limit],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_most_active_libraries(
-    db: aiosqlite.Connection, limit: int = 5, days: int = 30
+    db: aiosqlite.Connection, period: Period, limit: int = 5
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT item_type, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY item_type
            ORDER BY plays DESC LIMIT ?""",
-        [f"-{days} days", limit],
+        [*period.bounds, limit],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
-async def get_plays_per_day(
-    db: aiosqlite.Connection, days: int = 30, tz_offset_hours: float = 0.0
-) -> list[dict]:
-    mod = _tz_modifier(tz_offset_hours)
+async def get_plays_per_day(db: aiosqlite.Connection, period: Period) -> list[dict]:
     cursor = await db.execute(
-        f"""SELECT DATE(started_at, '{mod}') as date, COUNT(*) as plays,
+        """SELECT local_date(started_at, ?) as date, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
-           GROUP BY DATE(started_at, '{mod}')
+           WHERE started_at >= ? AND started_at < ?
+           GROUP BY date
            ORDER BY date""",
-        [f"-{days} days"],
+        [period.tz, *period.bounds],
     )
     rows = await cursor.fetchall()
-    return [dict(r) for r in rows]
+    return period.fill_days([dict(r) for r in rows], plays=0, total_duration=0)
 
 
-async def get_plays_by_type(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
+async def get_plays_by_type(db: aiosqlite.Connection, period: Period) -> list[dict]:
     cursor = await db.execute(
         """SELECT item_type, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY item_type ORDER BY plays DESC""",
-        [f"-{days} days"],
+        [*period.bounds],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
@@ -262,23 +294,18 @@ async def get_user_stats(db: aiosqlite.Connection, user_id: str) -> dict:
     return dict(row)
 
 
-async def get_item_stats(db: aiosqlite.Connection, item_id: str) -> dict:
+async def get_item_stats(
+    db: aiosqlite.Connection, item_id: str, tz: str = "UTC"
+) -> dict:
     """Get play stats for a specific item across time periods."""
-    result = {}
-    for label, days_expr in [
-        ("last_24h", "-1 days"),
-        ("last_7d", "-7 days"),
-        ("last_30d", "-30 days"),
-        ("all_time", "-99999 days"),
-    ]:
-        cursor = await db.execute(
-            """SELECT COUNT(*) as plays, COALESCE(SUM(duration_seconds), 0) as duration
-               FROM counted_plays WHERE item_id = ? AND started_at >= datetime('now', ?)""",
-            [item_id, days_expr],
-        )
-        row = await cursor.fetchone()
-        result[label] = dict(row)
-    return result
+    return await _totals_by_window(
+        db,
+        "item_id",
+        item_id,
+        tz,
+        ("last_24h", "last_7d", "last_30d", "all_time"),
+        "COUNT(*) as plays, COALESCE(SUM(duration_seconds), 0) as duration",
+    )
 
 
 async def get_item_user_stats(db: aiosqlite.Connection, item_id: str) -> list[dict]:
@@ -294,23 +321,18 @@ async def get_item_user_stats(db: aiosqlite.Connection, item_id: str) -> list[di
     return [dict(r) for r in rows]
 
 
-async def get_series_stats(db: aiosqlite.Connection, series_name: str) -> dict:
+async def get_series_stats(
+    db: aiosqlite.Connection, series_name: str, tz: str = "UTC"
+) -> dict:
     """Get play stats for a series across time periods."""
-    result = {}
-    for label, days_expr in [
-        ("last_24h", "-1 days"),
-        ("last_7d", "-7 days"),
-        ("last_30d", "-30 days"),
-        ("all_time", "-99999 days"),
-    ]:
-        cursor = await db.execute(
-            """SELECT COUNT(*) as plays, COALESCE(SUM(duration_seconds), 0) as duration
-               FROM counted_plays WHERE series_name = ? AND started_at >= datetime('now', ?)""",
-            [series_name, days_expr],
-        )
-        row = await cursor.fetchone()
-        result[label] = dict(row)
-    return result
+    return await _totals_by_window(
+        db,
+        "series_name",
+        series_name,
+        tz,
+        ("last_24h", "last_7d", "last_30d", "all_time"),
+        "COUNT(*) as plays, COALESCE(SUM(duration_seconds), 0) as duration",
+    )
 
 
 async def get_series_user_stats(
@@ -329,38 +351,37 @@ async def get_series_user_stats(
 
 
 async def get_user_plays_per_day(
-    db: aiosqlite.Connection, user_id: str, days: int = 30, tz_offset_hours: float = 0.0
+    db: aiosqlite.Connection, user_id: str, period: Period
 ) -> list[dict]:
-    mod = _tz_modifier(tz_offset_hours)
     cursor = await db.execute(
-        f"""SELECT DATE(started_at, '{mod}') as date, COUNT(*) as plays,
+        """SELECT local_date(started_at, ?) as date, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE user_id = ? AND started_at >= datetime('now', ?)
-           GROUP BY DATE(started_at, '{mod}')
+           WHERE user_id = ? AND started_at >= ? AND started_at < ?
+           GROUP BY date
            ORDER BY date""",
-        [user_id, f"-{days} days"],
+        [period.tz, user_id, *period.bounds],
     )
     rows = await cursor.fetchall()
-    return [dict(r) for r in rows]
+    return period.fill_days([dict(r) for r in rows], plays=0, total_duration=0)
 
 
 async def get_user_plays_by_type(
-    db: aiosqlite.Connection, user_id: str, days: int = 30
+    db: aiosqlite.Connection, user_id: str, period: Period
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT item_type, COUNT(*) as plays
            FROM counted_plays
-           WHERE user_id = ? AND started_at >= datetime('now', ?)
+           WHERE user_id = ? AND started_at >= ? AND started_at < ?
            GROUP BY item_type ORDER BY plays DESC""",
-        [user_id, f"-{days} days"],
+        [user_id, *period.bounds],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_user_most_watched(
-    db: aiosqlite.Connection, user_id: str, limit: int = 10, days: int = 30
+    db: aiosqlite.Connection, user_id: str, period: Period, limit: int = 10
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT
@@ -381,38 +402,31 @@ async def get_user_most_watched(
                COUNT(*) as plays,
                SUM(duration_seconds) as total_duration
            FROM counted_plays h
-           WHERE h.user_id = ? AND h.started_at >= datetime('now', ?)
+           WHERE h.user_id = ? AND h.started_at >= ? AND started_at < ?
            GROUP BY COALESCE(h.series_name, h.item_name)
            ORDER BY plays DESC LIMIT ?""",
-        [user_id, f"-{days} days", limit],
+        [user_id, *period.bounds, limit],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_library_stats(
-    db: aiosqlite.Connection, item_type: str, days: int = 30
+    db: aiosqlite.Connection, item_type: str, tz: str = "UTC"
 ) -> dict:
-    result = {}
-    for label, days_expr in [
-        ("last_7d", "-7 days"),
-        ("last_30d", "-30 days"),
-        ("all_time", "-99999 days"),
-    ]:
-        cursor = await db.execute(
-            """SELECT COUNT(*) as plays,
-                      COALESCE(SUM(duration_seconds), 0) as duration,
-                      COUNT(DISTINCT user_id) as users
-               FROM counted_plays WHERE item_type = ? AND started_at >= datetime('now', ?)""",
-            [item_type, days_expr],
-        )
-        row = await cursor.fetchone()
-        result[label] = dict(row)
-    return result
+    return await _totals_by_window(
+        db,
+        "item_type",
+        item_type,
+        tz,
+        ("last_7d", "last_30d", "all_time"),
+        "COUNT(*) as plays, COALESCE(SUM(duration_seconds), 0) as duration, "
+        "COUNT(DISTINCT user_id) as users",
+    )
 
 
 async def get_library_top_items(
-    db: aiosqlite.Connection, item_type: str, limit: int = 10, days: int = 30
+    db: aiosqlite.Connection, item_type: str, period: Period, limit: int = 10
 ) -> list[dict]:
     if item_type == "Episode":
         cursor = await db.execute(
@@ -433,10 +447,10 @@ async def get_library_top_items(
                       SUM(duration_seconds) as total_duration,
                       COUNT(DISTINCT user_id) as users
                FROM counted_plays h
-               WHERE h.item_type = ? AND h.started_at >= datetime('now', ?)
+               WHERE h.item_type = ? AND h.started_at >= ? AND started_at < ?
                GROUP BY h.series_name
                ORDER BY plays DESC LIMIT ?""",
-            [item_type, f"-{days} days", limit],
+            [item_type, *period.bounds, limit],
         )
     else:
         cursor = await db.execute(
@@ -445,140 +459,124 @@ async def get_library_top_items(
                       SUM(duration_seconds) as total_duration,
                       COUNT(DISTINCT user_id) as users
                FROM counted_plays
-               WHERE item_type = ? AND started_at >= datetime('now', ?)
+               WHERE item_type = ? AND started_at >= ? AND started_at < ?
                GROUP BY item_id
                ORDER BY plays DESC LIMIT ?""",
-            [item_type, f"-{days} days", limit],
+            [item_type, *period.bounds, limit],
         )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_library_top_users(
-    db: aiosqlite.Connection, item_type: str, limit: int = 10, days: int = 30
+    db: aiosqlite.Connection, item_type: str, period: Period, limit: int = 10
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT user_id, user_name, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE item_type = ? AND started_at >= datetime('now', ?)
+           WHERE item_type = ? AND started_at >= ? AND started_at < ?
            GROUP BY user_id
            ORDER BY plays DESC LIMIT ?""",
-        [item_type, f"-{days} days", limit],
+        [item_type, *period.bounds, limit],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_library_plays_per_day(
-    db: aiosqlite.Connection,
-    item_type: str,
-    days: int = 30,
-    tz_offset_hours: float = 0.0,
+    db: aiosqlite.Connection, item_type: str, period: Period
 ) -> list[dict]:
-    mod = _tz_modifier(tz_offset_hours)
     cursor = await db.execute(
-        f"""SELECT DATE(started_at, '{mod}') as date, COUNT(*) as plays,
+        """SELECT local_date(started_at, ?) as date, COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE item_type = ? AND started_at >= datetime('now', ?)
-           GROUP BY DATE(started_at, '{mod}')
+           WHERE item_type = ? AND started_at >= ? AND started_at < ?
+           GROUP BY date
            ORDER BY date""",
-        [item_type, f"-{days} days"],
+        [period.tz, item_type, *period.bounds],
     )
     rows = await cursor.fetchall()
-    return [dict(r) for r in rows]
+    return period.fill_days([dict(r) for r in rows], plays=0, total_duration=0)
 
 
 async def get_plays_by_day_of_week(
-    db: aiosqlite.Connection, days: int = 30, tz_offset_hours: float = 0.0
+    db: aiosqlite.Connection, period: Period
 ) -> list[dict]:
-    mod = _tz_modifier(tz_offset_hours)
     cursor = await db.execute(
-        f"""SELECT CAST(strftime('%w', started_at, '{mod}') AS INTEGER) as dow,
+        """SELECT local_dow(started_at, ?) as dow,
                   COUNT(*) as plays, SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY dow ORDER BY dow""",
-        [f"-{days} days"],
+        [period.tz, *period.bounds],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
-async def get_plays_by_hour(
-    db: aiosqlite.Connection, days: int = 30, tz_offset_hours: float = 0.0
-) -> list[dict]:
-    mod = _tz_modifier(tz_offset_hours)
+async def get_plays_by_hour(db: aiosqlite.Connection, period: Period) -> list[dict]:
     cursor = await db.execute(
-        f"""SELECT CAST(strftime('%H', started_at, '{mod}') AS INTEGER) as hour,
+        """SELECT local_hour(started_at, ?) as hour,
                   COUNT(*) as plays, SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY hour ORDER BY hour""",
-        [f"-{days} days"],
+        [period.tz, *period.bounds],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
-async def get_plays_per_month(
-    db: aiosqlite.Connection, months: int | None = 12, days: int | None = None
-) -> list[dict]:
-    if days is not None:
-        window = f"-{days} days"
-    else:
-        safe_months = months if months is not None else 12
-        window = f"-{safe_months} months"
-
+async def get_plays_per_month(db: aiosqlite.Connection, period: Period) -> list[dict]:
     cursor = await db.execute(
-        """SELECT strftime('%Y-%m', started_at) as month,
+        """SELECT local_month(started_at, ?) as month,
                   COUNT(*) as plays, COALESCE(SUM(duration_seconds), 0) as total_duration
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY month ORDER BY month""",
-        [window],
+        [period.tz, *period.bounds],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_plays_by_date_stacked(
-    db: aiosqlite.Connection, days: int = 30, tz_offset_hours: float = 0.0
+    db: aiosqlite.Connection, period: Period
 ) -> list[dict]:
-    mod = _tz_modifier(tz_offset_hours)
     cursor = await db.execute(
-        f"""SELECT DATE(started_at, '{mod}') as date, item_type,
+        """SELECT local_date(started_at, ?) as date, item_type,
                   COUNT(*) as plays, SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY date, item_type
            ORDER BY date""",
-        [f"-{days} days"],
+        [period.tz, *period.bounds],
     )
     rows = await cursor.fetchall()
-    return [dict(r) for r in rows]
+    return period.fill_days(
+        [dict(r) for r in rows], by="item_type", plays=0, total_duration=0
+    )
 
 
 async def get_plays_by_stream_type(
-    db: aiosqlite.Connection, days: int = 30, tz_offset_hours: float = 0.0
+    db: aiosqlite.Connection, period: Period
 ) -> list[dict]:
-    mod = _tz_modifier(tz_offset_hours)
     cursor = await db.execute(
-        f"""SELECT DATE(started_at, '{mod}') as date, play_method,
+        """SELECT local_date(started_at, ?) as date, play_method,
                   COUNT(*) as plays
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY date, play_method
            ORDER BY date""",
-        [f"-{days} days"],
+        [period.tz, *period.bounds],
     )
     rows = await cursor.fetchall()
-    return [dict(r) for r in rows]
+    return period.fill_days([dict(r) for r in rows], by="play_method", plays=0)
 
 
 async def get_source_resolution_distribution(
-    db: aiosqlite.Connection, days: int = 30
+    db: aiosqlite.Connection, period: Period
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT
@@ -592,59 +590,59 @@ async def get_source_resolution_distribution(
                END as resolution,
                COUNT(*) as plays
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY resolution
            ORDER BY plays DESC""",
-        [f"-{days} days"],
+        [*period.bounds],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
-async def get_transcode_ratio(db: aiosqlite.Connection, days: int = 30) -> list[dict]:
+async def get_transcode_ratio(db: aiosqlite.Connection, period: Period) -> list[dict]:
     cursor = await db.execute(
         """SELECT play_method, COUNT(*) as plays
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?) AND play_method IS NOT NULL
+           WHERE started_at >= ? AND started_at < ? AND play_method IS NOT NULL
            GROUP BY play_method ORDER BY plays DESC""",
-        [f"-{days} days"],
+        [*period.bounds],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_top_platforms_with_stream_type(
-    db: aiosqlite.Connection, days: int = 30, limit: int = 10
+    db: aiosqlite.Connection, period: Period, limit: int = 10
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT client, play_method, COUNT(*) as plays
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?) AND client IS NOT NULL
+           WHERE started_at >= ? AND started_at < ? AND client IS NOT NULL
            GROUP BY client, play_method
            ORDER BY plays DESC""",
-        [f"-{days} days"],
+        [*period.bounds],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_top_users_with_stream_type(
-    db: aiosqlite.Connection, days: int = 30, limit: int = 10
+    db: aiosqlite.Connection, period: Period, limit: int = 10
 ) -> list[dict]:
     cursor = await db.execute(
         """SELECT user_id, user_name, play_method, COUNT(*) as plays
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY user_id, play_method
            ORDER BY plays DESC""",
-        [f"-{days} days"],
+        [*period.bounds],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_completion_breakdown(
-    db: aiosqlite.Connection, days: int = 30
+    db: aiosqlite.Connection, period: Period
 ) -> list[dict]:
     """Breakdown of plays by completion percentage range."""
     cursor = await db.execute(
@@ -657,7 +655,7 @@ async def get_completion_breakdown(
                END as range,
                COUNT(*) as plays
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY range
            ORDER BY
                CASE range
@@ -666,22 +664,22 @@ async def get_completion_breakdown(
                    WHEN '50-75%' THEN 3
                    WHEN '75-100%' THEN 4
                END""",
-        [f"-{days} days"],
+        [*period.bounds],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
 
 
-async def get_period_comparison(db: aiosqlite.Connection, days: int = 30) -> dict:
-    """Stats for the current period and the previous same-length period."""
+async def get_period_comparison(db: aiosqlite.Connection, period: Period) -> dict:
+    """Stats for the period and its previous period."""
     cursor = await db.execute(
         """SELECT COUNT(*) as plays,
                   COALESCE(SUM(duration_seconds), 0) as total_duration,
                   COUNT(DISTINCT user_id) as unique_users,
                   COUNT(DISTINCT item_id) as unique_items
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)""",
-        [f"-{days} days"],
+           WHERE started_at >= ? AND started_at < ?""",
+        [*period.bounds],
     )
     current = dict(await cursor.fetchone())
 
@@ -691,49 +689,43 @@ async def get_period_comparison(db: aiosqlite.Connection, days: int = 30) -> dic
                   COUNT(DISTINCT user_id) as unique_users,
                   COUNT(DISTINCT item_id) as unique_items
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?) AND started_at < datetime('now', ?)""",
-        [f"-{days * 2} days", f"-{days} days"],
+           WHERE started_at >= ? AND started_at < ?""",
+        [*period.previous().bounds],
     )
     previous = dict(await cursor.fetchone())
     return {"current": current, "previous": previous}
 
 
-async def get_bandwidth_stats(
-    db: aiosqlite.Connection, days: int = 30, tz_offset_hours: float = 0.0
-) -> list[dict]:
+async def get_bandwidth_stats(db: aiosqlite.Connection, period: Period) -> list[dict]:
     """Average bitrate per day from stream_info JSON."""
-    mod = _tz_modifier(tz_offset_hours)
     cursor = await db.execute(
-        f"""SELECT DATE(started_at, '{mod}') as date,
+        """SELECT local_date(started_at, ?) as date,
                   AVG(json_extract(stream_info, '$.media.bitrate')) as avg_bitrate,
                   COUNT(*) as plays
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
                  AND json_extract(stream_info, '$.media.bitrate') IS NOT NULL
                  AND json_extract(stream_info, '$.media.bitrate') > 0
            GROUP BY date
            ORDER BY date""",
-        [f"-{days} days"],
+        [period.tz, *period.bounds],
     )
     rows = await cursor.fetchall()
-    return [dict(r) for r in rows]
+    return period.fill_days([dict(r) for r in rows], avg_bitrate=None, plays=0)
 
 
-async def get_watch_heatmap(
-    db: aiosqlite.Connection, days: int = 30, tz_offset_hours: float = 0.0
-) -> list[dict]:
+async def get_watch_heatmap(db: aiosqlite.Connection, period: Period) -> list[dict]:
     """Play counts grouped by day-of-week and hour for heatmap rendering."""
-    mod = _tz_modifier(tz_offset_hours)
     cursor = await db.execute(
-        f"""SELECT CAST(strftime('%w', started_at, '{mod}') AS INTEGER) as dow,
-                  CAST(strftime('%H', started_at, '{mod}') AS INTEGER) as hour,
+        """SELECT local_dow(started_at, ?) as dow,
+                  local_hour(started_at, ?) as hour,
                   COUNT(*) as plays,
                   SUM(duration_seconds) as total_duration
            FROM counted_plays
-           WHERE started_at >= datetime('now', ?)
+           WHERE started_at >= ? AND started_at < ?
            GROUP BY dow, hour
            ORDER BY dow, hour""",
-        [f"-{days} days"],
+        [period.tz, period.tz, *period.bounds],
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]

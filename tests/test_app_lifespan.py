@@ -8,7 +8,6 @@ from empulse.activity.poller import SessionPoller
 from empulse.app import create_app
 from empulse.config import settings
 from empulse.emby.websocket import EmbyWebSocket
-from empulse.newsletter import NewsletterScheduler, get_newsletter_config
 from empulse.web.poster_cache import PosterWallCache
 
 
@@ -19,7 +18,7 @@ async def test_startup_and_shutdown_preserve_background_services(monkeypatch, tm
     monkeypatch.setattr(database, "_db", None)
     monkeypatch.setattr("empulse.emby.client.EmbyClient", AsyncMock)
 
-    services = (SessionPoller, EmbyWebSocket, NewsletterScheduler, PosterWallCache)
+    services = (SessionPoller, EmbyWebSocket, PosterWallCache)
     started = {service: asyncio.Event() for service in services}
     stopped = {service: asyncio.Event() for service in services}
 
@@ -45,7 +44,6 @@ async def test_startup_and_shutdown_preserve_background_services(monkeypatch, tm
             )
             assert isinstance(app.state.poller, SessionPoller)
             assert app.state.emby_ws.poller is app.state.poller
-            assert await get_newsletter_config(database.get_db()) is None
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as client:
