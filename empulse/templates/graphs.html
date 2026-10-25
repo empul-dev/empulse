@@ -142,6 +142,17 @@
         </div>
     </div>
 
+    <!-- Local vs Remote -->
+    <div class="charts-grid">
+        <div class="chart-card wide">
+            <div class="chart-header">
+                <span class="chart-title">Local vs Remote</span>
+                <span class="chart-desc">Plays per day from the local network vs. outside, with average remote bitrate (Mbps). Behind a reverse proxy all plays may appear local.</span>
+            </div>
+            <div class="chart-body"><canvas id="g-location" role="img" aria-label="Local vs Remote plays chart"></canvas></div>
+        </div>
+    </div>
+
     <!-- ===== Content & Platforms ===== -->
     <div class="graphs-section-divider">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
@@ -814,6 +825,55 @@ function loadGraphs() {
                 plugins: {
                     tooltip: Object.assign({}, tooltipConfig(), {
                         callbacks: { label: function(ctx) { return 'Avg: ' + ctx.parsed.y + ' Mbps'; } }
+                    })
+                }
+            })
+        });
+    });
+
+    // --- 14b. Local vs Remote stacked bars + remote bitrate line ---
+    fetch('/api/charts/plays-by-location?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
+        destroy('location');
+        if (!data.some(function(r) { return r.lan || r.remote || r.unknown; })) return;
+        var series = [['LAN', 'lan', PALETTE[0]], ['Remote', 'remote', PALETTE[2]]];
+        if (data.some(function(r) { return r.unknown; })) series.push(['Unknown', 'unknown', PALETTE[9]]);
+        var datasets = series.map(function(s) {
+            return {
+                label: s[0],
+                data: data.map(function(r) { return r[s[1]]; }),
+                backgroundColor: soften(s[2]),
+                borderRadius: 2,
+                yAxisID: 'y'
+            };
+        });
+        datasets.push({
+            label: 'Remote Avg Bitrate (Mbps)',
+            type: 'line',
+            data: data.map(function(r) { return r.remote_avg_bitrate ? Math.round(r.remote_avg_bitrate / 100000) / 10 : null; }),
+            borderColor: PALETTE[3],
+            borderWidth: 2,
+            pointRadius: 2,
+            spanGaps: true,
+            fill: false,
+            yAxisID: 'y1',
+            order: 0
+        });
+        var scales = barScales(true);
+        scales.y.ticks.precision = 0;
+        scales.y1 = { position: 'right', beginAtZero: true, grid: { display: false }, title: { display: true, text: 'Mbps' } };
+        gCharts.location = new Chart(document.getElementById('g-location'), {
+            type: 'bar',
+            data: { labels: data.map(function(r) { return F.formatDateShort(r.date); }), datasets: datasets },
+            options: baseOpts({
+                interaction: { mode: 'index', intersect: false },
+                hover: { mode: 'index', intersect: false },
+                scales: scales,
+                plugins: {
+                    legend: legendOpts(),
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: { label: function(ctx) {
+                            return ctx.dataset.yAxisID === 'y1' ? 'Remote avg: ' + ctx.parsed.y + ' Mbps' : ctx.dataset.label + ': ' + ctx.parsed.y;
+                        } }
                     })
                 }
             })
