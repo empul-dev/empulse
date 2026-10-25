@@ -37,20 +37,7 @@ class PosterWallCache:
 
     async def _refresh(self):
         """Fetch random item IDs from Emby, only download images not already cached."""
-        params = {
-            "SortBy": "Random",
-            "Recursive": "true",
-            "Limit": str(POSTER_COUNT),
-            "IncludeItemTypes": "Movie,Series",
-            "ImageTypes": "Primary",
-            "Fields": "PrimaryImageAspectRatio",
-        }
-        r = await self.emby_client._client.get(
-            f"{self.emby_client.base_url}/Items", params=params
-        )
-        r.raise_for_status()
-        items = r.json().get("Items", [])
-        ids = [item["Id"] for item in items if item.get("Id")]
+        ids = await self.emby_client.get_random_poster_ids(POSTER_COUNT)
 
         if not ids:
             logger.warning("No poster items returned from Emby")

@@ -1641,3 +1641,34 @@ class TestEmbyUrlValidation:
 async def test_removed_notification_routes_return_404(client, method, path):
     response = await client.request(method, path)
     assert response.status_code == 404
+
+
+class TestRandomPosters:
+    """Live fallback of /api/random-posters goes through the real EmbyClient."""
+
+    @pytest.mark.asyncio
+    async def test_live_fallback_returns_ids(self, client):
+        import httpx
+        from empulse.emby.client import EmbyClient
+
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["path"] = request.url.path
+            seen["params"] = dict(request.url.params)
+            return httpx.Response(200, json={"Items": [{"Id": "a"}, {"Id": "b"}, {}]})
+
+        emby = EmbyClient.__new__(EmbyClient)
+        emby.base_url = "http://emby.test"
+        emby._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        client._test_app.state.poster_cache = None
+        client._test_app.state.emby_client = emby
+
+        r = await client.get("/api/random-posters?limit=5")
+
+        assert r.status_code == 200
+        assert r.json() == ["a", "b"]
+        assert seen["path"] == "/Items"
+        assert seen["params"]["SortBy"] == "Random"
+        assert seen["params"]["Limit"] == "5"
+        await emby._client.aclose()
