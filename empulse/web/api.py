@@ -699,6 +699,13 @@ async def chart_transcode_ratio(period: Period = Depends(get_period)):
     return JSONResponse(rows)
 
 
+@router.get("/charts/transcode-reasons")
+async def chart_transcode_reasons(period: Period = Depends(get_period)):
+    db = get_db()
+    data = await stats_db.get_transcode_reasons_by_client(db, period=period)
+    return JSONResponse(data)
+
+
 @router.get("/charts/top-platforms-stream-type")
 async def chart_top_platforms_stream_type(period: Period = Depends(get_period)):
     db = get_db()

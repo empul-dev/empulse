@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import aiosqlite
 
+from empulse.formatting import format_transcode_reason
 from empulse.period import Period
 
 
@@ -609,6 +610,63 @@ async def get_transcode_ratio(db: aiosqlite.Connection, period: Period) -> list[
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
+
+
+async def get_transcode_reasons_by_client(
+    db: aiosqlite.Connection, period: Period, clients: int = 8, reasons: int = 6
+) -> dict:
+    """Transcoded plays per client split by Emby TranscodeReasons, for a
+    stacked bar. A play with several reasons counts once per reason; plays
+    with none stored (pre-0.2.8 rows, or Emby gave none) count as "Unknown".
+    Reasons beyond the top ``reasons`` overall collapse into "Other"."""
+    cursor = await db.execute(
+        """WITH t AS (
+               SELECT client, stream_info FROM counted_plays
+               WHERE started_at >= ? AND started_at < ?
+                 AND play_method = 'Transcode' AND client IS NOT NULL
+           ), top AS (
+               SELECT client, COUNT(*) AS n FROM t
+               GROUP BY client ORDER BY n DESC, client LIMIT ?
+           )
+           SELECT t.client, r.value AS reason, COUNT(*) AS plays
+           FROM t JOIN top USING (client)
+           LEFT JOIN json_each(
+               CASE WHEN json_valid(t.stream_info) THEN t.stream_info END,
+               '$.transcode.reasons'
+           ) r
+           GROUP BY t.client, r.value
+           ORDER BY MAX(top.n) DESC, t.client""",
+        [*period.bounds, clients],
+    )
+    rows = await cursor.fetchall()
+
+    client_names = list(dict.fromkeys(r["client"] for r in rows))
+    counts: dict[str, dict[str, int]] = {}
+    for r in rows:
+        label = format_transcode_reason(r["reason"] or "") or "Unknown"
+        per = counts.setdefault(label, {})
+        per[r["client"]] = per.get(r["client"], 0) + r["plays"]
+
+    # ponytail: "Unknown" is kept as its own bucket, never folded into "Other".
+    ranked = sorted(
+        (k for k in counts if k != "Unknown"), key=lambda k: (-sum(counts[k].values()), k)
+    )
+    labels = ranked[:reasons]
+    if ranked[reasons:]:
+        other: dict[str, int] = {}
+        for k in ranked[reasons:]:
+            for c, n in counts[k].items():
+                other[c] = other.get(c, 0) + n
+        counts["Other"] = other
+        labels.append("Other")
+    if "Unknown" in counts:
+        labels.append("Unknown")
+
+    return {
+        "clients": client_names,
+        "reasons": labels,
+        "counts": {k: [counts[k].get(c, 0) for c in client_names] for k in labels},
+    }
 
 
 async def get_top_platforms_with_stream_type(
