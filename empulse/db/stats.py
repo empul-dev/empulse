@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 import aiosqlite
 
-from empulse.period import Period
+from empulse.period import Period, _local, _zone
 
 
 def _safe_order(metric: str) -> str:
@@ -729,3 +729,47 @@ async def get_watch_heatmap(db: aiosqlite.Connection, period: Period) -> list[di
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]
+
+
+async def get_concurrent_streams(
+    db: aiosqlite.Connection, period: Period
+) -> list[dict]:
+    """Peak simultaneous streams per local day, and how many of those were transcodes.
+
+    Sweep line over start/stop events; a stream spanning midnight counts toward each
+    local day it overlaps. A stop at the same instant as a start is not concurrent.
+    """
+    start, end = period.bounds
+    cursor = await db.execute(
+        """SELECT started_at, stopped_at, play_method = 'Transcode' as transcode
+           FROM counted_plays
+           WHERE started_at < ? AND stopped_at > ?""",
+        [end, start],
+    )
+    # Event order at equal instants: stop (0), day boundary (1), start (2).
+    events = []
+    for r in await cursor.fetchall():
+        tc = 1 if r["transcode"] else 0
+        events.append((_local(r["started_at"], period.tz), 2, tc))
+        events.append((_local(r["stopped_at"], period.tz), 0, tc))
+    for day in period.day_keys():
+        midnight = datetime.combine(date.fromisoformat(day), time.min, _zone(period.tz))
+        events.append((midnight, 1, 0))
+    events.sort(key=lambda e: (e[0], e[1]))
+
+    peaks: dict[str, dict] = {}
+    active = active_tc = 0
+    for at, kind, tc in events:
+        if kind == 0:
+            active -= 1
+            active_tc -= tc
+            continue
+        if kind == 2:
+            active += 1
+            active_tc += tc
+        day = at.date().isoformat()
+        best = peaks.get(day)
+        # Among equal peaks, report the moment with the most transcodes.
+        if best is None or (active, active_tc) > (best["peak"], best["peak_transcode"]):
+            peaks[day] = {"date": day, "peak": active, "peak_transcode": active_tc}
+    return period.fill_days(list(peaks.values()), peak=0, peak_transcode=0)

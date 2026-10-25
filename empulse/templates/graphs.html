@@ -66,6 +66,13 @@
             </div>
             <div class="chart-body" style="height: 240px;"><canvas id="g-heatmap" role="img" aria-label="Watch Time Heatmap"></canvas></div>
         </div>
+        <div class="chart-card wide">
+            <div class="chart-header">
+                <span class="chart-title">Concurrent Streams</span>
+                <span class="chart-desc">Peak simultaneous streams per day, and how many of them were transcodes.</span>
+            </div>
+            <div class="chart-body"><canvas id="g-concurrent" role="img" aria-label="Concurrent Streams chart"></canvas></div>
+        </div>
     </div>
 
     <!-- ===== Monthly Trends ===== -->
@@ -948,7 +955,45 @@ function loadGraphs() {
         });
     });
 
-    // --- 16. Period Comparison Cards ---
+    // --- 16. Concurrent Streams (daily peak, transcodes stacked) ---
+    fetch('/api/charts/concurrent-streams?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
+        destroy('concurrent');
+        // Every day is present (zero-filled); skip the chart when there were no streams.
+        if (!data.some(function(r) { return r.peak; })) return;
+        var scales = barScales(true);
+        scales.y.ticks.precision = 0;
+        gCharts.concurrent = new Chart(document.getElementById('g-concurrent'), {
+            type: 'bar',
+            data: {
+                labels: data.map(function(r) { return F.formatDateShort(r.date); }),
+                datasets: [{
+                    label: 'Transcode',
+                    data: data.map(function(r) { return r.peak_transcode; }),
+                    backgroundColor: soften(STREAM_COLORS.Transcode),
+                    borderRadius: 1
+                }, {
+                    label: 'Direct',
+                    data: data.map(function(r) { return r.peak - r.peak_transcode; }),
+                    backgroundColor: soften(PALETTE[0]),
+                    borderRadius: 1
+                }]
+            },
+            options: baseOpts({
+                scales: scales,
+                plugins: {
+                    legend: legendOpts('top'),
+                    tooltip: Object.assign({}, tooltipConfig(), {
+                        callbacks: {
+                            label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y; },
+                            footer: function(items) { return items.length ? 'Peak: ' + data[items[0].dataIndex].peak : ''; }
+                        }
+                    })
+                }
+            })
+        });
+    });
+
+    // --- 17. Period Comparison Cards ---
     fetch('/api/charts/period-comparison?days=' + d).then(function(r) { return r.json(); }).then(function(data) {
         var el = document.getElementById('period-comparison');
         if (!el || !data.current || !data.previous) { if (el) el.style.display = 'none'; return; }
