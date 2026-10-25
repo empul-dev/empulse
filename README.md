@@ -204,6 +204,16 @@ an older release changed the data in the meantime. Allow room for the retained
 backups, one temporary database copy, and SQLite's own working files. Invalid
 backups are left for manual inspection rather than counted as usable copies.
 
+### Restore from a downloaded backup
+
+Settings → Backup downloads a consistent copy of the database. Settings → Restore
+accepts such a file, checks it and tests the startup migrations on a copy. The
+restore is applied on the next restart, before the database is opened, using the
+same protected procedure as the restore command below. The previous files are
+kept in an `empulse.db.before-restore-*` directory and all users are signed out.
+If a staged restore turns out to be invalid at startup, Empulse refuses to start
+and names the `backups/empulse.db/pending-restore` directory to remove.
+
 ### Restore after a failed update
 
 Stop every Empulse container using the volume before restoring. Releases before

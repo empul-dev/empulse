@@ -1,6 +1,8 @@
 import aiosqlite
 import logging
 from pathlib import Path
+import shutil
+import tempfile
 
 from empulse.config import settings
 from empulse.backups import prepare_backup, prune_backups, read_release, run_io
@@ -151,6 +153,26 @@ async def close_db() -> None:
         await db.close()
 
 
+async def _apply_schema(db: aiosqlite.Connection) -> None:
+    # executescript commits an existing transaction, so BEGIN belongs inside.
+    await db.executescript("BEGIN IMMEDIATE;\n" + SCHEMA)
+    await _migrate(db)
+
+
+async def check_migrates(path: Path) -> None:
+    """Run startup schema setup on a throwaway copy, so a restore cannot block startup."""
+    with tempfile.TemporaryDirectory() as directory:
+        copy = Path(directory) / "check.db"
+        await run_io(shutil.copyfile, path, copy)
+        db = await aiosqlite.connect(str(copy))
+        db.row_factory = aiosqlite.Row
+        try:
+            await register_sql_functions(db)
+            await _apply_schema(db)
+        finally:
+            await db.close()
+
+
 async def init_db() -> None:
     global _db
     await close_db()
@@ -178,9 +200,7 @@ async def init_db() -> None:
         await register_sql_functions(db)
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA busy_timeout=5000")
-        # executescript commits an existing transaction, so BEGIN belongs inside.
-        await db.executescript("BEGIN IMMEDIATE;\n" + SCHEMA)
-        await _migrate(db)
+        await _apply_schema(db)
         await db.execute("DELETE FROM sessions")
         await db.execute(
             "CREATE TABLE IF NOT EXISTS app_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"

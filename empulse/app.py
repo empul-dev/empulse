@@ -13,7 +13,8 @@ from starlette.responses import Response
 
 from empulse.config import settings
 from empulse.database import init_db, get_db, close_db
-from empulse.backups import database_lock
+from empulse.backups import database_lock, run_io
+from empulse.restore import apply_pending_restore
 from empulse.version import get_version
 from empulse.formatting import (
     format_date,
@@ -70,6 +71,10 @@ templates.env.filters["transcode_summary"] = derive_transcode_summary
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.db_path != ":memory:":
+        rescue = await run_io(apply_pending_restore, Path(settings.db_path))
+        if rescue:
+            logger.info("Applied uploaded restore; previous files kept in %s", rescue)
     with database_lock(Path(settings.db_path)):
         try:
             async with _lifespan(app):

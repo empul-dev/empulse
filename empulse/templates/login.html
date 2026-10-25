@@ -53,7 +53,7 @@
 
         function buildImg(id) {
             var img = document.createElement('img');
-            img.src = '/api/img/' + id + '?w=120';
+            img.src = '/api/login-posters/' + encodeURIComponent(id);
             img.alt = '';
             img.onload = function() { img.classList.add('loaded'); };
             img.onerror = function() { img.style.visibility = 'hidden'; };

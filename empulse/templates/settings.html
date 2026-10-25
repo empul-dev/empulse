@@ -254,7 +254,7 @@ function _setResult(el, cls, text) {
 }
 document.getElementById('restore-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    if (!confirm('This will replace the current database. A backup of the current database will be saved. Continue?')) return;
+    if (!confirm('The current database will be replaced on the next restart and kept as a rescue copy. Continue?')) return;
     var form = document.getElementById('restore-form');
     var data = new FormData(form);
     var el = document.getElementById('restore-result');

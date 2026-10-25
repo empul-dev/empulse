@@ -238,25 +238,6 @@ async def _stats_cards(request: Request, period: Period, metric: str):
     )
 
 
-@router.get("/recent-history")
-async def recent_history(request: Request):
-    db = get_db()
-    rows = await history_db.get_history(db, limit=10)
-    records = [HistoryRecord(**r) for r in rows]
-    return templates.TemplateResponse(
-        request,
-        "partials/history_table.html",
-        {
-            "records": records,
-            "page": 1,
-            "total_pages": 1,
-            "filter_params": "",
-            "sort_by": "date",
-            "sort_order": "desc",
-        },
-    )
-
-
 @router.get("/history-table")
 async def history_table(
     request: Request,
@@ -783,23 +764,50 @@ async def chart_watch_heatmap(period: Period = Depends(get_period)):
 
 @router.get("/backup", dependencies=[Depends(admin_only)])
 async def backup_database():
+    import os
     from pathlib import Path
+    import tempfile
+
+    from starlette.background import BackgroundTask
+    from starlette.responses import FileResponse
+
+    from empulse.backups import export_snapshot, run_io
 
     db_path = Path(settings.db_path)
-    if not db_path.exists() or str(db_path) == ":memory:":
+    if str(db_path) == ":memory:" or not db_path.exists():
         return Response(content="Database not available for backup", status_code=400)
 
-    return Response(
-        content=db_path.read_bytes(),
+    # Reading the raw file would miss commits still in the WAL.
+    descriptor, name = tempfile.mkstemp(suffix=".db")
+    os.close(descriptor)
+    snapshot = Path(name)
+    try:
+        await run_io(export_snapshot, db_path, snapshot)
+    except BaseException:
+        snapshot.unlink(missing_ok=True)
+        raise
+    return FileResponse(
+        snapshot,
         media_type="application/octet-stream",
-        headers={"Content-Disposition": "attachment; filename=empulse_backup.db"},
+        filename="empulse_backup.db",
+        background=BackgroundTask(snapshot.unlink, missing_ok=True),
     )
+
+
+RESTORE_MAX_BYTES = 500 * 1024 * 1024
+# Two uploads at once would race while replacing the staged restore.
+_restore_lock = asyncio.Lock()
 
 
 @router.post("/restore", dependencies=[Depends(admin_only)])
 async def restore_database(request: Request):
+    import os
     from pathlib import Path
-    import shutil
+    import sqlite3
+    import tempfile
+
+    from empulse.backups import RESTORE_REQUIRED_TABLES, run_io, stage_restore
+    from empulse.database import check_migrates
 
     db_path = Path(settings.db_path)
     if str(db_path) == ":memory:":
@@ -813,96 +821,94 @@ async def restore_database(request: Request):
 
     form = await request.form()
     upload = form.get("file")
-    if not upload:
+    if not upload or isinstance(upload, str):
         return JSONResponse({"error": "No file uploaded"}, status_code=400)
 
-    data = await upload.read()
-    # Basic SQLite validation: check magic header
-    if not data[:16].startswith(b"SQLite format 3"):
-        return JSONResponse({"error": "Invalid SQLite database file"}, status_code=400)
-
-    # Size limit: 500MB
-    if len(data) > 500 * 1024 * 1024:
-        return JSONResponse({"error": "File too large (max 500MB)"}, status_code=400)
-
-    # Validate the uploaded DB has the expected schema
-    import aiosqlite
-    import tempfile
-    import os
-
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-        tmp.write(data)
-        tmp_path = tmp.name
+    descriptor, name = tempfile.mkstemp(suffix=".db")
+    tmp_path = Path(name)
     try:
-        async with aiosqlite.connect(tmp_path) as test_db:
-            # Check that required tables exist
-            cursor = await test_db.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )
-            tables = {row[0] for row in await cursor.fetchall()}
-            required = {"history", "users", "libraries"}
-            missing = required - tables
-            if missing:
+        with os.fdopen(descriptor, "wb") as tmp:
+            size = 0
+            while chunk := await upload.read(1024 * 1024):
+                size += len(chunk)
+                if size > RESTORE_MAX_BYTES:
+                    return JSONResponse(
+                        {"error": "File too large (max 500MB)"}, status_code=400
+                    )
+                tmp.write(chunk)
+        with tmp_path.open("rb") as tmp:
+            if not tmp.read(16).startswith(b"SQLite format 3"):
                 return JSONResponse(
-                    {
-                        "error": f"Invalid database: missing tables {', '.join(sorted(missing))}"
-                    },
+                    {"error": "Invalid SQLite database file"}, status_code=400
+                )
+        if _restore_lock.locked():
+            return JSONResponse(
+                {"error": "Another restore is in progress"}, status_code=409
+            )
+        async with _restore_lock:
+            try:
+                await check_migrates(tmp_path)
+            except sqlite3.Error:
+                return JSONResponse(
+                    {"error": "Uploaded database is not compatible with this Empulse version"},
                     status_code=400,
                 )
-    except Exception:
-        return JSONResponse(
-            {"error": "Uploaded file is not a valid database"}, status_code=400
-        )
+            try:
+                await run_io(stage_restore, tmp_path, db_path)
+            except ValueError:
+                # Fixed text: exception messages may carry internal details.
+                required = ", ".join(sorted(RESTORE_REQUIRED_TABLES))
+                return JSONResponse(
+                    {"error": f"Invalid database: it must contain the {required} tables"},
+                    status_code=400,
+                )
+            except (sqlite3.Error, RuntimeError):
+                return JSONResponse(
+                    {"error": "Uploaded file is not a valid database"}, status_code=400
+                )
     finally:
-        os.unlink(tmp_path)
-
-    # Create backup of current DB before replacing
-    backup_path = db_path.with_suffix(".db.bak")
-    if db_path.exists():
-        shutil.copy2(str(db_path), str(backup_path))
-
-    # Write new DB
-    db_path.write_bytes(data)
-
-    # Invalidate all login sessions in the restored DB to prevent session hijacking
-    try:
-        async with aiosqlite.connect(str(db_path)) as new_db:
-            await new_db.execute("DELETE FROM login_sessions")
-            await new_db.commit()
-    except Exception:
-        pass  # Table may not exist in older backups; migration will handle it
+        tmp_path.unlink(missing_ok=True)
+        for suffix in ("-wal", "-shm"):
+            Path(f"{tmp_path}{suffix}").unlink(missing_ok=True)
 
     return JSONResponse(
         {
-            "status": "restored",
-            "message": "Database restored. All sessions invalidated. Restart the application to apply changes.",
+            "status": "scheduled",
+            "message": "Restore scheduled. Restart Empulse to apply it; the current "
+            "database is kept as a rescue copy and all sessions are signed out.",
         }
     )
 
 
 @router.get("/random-posters")
 async def random_posters(request: Request, limit: int = 24):
-    """Return random item IDs from Emby for the login poster wall."""
+    """Return cached item IDs for the login poster wall (unauthenticated).
+
+    Only cached posters are listed, because /api/login-posters serves nothing else.
+    """
     limit = max(1, min(limit, 48))
-
-    # Serve from poster cache if available
     poster_cache = getattr(request.app.state, "poster_cache", None)
-    if poster_cache and poster_cache.item_ids:
-        return JSONResponse(
-            poster_cache.item_ids[:limit],
-            headers={"Cache-Control": "public, max-age=300"},
-        )
+    ids = poster_cache.item_ids if poster_cache else []
+    return JSONResponse(ids[:limit], headers={"Cache-Control": "public, max-age=300"})
 
-    # Fallback: live query
-    emby_client = getattr(request.app.state, "emby_client", None)
-    if not emby_client:
-        return JSONResponse([])
-    try:
-        ids = await emby_client.get_random_poster_ids(limit)
-        return JSONResponse(ids, headers={"Cache-Control": "public, max-age=300"})
-    except Exception as e:
-        logger.warning(f"Random posters fetch failed: {e}")
-        return JSONResponse([])
+
+@router.get("/login-posters/{item_id}")
+async def login_poster(request: Request, item_id: str):
+    """Serve login poster wall images from the cache only (unauthenticated).
+
+    Everything else under /api/img requires a session, so anonymous visitors
+    cannot enumerate library artwork by item ID.
+    """
+    poster_cache = getattr(request.app.state, "poster_cache", None)
+    cached = poster_cache.get_image(item_id) if poster_cache else None
+    if not cached:
+        return Response(status_code=404)
+    content, content_type = cached
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @router.get("/display-settings")

@@ -538,12 +538,6 @@ class TestAPIRoutes:
         assert 'data-icon="Emby for LG"' in r.text
 
     @pytest.mark.asyncio
-    async def test_recent_history_empty(self, client):
-        r = await client.get("/api/recent-history")
-        assert r.status_code == 200
-        assert "No history records" in r.text
-
-    @pytest.mark.asyncio
     async def test_history_table_empty(self, client):
         r = await client.get("/api/history-table")
         assert r.status_code == 200
@@ -1614,6 +1608,8 @@ class TestEmbyUrlValidation:
 @pytest.mark.parametrize(
     ("method", "path"),
     [
+        # Unused and unscoped: leaked every user's plays and IPs to viewers.
+        ("GET", "/api/recent-history"),
         ("GET", "/settings/notifications"),
         ("GET", "/api/notification-channels"),
         ("POST", "/api/notification-channels"),
@@ -1633,35 +1629,157 @@ async def test_removed_feature_routes_return_404(client, method, path):
     assert response.status_code == 404
 
 
-class TestRandomPosters:
-    """Live fallback of /api/random-posters goes through the real EmbyClient."""
+class FakePosterCache:
+    item_ids = ["a", "b"]
+
+    def get_image(self, item_id):
+        return (b"poster-" + item_id.encode(), "image/jpeg") if item_id in self.item_ids else None
+
+
+class TestLoginPosters:
+    """The login wall only exposes posters that are already cached."""
 
     @pytest.mark.asyncio
-    async def test_live_fallback_returns_ids(self, client):
-        import httpx
-        from empulse.emby.client import EmbyClient
+    async def test_random_posters_lists_cached_ids(self, client):
+        client._test_app.state.poster_cache = FakePosterCache()
+        r = await client.get("/api/random-posters?limit=1")
+        assert r.json() == ["a"]
 
-        seen = {}
-
-        def handler(request: httpx.Request) -> httpx.Response:
-            seen["path"] = request.url.path
-            seen["params"] = dict(request.url.params)
-            return httpx.Response(200, json={"Items": [{"Id": "a"}, {"Id": "b"}, {}]})
-
-        emby = EmbyClient.__new__(EmbyClient)
-        emby.base_url = "http://emby.test"
-        emby._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    @pytest.mark.asyncio
+    async def test_random_posters_without_cache_is_empty(self, client):
         client._test_app.state.poster_cache = None
-        client._test_app.state.emby_client = emby
+        r = await client.get("/api/random-posters")
+        assert r.json() == []
 
-        r = await client.get("/api/random-posters?limit=5")
+    @pytest.mark.asyncio
+    async def test_login_poster_is_public_but_cache_only(self, client):
+        client._test_app.state.poster_cache = FakePosterCache()
+        client.cookies.clear()
+        r = await client.get("/api/login-posters/a")
+        assert r.status_code == 200
+        assert r.content == b"poster-a"
+        assert (await client.get("/api/login-posters/999")).status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_image_proxy_requires_session(self, client):
+        client.cookies.clear()
+        for path in ("/api/img/123", "/api/img/backdrop/123", "/api/img/user/u1"):
+            r = await client.get(path, follow_redirects=False)
+            assert r.status_code == 302, path
+            assert r.headers["location"] == "/login"
+
+
+@pytest.mark.asyncio
+async def test_backup_includes_commits_still_in_wal(client, tmp_path):
+    import sqlite3
+
+    db_path = tmp_path / "live.db"
+    live = sqlite3.connect(db_path)
+    live.execute("PRAGMA journal_mode=WAL")
+    live.execute("PRAGMA wal_autocheckpoint=0")
+    live.execute("CREATE TABLE t (v TEXT)")
+    live.execute("INSERT INTO t VALUES ('in-wal')")
+    live.commit()
+    try:
+        with patch("empulse.web.api.settings") as api_settings:
+            api_settings.db_path = str(db_path)
+            r = await client.get("/api/backup")
+    finally:
+        live.close()
+
+    assert r.status_code == 200
+    assert "empulse_backup.db" in r.headers["content-disposition"]
+    downloaded = tmp_path / "download.db"
+    downloaded.write_bytes(r.content)
+    copy = sqlite3.connect(downloaded)
+    try:
+        assert copy.execute("SELECT v FROM t").fetchall() == [("in-wal",)]
+        assert copy.execute("PRAGMA journal_mode").fetchone() == ("delete",)
+    finally:
+        copy.close()
+
+
+def _make_restore_upload(path, drop=()):
+    import sqlite3
+    from empulse.database import SCHEMA
+
+    with sqlite3.connect(path) as connection:
+        connection.executescript(SCHEMA)
+        for table in drop:
+            connection.execute(f"DROP TABLE {table}")
+    return path.read_bytes()
+
+
+class TestRestoreUpload:
+    """Uploads are staged; the live database is only replaced at startup."""
+
+    async def _post(self, client, db_path, content):
+        with patch("empulse.web.api.settings") as api_settings:
+            api_settings.db_path = str(db_path)
+            return await client.post(
+                "/api/restore", files={"file": ("backup.db", content)}
+            )
+
+    @pytest.mark.asyncio
+    async def test_valid_upload_is_staged_not_applied(self, client, tmp_path):
+        from empulse.backups import pending_restore_dir, validate_backup
+
+        db_path = tmp_path / "empulse.db"
+        db_path.write_bytes(b"live database")
+        r = await self._post(client, db_path, _make_restore_upload(tmp_path / "u.db"))
 
         assert r.status_code == 200
-        assert r.json() == ["a", "b"]
-        assert seen["path"] == "/Items"
-        assert seen["params"]["SortBy"] == "Random"
-        assert seen["params"]["Limit"] == "5"
-        await emby._client.aclose()
+        assert r.json()["status"] == "scheduled"
+        assert db_path.read_bytes() == b"live database"
+        validate_backup(pending_restore_dir(db_path))
+
+    @pytest.mark.asyncio
+    async def test_upload_missing_tables_is_rejected(self, client, tmp_path):
+        db_path = tmp_path / "empulse.db"
+        upload = _make_restore_upload(tmp_path / "u.db", drop=("users", "libraries"))
+        r = await self._post(client, db_path, upload)
+
+        assert r.status_code == 400
+        assert r.json()["error"] == (
+            "Invalid database: it must contain the history, libraries, users tables"
+        )
+
+    @pytest.mark.asyncio
+    async def test_upload_that_breaks_startup_migration_is_rejected(
+        self, client, tmp_path
+    ):
+        import sqlite3
+        from empulse.backups import pending_restore_dir
+
+        upload = tmp_path / "u.db"
+        with sqlite3.connect(upload) as connection:
+            # history without user_id: the startup indexes would fail on it.
+            for table in ("history", "users", "libraries"):
+                connection.execute(f"CREATE TABLE {table} (id TEXT)")
+        db_path = tmp_path / "empulse.db"
+        r = await self._post(client, db_path, upload.read_bytes())
+
+        assert r.status_code == 400
+        assert "not compatible" in r.json()["error"]
+        assert not pending_restore_dir(db_path).exists()
+
+    @pytest.mark.asyncio
+    async def test_oversized_upload_is_rejected(self, client, tmp_path, monkeypatch):
+        from empulse.backups import pending_restore_dir
+
+        monkeypatch.setattr("empulse.web.api.RESTORE_MAX_BYTES", 1024)
+        db_path = tmp_path / "empulse.db"
+        r = await self._post(client, db_path, b"SQLite format 3\x00" + b"x" * 4096)
+
+        assert r.status_code == 400
+        assert "too large" in r.json()["error"]
+        assert not pending_restore_dir(db_path).exists()
+
+    @pytest.mark.asyncio
+    async def test_non_sqlite_upload_is_rejected(self, client, tmp_path):
+        r = await self._post(client, tmp_path / "empulse.db", b"not a database")
+        assert r.status_code == 400
+        assert r.json()["error"] == "Invalid SQLite database file"
 
 
 def test_get_period_uses_display_timezone_and_falls_back_to_utc():
