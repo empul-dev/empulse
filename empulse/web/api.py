@@ -5,7 +5,6 @@ import io
 import json
 import logging
 import re
-from datetime import date, timedelta
 from urllib.parse import quote
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse, Response
@@ -13,9 +12,14 @@ from empulse.app import templates
 from empulse.config import settings
 from empulse.database import get_db
 from empulse.db import history as history_db, stats as stats_db, users as users_db
-from empulse.formatting import DEFAULT_DISPLAY, get_tz_offset_hours
 from empulse.models import SessionInfo, HistoryRecord
-from empulse.web.deps import admin_only, require_self_or_admin, scoped_user_filter
+from empulse.period import Period
+from empulse.web.deps import (
+    admin_only,
+    get_period,
+    require_self_or_admin,
+    scoped_user_filter,
+)
 from empulse.web.poster_cache import POSTER_WIDTH
 from empulse.web.unwatched import fetch_unwatched_items
 
@@ -79,12 +83,6 @@ logger = logging.getLogger("empulse.api")
 router = APIRouter()
 
 VALID_ID = re.compile(r"^[a-zA-Z0-9_-]+$")
-MASKED_SECRET = "***"
-
-
-def _get_tz_offset(request: Request) -> float:
-    display = getattr(request.app.state, "display_settings", DEFAULT_DISPLAY)
-    return get_tz_offset_hours(display.get("timezone", "UTC"))
 
 
 def _validate_id(value: str) -> bool:
@@ -143,10 +141,6 @@ async def stop_session(session_key: str, request: Request):
     )
 
 
-def _clamp_days(days: int) -> int:
-    return max(1, min(days, 365))
-
-
 VALID_METRICS = {"plays", "duration"}
 
 
@@ -167,39 +161,40 @@ def _render_update_status(request: Request):
 
 
 @router.get("/stats-cards")
-async def stats_cards(request: Request, days: int = 30, metric: str = "plays"):
-    days = _clamp_days(days)
+async def stats_cards(
+    request: Request, period: Period = Depends(get_period), metric: str = "plays"
+):
     metric = _validate_metric(metric)
     try:
-        return await _stats_cards(request, days, metric)
+        return await _stats_cards(request, period, metric)
     except Exception:
         logger.exception("stats-cards error")
         return '<p class="empty-state">An internal error occurred.</p>'
 
 
-async def _stats_cards(request: Request, days: int, metric: str):
+async def _stats_cards(request: Request, period: Period, metric: str):
     db = get_db()
 
     state_tracker = getattr(request.app.state, "state_tracker", None)
     active_streams = len(state_tracker.get_all_sessions()) if state_tracker else 0
 
     most_watched_movies = await stats_db.get_most_watched_movies(
-        db, limit=5, days=days, metric=metric
+        db, limit=5, period=period, metric=metric
     )
-    most_popular_movies = await stats_db.get_most_popular_movies(db, limit=5, days=days)
+    most_popular_movies = await stats_db.get_most_popular_movies(db, limit=5, period=period)
     most_watched_shows = await stats_db.get_most_watched_shows(
-        db, limit=5, days=days, metric=metric
+        db, limit=5, period=period, metric=metric
     )
-    most_popular_shows = await stats_db.get_most_popular_shows(db, limit=5, days=days)
+    most_popular_shows = await stats_db.get_most_popular_shows(db, limit=5, period=period)
     recently_watched = await stats_db.get_recently_watched(db, limit=5)
     most_active_users = await stats_db.get_top_users(
-        db, limit=5, days=days, metric=metric
+        db, limit=5, period=period, metric=metric
     )
     most_active_platforms = await stats_db.get_most_active_platforms(
-        db, limit=5, days=days
+        db, limit=5, period=period
     )
     most_active_libraries = await stats_db.get_most_active_libraries(
-        db, limit=5, days=days
+        db, limit=5, period=period
     )
 
     # Format recently watched display titles
@@ -237,7 +232,7 @@ async def _stats_cards(request: Request, days: int, metric: str):
             "most_active_users": most_active_users,
             "most_active_platforms": most_active_platforms,
             "most_active_libraries": most_active_libraries,
-            "days": days,
+            "days": period.days,
             "metric": metric,
         },
     )
@@ -532,80 +527,52 @@ async def user_image_proxy(user_id: str, name: str = Query("")):
     )
 
 
-def _fill_date_gaps(rows: list[dict], days: int) -> list[dict]:
-    """Fill missing dates with zeroed entries."""
-    today = date.today()
-    start = today - timedelta(days=days - 1)
-    existing = {r["date"]: r for r in rows}
-    result = []
-    for i in range(days):
-        d = (start + timedelta(days=i)).isoformat()
-        if d in existing:
-            result.append(existing[d])
-        else:
-            result.append({"date": d, "plays": 0, "total_duration": 0})
-    return result
-
-
 @router.get("/charts/daily-plays")
-async def chart_daily_plays(request: Request, days: int = 30):
-    days = _clamp_days(days)
+async def chart_daily_plays(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_plays_per_day(
-        db, days=days, tz_offset_hours=_get_tz_offset(request)
-    )
-    filled = _fill_date_gaps(rows, days)
-    return JSONResponse(filled)
+    rows = await stats_db.get_plays_per_day(db, period=period)
+    return JSONResponse(rows)
 
 
 @router.get("/charts/plays-by-type")
-async def chart_plays_by_type(days: int = 30):
-    days = _clamp_days(days)
+async def chart_plays_by_type(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_plays_by_type(db, days=days)
+    rows = await stats_db.get_plays_by_type(db, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/plays-by-platform")
-async def chart_plays_by_platform(days: int = 30):
-    days = _clamp_days(days)
+async def chart_plays_by_platform(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_most_active_platforms(db, limit=10, days=days)
+    rows = await stats_db.get_most_active_platforms(db, limit=10, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/user/{user_id}/daily-plays")
-async def chart_user_daily_plays(request: Request, user_id: str, days: int = 30):
+async def chart_user_daily_plays(
+    request: Request, user_id: str, period: Period = Depends(get_period)
+):
     if (forbidden := require_self_or_admin(request, user_id)) is not None:
         return forbidden
-    days = _clamp_days(days)
     db = get_db()
-    rows = await stats_db.get_user_plays_per_day(
-        db, user_id, days=days, tz_offset_hours=_get_tz_offset(request)
-    )
-    filled = _fill_date_gaps(rows, days)
-    return JSONResponse(filled)
+    rows = await stats_db.get_user_plays_per_day(db, user_id, period=period)
+    return JSONResponse(rows)
 
 
 @router.get("/charts/user/{user_id}/by-type")
-async def chart_user_by_type(request: Request, user_id: str, days: int = 30):
+async def chart_user_by_type(request: Request, user_id: str, period: Period = Depends(get_period)):
     if (forbidden := require_self_or_admin(request, user_id)) is not None:
         return forbidden
-    days = _clamp_days(days)
     db = get_db()
-    rows = await stats_db.get_user_plays_by_type(db, user_id, days=days)
+    rows = await stats_db.get_user_plays_by_type(db, user_id, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/library/{item_type}/daily-plays")
-async def chart_library_daily_plays(request: Request, item_type: str, days: int = 30):
-    days = _clamp_days(days)
+async def chart_library_daily_plays(item_type: str, period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_library_plays_per_day(
-        db, item_type, days=days, tz_offset_hours=_get_tz_offset(request)
-    )
-    filled = _fill_date_gaps(rows, days)
-    return JSONResponse(filled)
+    rows = await stats_db.get_library_plays_per_day(db, item_type, period=period)
+    return JSONResponse(rows)
 
 
 @router.get("/recently-added")
@@ -704,93 +671,72 @@ async def unwatched_items_table(
 
 
 @router.get("/charts/plays-by-date-stacked")
-async def chart_plays_by_date_stacked(request: Request, days: int = 30):
-    days = _clamp_days(days)
+async def chart_plays_by_date_stacked(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_plays_by_date_stacked(
-        db, days=days, tz_offset_hours=_get_tz_offset(request)
-    )
+    rows = await stats_db.get_plays_by_date_stacked(db, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/plays-by-dow")
-async def chart_plays_by_dow(request: Request, days: int = 30):
-    days = _clamp_days(days)
+async def chart_plays_by_dow(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_plays_by_day_of_week(
-        db, days=days, tz_offset_hours=_get_tz_offset(request)
-    )
+    rows = await stats_db.get_plays_by_day_of_week(db, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/plays-by-hour")
-async def chart_plays_by_hour(request: Request, days: int = 30):
-    days = _clamp_days(days)
+async def chart_plays_by_hour(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_plays_by_hour(
-        db, days=days, tz_offset_hours=_get_tz_offset(request)
-    )
+    rows = await stats_db.get_plays_by_hour(db, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/plays-per-month")
-async def chart_plays_per_month(days: int | None = None, months: int = 12):
-    db = get_db()
-    if days is not None:
-        rows = await stats_db.get_plays_per_month(db, days=_clamp_days(days))
-    else:
-        rows = await stats_db.get_plays_per_month(db, months=max(1, min(months, 36)))
+async def chart_plays_per_month(period: Period = Depends(get_period)):
+    rows = await stats_db.get_plays_per_month(get_db(), period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/plays-by-stream-type")
-async def chart_plays_by_stream_type(request: Request, days: int = 30):
-    days = _clamp_days(days)
+async def chart_plays_by_stream_type(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_plays_by_stream_type(
-        db, days=days, tz_offset_hours=_get_tz_offset(request)
-    )
+    rows = await stats_db.get_plays_by_stream_type(db, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/source-resolution")
-async def chart_source_resolution(days: int = 30):
-    days = _clamp_days(days)
+async def chart_source_resolution(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_source_resolution_distribution(db, days=days)
+    rows = await stats_db.get_source_resolution_distribution(db, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/transcode-ratio")
-async def chart_transcode_ratio(days: int = 30):
-    days = _clamp_days(days)
+async def chart_transcode_ratio(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_transcode_ratio(db, days=days)
+    rows = await stats_db.get_transcode_ratio(db, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/top-platforms-stream-type")
-async def chart_top_platforms_stream_type(days: int = 30):
-    days = _clamp_days(days)
+async def chart_top_platforms_stream_type(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_top_platforms_with_stream_type(db, days=days)
+    rows = await stats_db.get_top_platforms_with_stream_type(db, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/top-users-stream-type")
-async def chart_top_users_stream_type(days: int = 30):
-    days = _clamp_days(days)
+async def chart_top_users_stream_type(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_top_users_with_stream_type(db, days=days)
+    rows = await stats_db.get_top_users_with_stream_type(db, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/top-users")
-async def chart_top_users(days: int = 30, metric: str = "plays"):
-    days = _clamp_days(days)
+async def chart_top_users(period: Period = Depends(get_period), metric: str = "plays"):
     metric = _validate_metric(metric)
     db = get_db()
-    rows = await stats_db.get_top_users(db, limit=10, days=days, metric=metric)
+    rows = await stats_db.get_top_users(db, limit=10, period=period, metric=metric)
     return JSONResponse(rows)
 
 
@@ -808,92 +754,31 @@ async def update_check(request: Request):
 
 
 @router.get("/charts/completion-rate")
-async def chart_completion_rate(days: int = 30):
-    days = _clamp_days(days)
+async def chart_completion_rate(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_completion_breakdown(db, days=days)
+    rows = await stats_db.get_completion_breakdown(db, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/period-comparison")
-async def chart_period_comparison(days: int = 30):
-    days = _clamp_days(days)
+async def chart_period_comparison(period: Period = Depends(get_period)):
     db = get_db()
-    result = await stats_db.get_period_comparison(db, days=days)
+    result = await stats_db.get_period_comparison(db, period=period)
     return JSONResponse(result)
 
 
 @router.get("/charts/bandwidth")
-async def chart_bandwidth(request: Request, days: int = 30):
-    days = _clamp_days(days)
+async def chart_bandwidth(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_bandwidth_stats(
-        db, days=days, tz_offset_hours=_get_tz_offset(request)
-    )
+    rows = await stats_db.get_bandwidth_stats(db, period=period)
     return JSONResponse(rows)
 
 
 @router.get("/charts/watch-heatmap")
-async def chart_watch_heatmap(request: Request, days: int = 30):
-    days = _clamp_days(days)
+async def chart_watch_heatmap(period: Period = Depends(get_period)):
     db = get_db()
-    rows = await stats_db.get_watch_heatmap(
-        db, days=days, tz_offset_hours=_get_tz_offset(request)
-    )
+    rows = await stats_db.get_watch_heatmap(db, period=period)
     return JSONResponse(rows)
-
-
-@router.get("/newsletter/config", dependencies=[Depends(admin_only)])
-async def get_newsletter_config_api():
-    db = get_db()
-    from empulse.newsletter import get_newsletter_config
-
-    config = await get_newsletter_config(db)
-    if config and config.get("smtp_pass"):
-        config = {**config, "smtp_pass": MASKED_SECRET}
-    return JSONResponse(config or {})
-
-
-@router.post("/newsletter/config", dependencies=[Depends(admin_only)])
-async def save_newsletter_config_api(request: Request):
-    data = await request.json()
-    db = get_db()
-    from empulse.newsletter import save_newsletter_config
-
-    await save_newsletter_config(db, data)
-    return JSONResponse({"status": "saved"})
-
-
-@router.get("/newsletter/preview", dependencies=[Depends(admin_only)])
-async def newsletter_preview(request: Request):
-    db = get_db()
-    from empulse.newsletter import get_newsletter_config, build_newsletter_html
-
-    config = await get_newsletter_config(db)
-    if not config:
-        config = {
-            "recently_added_days": 7,
-            "recently_added_limit": 20,
-            "include_stats": 1,
-        }
-    emby_client = getattr(request.app.state, "emby_client", None)
-    html = await build_newsletter_html(db, config, emby_client)
-    return Response(content=html, media_type="text/html")
-
-
-@router.post("/newsletter/send", dependencies=[Depends(admin_only)])
-async def send_newsletter_now(request: Request):
-    db = get_db()
-    from empulse.newsletter import get_newsletter_config, send_newsletter
-
-    config = await get_newsletter_config(db)
-    if not config:
-        return JSONResponse(
-            {"success": False, "message": "Newsletter not configured"}, status_code=400
-        )
-    emby_client = getattr(request.app.state, "emby_client", None)
-    success, message = await send_newsletter(db, config, emby_client)
-    return JSONResponse({"success": success, "message": message})
 
 
 @router.get("/backup", dependencies=[Depends(admin_only)])
@@ -1037,7 +922,6 @@ async def random_posters(request: Request, limit: int = 24):
 @router.get("/display-settings")
 async def get_display_settings_api(request: Request):
     from empulse.formatting import DEFAULT_DISPLAY
-
     display = getattr(request.app.state, "display_settings", DEFAULT_DISPLAY)
     return JSONResponse(display)
 

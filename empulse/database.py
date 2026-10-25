@@ -4,6 +4,7 @@ from pathlib import Path
 
 from empulse.config import settings
 from empulse.backups import prepare_backup, prune_backups, read_release, run_io
+from empulse.period import register_sql_functions
 from empulse.version import get_version
 
 logger = logging.getLogger("empulse.db")
@@ -116,25 +117,6 @@ CREATE TABLE IF NOT EXISTS server_info (
     os TEXT
 );
 
-CREATE TABLE IF NOT EXISTS newsletter_config (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    enabled INTEGER DEFAULT 0,
-    schedule TEXT DEFAULT 'weekly',
-    day_of_week INTEGER DEFAULT 0,
-    hour INTEGER DEFAULT 9,
-    recently_added_days INTEGER DEFAULT 7,
-    recently_added_limit INTEGER DEFAULT 20,
-    include_stats INTEGER DEFAULT 1,
-    smtp_host TEXT,
-    smtp_port INTEGER DEFAULT 587,
-    smtp_user TEXT,
-    smtp_pass TEXT,
-    smtp_tls INTEGER DEFAULT 1,
-    from_addr TEXT,
-    to_addrs TEXT DEFAULT '',
-    last_sent TEXT
-);
-
 CREATE TABLE IF NOT EXISTS login_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     token_hash TEXT UNIQUE NOT NULL,
@@ -193,6 +175,7 @@ async def init_db() -> None:
     db = await aiosqlite.connect(str(db_path))
     db.row_factory = aiosqlite.Row
     try:
+        await register_sql_functions(db)
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA busy_timeout=5000")
         # executescript commits an existing transaction, so BEGIN belongs inside.
@@ -224,9 +207,10 @@ async def init_db() -> None:
 
 async def _migrate(db: aiosqlite.Connection):
     """Upgrade older databases while preserving retained application data."""
-    # Retired channel settings and delivery logs are no longer used.
+    # Retired notification and newsletter tables are no longer used.
     await db.execute("DROP TABLE IF EXISTS notification_log")
     await db.execute("DROP TABLE IF EXISTS notification_channels")
+    await db.execute("DROP TABLE IF EXISTS newsletter_config")
 
     cursor = await db.execute("PRAGMA table_info(history)")
     cols = {row[1] for row in await cursor.fetchall()}
@@ -328,23 +312,6 @@ async def _migrate(db: aiosqlite.Connection):
 
     now = datetime.now(timezone.utc).isoformat()
     await db.execute("DELETE FROM login_sessions WHERE expires_at < ?", [now])
-
-    await _encrypt_legacy_newsletter_password(db)
-
-
-async def _encrypt_legacy_newsletter_password(db: aiosqlite.Connection):
-    """Encrypt legacy SMTP passwords; already-encrypted values stay unchanged."""
-    from empulse.crypto import encrypt_secret
-
-    cursor = await db.execute("SELECT smtp_pass FROM newsletter_config WHERE id = 1")
-    row = await cursor.fetchone()
-    if row and row["smtp_pass"]:
-        encrypted_pass = encrypt_secret(row["smtp_pass"])
-        if encrypted_pass != row["smtp_pass"]:
-            await db.execute(
-                "UPDATE newsletter_config SET smtp_pass = ? WHERE id = 1", [encrypted_pass]
-            )
-            logger.info("Migration: encrypted newsletter SMTP password")
 
 
 def get_db() -> aiosqlite.Connection:

@@ -21,8 +21,10 @@ def event_loop():
 async def db():
     """Create a fresh in-memory database for each test."""
     from empulse.database import SCHEMA
+    from empulse.period import register_sql_functions
     conn = await aiosqlite.connect(":memory:")
     conn.row_factory = aiosqlite.Row
+    await register_sql_functions(conn)
     await conn.executescript(SCHEMA)
     await conn.commit()
     yield conn

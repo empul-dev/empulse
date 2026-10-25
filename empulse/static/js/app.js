@@ -239,9 +239,16 @@ document.body.addEventListener("htmx:responseError", function(evt) {
         Chart.defaults.scale.border = { display: false };
     }
 
+    // Normalize a days input to what the server uses (1-365, default 30) and show it.
+    function clampDays(input) {
+        var days = Math.min(365, Math.max(1, parseInt(input.value, 10) || 30));
+        input.value = days;
+        return days;
+    }
+
     function getDays() {
         var input = document.getElementById("days-input");
-        return input ? (parseInt(input.value) || 30) : 30;
+        return input ? clampDays(input) : 30;
     }
 
     function getMetric() {
@@ -365,6 +372,7 @@ document.body.addEventListener("htmx:responseError", function(evt) {
         setupDefaults: setupDefaults,
         destroyChart: destroyChart,
         getCSS: getCSS,
+        clampDays: clampDays,
         reload: loadCharts
     };
 

@@ -1,6 +1,6 @@
 # Empulse
 
-Activity monitoring dashboard for [Emby](https://emby.media) media servers. Track who's watching what, view playback history and graphs, and schedule email newsletters.
+Activity monitoring dashboard for [Emby](https://emby.media) media servers. Track who's watching what, view playback history and graphs.
 
 ![Empulse Dashboard](docs/screenshot.png)
 
@@ -130,10 +130,7 @@ All settings are via environment variables (in `.env` or `docker-compose.yml`):
 
 ## Secrets & Key Rotation
 
-The newsletter SMTP password is encrypted at rest using a key derived from `SECRET_KEY`.
-
-- Rotating `SECRET_KEY` by deleting `.empulse_secret` or changing the environment variable invalidates the stored SMTP password. Re-enter it after rotating the key.
-- Session tokens are also signed with `SECRET_KEY`, so rotating it logs everyone out as well.
+Session tokens are signed with `SECRET_KEY`, so rotating it by deleting `.empulse_secret` or changing the environment variable logs everyone out.
 
 ## Features
 
@@ -143,7 +140,6 @@ The newsletter SMTP password is encrypted at rest using a key derived from `SECR
 - **Graphs** -- Daily/monthly play counts, watch heatmap, completion rates, bandwidth stats
 - **Users / Libraries** -- Per-user and per-library statistics
 - **Re-watch Detection** -- Tracks when content is watched again
-- **Newsletter** -- Scheduled email digests of recent activity
 
 ## Updating
 

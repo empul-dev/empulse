@@ -17,7 +17,6 @@ async def test_lifespan_holds_lock_and_closes_resources(
     from empulse.activity.poller import SessionPoller
     from empulse.emby.client import EmbyClient
     from empulse.emby.websocket import EmbyWebSocket
-    from empulse.newsletter import NewsletterScheduler
     from empulse.update_checker import UpdateChecker
     from empulse.web.poster_cache import PosterWallCache
 
@@ -32,7 +31,6 @@ async def test_lifespan_holds_lock_and_closes_resources(
     services = [
         SessionPoller,
         EmbyWebSocket,
-        NewsletterScheduler,
         UpdateChecker,
         PosterWallCache,
     ]

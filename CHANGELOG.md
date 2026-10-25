@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.20
+
+- Removed the newsletter, its schedule, settings page and API endpoints, and the now unused `cryptography` dependency. Startup backs up existing databases before removing the newsletter configuration table, including the stored SMTP password.
+- Kept playback history, statistics, live dashboard updates, and the generated secret key in update backups so restores to earlier releases still work.
+
 ## 0.2.19
 
 - Removed notification channels, automatic playback and new-media alerts, their settings and API endpoints. Startup backs up existing databases before removing the old channel configuration and delivery-log tables.

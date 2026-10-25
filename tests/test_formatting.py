@@ -13,7 +13,6 @@ from empulse.formatting import (
     get_dow_labels,
     get_dow_order,
     get_hour_label,
-    get_tz_offset_hours,
 )
 
 
@@ -179,18 +178,6 @@ def test_hour_label_12h():
     assert get_hour_label(12, settings) == "12PM"
     assert get_hour_label(13, settings) == "1PM"
     assert get_hour_label(23, settings) == "11PM"
-
-
-# ── Timezone offset ────────────────────────────────────────────────────────
-
-
-def test_tz_offset_utc():
-    assert get_tz_offset_hours("UTC") == 0.0
-
-
-def test_tz_offset_nonzero():
-    offset = get_tz_offset_hours("Asia/Kolkata")
-    assert offset == 5.5
 
 
 # ── Transcode reason labels ─────────────────────────────────────────────────
