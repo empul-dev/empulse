@@ -806,7 +806,7 @@ async def restore_database(request: Request):
     import sqlite3
     import tempfile
 
-    from empulse.backups import run_io, stage_restore
+    from empulse.backups import RESTORE_REQUIRED_TABLES, run_io, stage_restore
     from empulse.database import check_migrates
 
     db_path = Path(settings.db_path)
@@ -855,9 +855,12 @@ async def restore_database(request: Request):
                 )
             try:
                 await run_io(stage_restore, tmp_path, db_path)
-            except ValueError as error:
+            except ValueError:
+                # Fixed text: exception messages may carry internal details.
+                required = ", ".join(sorted(RESTORE_REQUIRED_TABLES))
                 return JSONResponse(
-                    {"error": f"Invalid database: {error}"}, status_code=400
+                    {"error": f"Invalid database: it must contain the {required} tables"},
+                    status_code=400,
                 )
             except (sqlite3.Error, RuntimeError):
                 return JSONResponse(

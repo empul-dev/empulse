@@ -1740,7 +1740,9 @@ class TestRestoreUpload:
         r = await self._post(client, db_path, upload)
 
         assert r.status_code == 400
-        assert "missing tables libraries, users" in r.json()["error"]
+        assert r.json()["error"] == (
+            "Invalid database: it must contain the history, libraries, users tables"
+        )
 
     @pytest.mark.asyncio
     async def test_upload_that_breaks_startup_migration_is_rejected(
