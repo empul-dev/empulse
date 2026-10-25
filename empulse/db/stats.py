@@ -714,6 +714,30 @@ async def get_bandwidth_stats(db: aiosqlite.Connection, period: Period) -> list[
     return period.fill_days([dict(r) for r in rows], avg_bitrate=None, plays=0)
 
 
+async def get_plays_by_location(db: aiosqlite.Connection, period: Period) -> list[dict]:
+    """Plays per day by client network (LAN/remote/unknown) plus avg remote bitrate."""
+    cursor = await db.execute(
+        """SELECT date,
+                  SUM(scope = 'lan') as lan,
+                  SUM(scope = 'remote') as remote,
+                  SUM(scope = 'unknown') as unknown,
+                  AVG(CASE WHEN scope = 'remote' AND bitrate > 0 THEN bitrate END)
+                      as remote_avg_bitrate
+           FROM (SELECT local_date(started_at, ?) as date,
+                        ip_scope(ip_address) as scope,
+                        json_extract(stream_info, '$.media.bitrate') as bitrate
+                 FROM counted_plays
+                 WHERE started_at >= ? AND started_at < ?)
+           GROUP BY date
+           ORDER BY date""",
+        [period.tz, *period.bounds],
+    )
+    rows = await cursor.fetchall()
+    return period.fill_days(
+        [dict(r) for r in rows], lan=0, remote=0, unknown=0, remote_avg_bitrate=None
+    )
+
+
 async def get_watch_heatmap(db: aiosqlite.Connection, period: Period) -> list[dict]:
     """Play counts grouped by day-of-week and hour for heatmap rendering."""
     cursor = await db.execute(

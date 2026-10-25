@@ -3,6 +3,7 @@
 See GLOSSARY.md and docs/adr/0001-period-is-calendar-days.md.
 """
 
+import ipaddress
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from functools import lru_cache
@@ -104,8 +105,30 @@ def _local_month(ts, tz):
     return dt and dt.strftime("%Y-%m")
 
 
+def ip_scope(ip: str | None) -> str:
+    """'lan' for private/loopback/link-local addresses, 'remote' for any other, else 'unknown'.
+
+    CGNAT (100.64.0.0/10, e.g. Tailscale) counts as remote: that traffic leaves the LAN.
+    Accepts an optional port ("1.2.3.4:5678", "[::1]:8096") and IPv4-mapped IPv6.
+    """
+    host = (ip or "").strip()
+    if host.startswith("[") and "]" in host:
+        host = host[1 : host.index("]")]
+    elif host.count(":") == 1:
+        host = host.partition(":")[0]
+    try:
+        addr = ipaddress.ip_address(host)
+    except ValueError:
+        return "unknown"
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+        addr = addr.ipv4_mapped
+    return (
+        "lan" if addr.is_private or addr.is_loopback or addr.is_link_local else "remote"
+    )
+
+
 async def register_sql_functions(conn: aiosqlite.Connection) -> None:
-    """Add local_date/local_hour/local_dow/local_month(ts, tz) to *conn*.
+    """Add local_date/local_hour/local_dow/local_month(ts, tz) and ip_scope(ip) to *conn*.
 
     Each row is converted with its own UTC offset, so grouping stays correct across DST.
     """
@@ -116,3 +139,4 @@ async def register_sql_functions(conn: aiosqlite.Connection) -> None:
         ("local_month", _local_month),
     ):
         await conn.create_function(name, 2, fn, deterministic=True)
+    await conn.create_function("ip_scope", 1, ip_scope, deterministic=True)
