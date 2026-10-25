@@ -769,6 +769,13 @@ async def chart_watch_heatmap(period: Period = Depends(get_period)):
     return JSONResponse(rows)
 
 
+@router.get("/charts/concurrent-streams")
+async def chart_concurrent_streams(period: Period = Depends(get_period)):
+    db = get_db()
+    rows = await stats_db.get_concurrent_streams(db, period=period)
+    return JSONResponse(rows)
+
+
 @router.get("/backup", dependencies=[Depends(admin_only)])
 async def backup_database():
     import os
