@@ -61,7 +61,7 @@ _AVATAR_GRADIENTS = [
 
 def _generate_user_avatar(user_id: str, initial: str) -> bytes:
     """Generate a personalized SVG avatar with gradient background and initial."""
-    idx = int(hashlib.md5(user_id.encode()).hexdigest(), 16) % len(_AVATAR_GRADIENTS)
+    idx = int(hashlib.md5(user_id.encode(), usedforsecurity=False).hexdigest(), 16) % len(_AVATAR_GRADIENTS)
     c1, c2 = _AVATAR_GRADIENTS[idx]
     letter = (initial or "?")[0].upper()
     grad_id = f"g{idx}"
