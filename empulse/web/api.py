@@ -5,7 +5,7 @@ import io
 import json
 import logging
 import re
-from datetime import date, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse, Response
@@ -531,13 +531,18 @@ async def user_image_proxy(user_id: str, name: str = Query("")):
     )
 
 
-def _fill_date_gaps(rows: list[dict], days: int) -> list[dict]:
-    """Fill missing dates with zeroed entries."""
-    today = date.today()
-    start = today - timedelta(days=days - 1)
+def _fill_date_gaps(rows: list[dict], days: int, tz_offset_hours: float) -> list[dict]:
+    """Fill missing dates with zeroed entries, ending on today in the display timezone.
+
+    The SQL window is a rolling days x 24h, which touches days + 1 calendar dates
+    (a partial oldest day and today), so the chart has days + 1 buckets and sums
+    to the same total as the stat cards.
+    """
+    today = (datetime.now(timezone.utc) + timedelta(hours=tz_offset_hours)).date()
+    start = today - timedelta(days=days)
     existing = {r["date"]: r for r in rows}
     result = []
-    for i in range(days):
+    for i in range(days + 1):
         d = (start + timedelta(days=i)).isoformat()
         if d in existing:
             result.append(existing[d])
@@ -550,10 +555,11 @@ def _fill_date_gaps(rows: list[dict], days: int) -> list[dict]:
 async def chart_daily_plays(request: Request, days: int = 30):
     days = _clamp_days(days)
     db = get_db()
+    tz = _get_tz_offset(request)
     rows = await stats_db.get_plays_per_day(
-        db, days=days, tz_offset_hours=_get_tz_offset(request)
+        db, days=days, tz_offset_hours=tz
     )
-    filled = _fill_date_gaps(rows, days)
+    filled = _fill_date_gaps(rows, days, tz)
     return JSONResponse(filled)
 
 
@@ -579,10 +585,11 @@ async def chart_user_daily_plays(request: Request, user_id: str, days: int = 30)
         return forbidden
     days = _clamp_days(days)
     db = get_db()
+    tz = _get_tz_offset(request)
     rows = await stats_db.get_user_plays_per_day(
-        db, user_id, days=days, tz_offset_hours=_get_tz_offset(request)
+        db, user_id, days=days, tz_offset_hours=tz
     )
-    filled = _fill_date_gaps(rows, days)
+    filled = _fill_date_gaps(rows, days, tz)
     return JSONResponse(filled)
 
 
@@ -600,10 +607,11 @@ async def chart_user_by_type(request: Request, user_id: str, days: int = 30):
 async def chart_library_daily_plays(request: Request, item_type: str, days: int = 30):
     days = _clamp_days(days)
     db = get_db()
+    tz = _get_tz_offset(request)
     rows = await stats_db.get_library_plays_per_day(
-        db, item_type, days=days, tz_offset_hours=_get_tz_offset(request)
+        db, item_type, days=days, tz_offset_hours=tz
     )
-    filled = _fill_date_gaps(rows, days)
+    filled = _fill_date_gaps(rows, days, tz)
     return JSONResponse(filled)
 
 

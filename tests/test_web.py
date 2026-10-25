@@ -817,8 +817,29 @@ class TestAPIRoutes:
         r = await client.get("/api/charts/daily-plays?days=7")
         assert r.status_code == 200
         data = r.json()
-        assert len(data) == 7
+        # 7 x 24h reaches back into an 8th calendar day (partial oldest day)
+        assert len(data) == 8
         assert all(d["plays"] == 0 for d in data)
+
+    @pytest.mark.asyncio
+    async def test_chart_daily_plays_includes_partial_oldest_day(self, client):
+        """Every play the stat cards count for N days also appears in the chart."""
+        from datetime import datetime, timedelta, timezone
+
+        start = datetime.now(timezone.utc) - timedelta(days=7) + timedelta(minutes=1)
+        await history_db.insert_history(
+            client._test_db,
+            {
+                "session_key": "edge",
+                "user_id": "u1",
+                "item_type": "Movie",
+                "started_at": start.isoformat(),
+                "stopped_at": (start + timedelta(hours=1)).isoformat(),
+                "duration_seconds": 3600,
+            },
+        )
+        r = await client.get("/api/charts/daily-plays?days=7")
+        assert sum(d["plays"] for d in r.json()) == 1
 
     @pytest.mark.asyncio
     async def test_chart_daily_plays_with_data(self, client):
@@ -1574,3 +1595,22 @@ class TestEmbyUrlValidation:
 async def test_removed_feature_routes_return_404(client, method, path):
     response = await client.request(method, path)
     assert response.status_code == 404
+
+
+def test_fill_date_gaps_ends_on_today_in_display_timezone(monkeypatch):
+    from datetime import datetime, timezone
+
+    from empulse.web import api
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 25, 7, 0, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(api, "datetime", FixedDatetime)
+    # UTC-10: it is still Oct 24 for the viewer
+    assert [r["date"] for r in api._fill_date_gaps([], 2, -10)] == [
+        "2026-10-22", "2026-10-23", "2026-10-24",
+    ]
+    # UTC+20 would be Oct 26 (exercise the other direction)
+    assert api._fill_date_gaps([], 1, 20)[-1]["date"] == "2026-10-26"

@@ -646,3 +646,22 @@ class TestStats:
         assert top[0]["user_name"] == "Alice"
         assert top[0]["plays"] == 5
 
+
+async def test_days_window_is_rolling_not_calendar(db):
+    """days=1 means the last 24h, not "since midnight UTC yesterday"."""
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    # Midnight on the cutoff date: older than 24h, but the old string comparison
+    # ('T' > ' ') matched every row on that date.
+    stale = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    for key, start in (("recent", now - timedelta(hours=23)), ("old", stale)):
+        await history_db.insert_history(db, {
+            "session_key": key, "user_id": "u1", "user_name": "Alice",
+            "started_at": start.isoformat(),
+            "stopped_at": (start + timedelta(hours=1)).isoformat(),
+            "duration_seconds": 3600,
+        })
+
+    top = await stats_db.get_top_users(db, limit=10, days=1)
+    assert top[0]["plays"] == 1
