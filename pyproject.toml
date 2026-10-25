@@ -4,15 +4,15 @@ version = "0.2.20"
 description = "Activity monitoring for Emby Server"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi~=0.115",
-    "uvicorn[standard]~=0.34",
-    "aiosqlite~=0.20",
+    "fastapi~=0.159",
+    "uvicorn[standard]~=0.54",
+    "aiosqlite~=0.22",
     "httpx~=0.28",
-    "websockets~=14.0",
-    "pydantic-settings~=2.7",
+    "websockets~=17.3",
+    "pydantic-settings~=2.16",
     "jinja2~=3.1",
-    "python-dotenv~=1.0",
-    "python-multipart~=0.0.18",
+    "python-dotenv~=1.2",
+    "python-multipart~=0.0.32",
     "tzdata",  # zoneinfo fallback when the OS lacks tz data (e.g. US/* on Ubuntu 24.04)
 ]
 
@@ -23,7 +23,7 @@ dev = ["pytest", "pytest-asyncio", "ruff"]
 include = ["empulse*"]
 
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=84.2.1"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
