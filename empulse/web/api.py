@@ -898,21 +898,7 @@ async def random_posters(request: Request, limit: int = 24):
     if not emby_client:
         return JSONResponse([])
     try:
-        params = {
-            **emby_client._params,
-            "SortBy": "Random",
-            "Recursive": "true",
-            "Limit": str(limit),
-            "IncludeItemTypes": "Movie,Series",
-            "ImageTypes": "Primary",
-            "Fields": "PrimaryImageAspectRatio",
-        }
-        r = await emby_client._client.get(
-            f"{emby_client.base_url}/Items", params=params
-        )
-        r.raise_for_status()
-        items = r.json().get("Items", [])
-        ids = [item["Id"] for item in items if item.get("Id")]
+        ids = await emby_client.get_random_poster_ids(limit)
         return JSONResponse(ids, headers={"Cache-Control": "public, max-age=300"})
     except Exception as e:
         logger.warning(f"Random posters fetch failed: {e}")

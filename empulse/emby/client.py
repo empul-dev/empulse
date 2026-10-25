@@ -166,6 +166,20 @@ class EmbyClient:
         r.raise_for_status()
         return r.json().get("Items", [])
 
+    async def get_random_poster_ids(self, limit: int) -> list[str]:
+        """Random Movie/Series IDs that have a primary image (login poster wall)."""
+        params = {
+            "SortBy": "Random",
+            "Recursive": "true",
+            "Limit": str(limit),
+            "IncludeItemTypes": "Movie,Series",
+            "ImageTypes": "Primary",
+            "Fields": "PrimaryImageAspectRatio",
+        }
+        r = await self._client.get(f"{self.base_url}/Items", params=params)
+        r.raise_for_status()
+        return [item["Id"] for item in r.json().get("Items", []) if item.get("Id")]
+
     async def get_catalog_page(
         self,
         limit: int = 100,
