@@ -762,6 +762,13 @@ async def chart_bandwidth(period: Period = Depends(get_period)):
     return JSONResponse(rows)
 
 
+@router.get("/charts/plays-by-location")
+async def chart_plays_by_location(period: Period = Depends(get_period)):
+    db = get_db()
+    rows = await stats_db.get_plays_by_location(db, period=period)
+    return JSONResponse(rows)
+
+
 @router.get("/charts/watch-heatmap")
 async def chart_watch_heatmap(period: Period = Depends(get_period)):
     db = get_db()
