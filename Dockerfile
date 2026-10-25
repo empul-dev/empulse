@@ -1,5 +1,5 @@
 # ---- Build stage: install dependencies with uv on alpine ----
-FROM python:3.13-alpine AS builder
+FROM python:3.15-alpine AS builder
 
 WORKDIR /build
 
@@ -9,7 +9,7 @@ COPY pyproject.toml .
 RUN uv pip install --system --no-cache .
 
 # ---- Runtime stage: clean alpine without build tools ----
-FROM python:3.13-alpine
+FROM python:3.15-alpine
 
 LABEL org.opencontainers.image.source="https://github.com/empul-dev/empulse"
 LABEL org.opencontainers.image.description="Activity monitoring for Emby Server"
