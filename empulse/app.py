@@ -114,7 +114,6 @@ async def _lifespan(app: FastAPI):
 
     poller_task = None
     ws_task = None
-    newsletter_task = None
     poster_cache_task = None
     update_checker_task = None
 
@@ -146,12 +145,6 @@ async def _lifespan(app: FastAPI):
             poller_task = asyncio.create_task(poller.run())
             logger.info("Session poller started")
 
-            from empulse.newsletter import NewsletterScheduler
-
-            newsletter_scheduler = NewsletterScheduler(get_db, emby_client)
-            newsletter_task = asyncio.create_task(newsletter_scheduler.run())
-            logger.info("Newsletter scheduler started")
-
             from empulse.emby.websocket import EmbyWebSocket
 
             emby_ws = EmbyWebSocket(poller)
@@ -172,7 +165,7 @@ async def _lifespan(app: FastAPI):
     finally:
         tasks = [
             task for task in (
-                poller_task, ws_task, newsletter_task, poster_cache_task,
+                poller_task, ws_task, poster_cache_task,
                 update_checker_task,
             ) if task is not None
         ]

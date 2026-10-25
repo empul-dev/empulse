@@ -646,23 +646,3 @@ class TestStats:
         assert top[0]["user_name"] == "Alice"
         assert top[0]["plays"] == 5
 
-
-class TestLegacySecretMigration:
-    """I-1: plaintext newsletter passwords get encrypted on boot."""
-
-    @pytest.mark.asyncio
-    async def test_encrypts_plaintext_newsletter_password(self, db):
-        from empulse.database import _migrate
-
-        await db.execute(
-            "INSERT INTO newsletter_config (id, smtp_pass) VALUES (1, ?)",
-            ["plaintext-smtp-pass"],
-        )
-        await db.commit()
-
-        await _migrate(db)
-
-        cursor = await db.execute("SELECT smtp_pass FROM newsletter_config WHERE id = 1")
-        row = await cursor.fetchone()
-        assert row["smtp_pass"] != "plaintext-smtp-pass"
-        assert row["smtp_pass"].startswith("enc:v1:")

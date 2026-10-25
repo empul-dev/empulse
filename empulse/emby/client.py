@@ -1,5 +1,4 @@
 import logging
-import base64
 import ipaddress
 import socket
 from urllib.parse import urlparse
@@ -210,22 +209,6 @@ class EmbyClient:
             parent_id=parent_id,
             include_item_types="Series",
         )
-
-    async def get_image_data_url(
-        self,
-        item_id: str,
-        image_type: str = "Primary",
-        max_width: int = 300,
-    ) -> str:
-        """Fetch an Emby image and return it as a data URL for email embedding."""
-        r = await self._client.get(
-            f"{self.base_url}/Items/{item_id}/Images/{image_type}",
-            params={"maxWidth": str(max_width)},
-        )
-        r.raise_for_status()
-        content_type = r.headers.get("content-type", "image/jpeg")
-        encoded = base64.b64encode(r.content).decode("ascii")
-        return f"data:{content_type};base64,{encoded}"
 
     async def authenticate_user(self, username: str, password: str) -> dict | None:
         """Authenticate a user against Emby via AuthenticateByName.

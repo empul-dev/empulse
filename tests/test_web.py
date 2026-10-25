@@ -1427,85 +1427,13 @@ class TestAPIRoutes:
         assert "Update available: v0.2.3" in r.text
         assert "Current version: v0.2.1" in r.text
 
-    # --- Phase 3: Map, Newsletter, Locations ---
+    # --- Phase 3: Map, Locations ---
 
     @pytest.mark.asyncio
-    async def test_newsletter_config_crud(self, client):
-        # Initially empty
-        r = await client.get("/api/newsletter/config")
+    async def test_settings_page_has_no_newsletter(self, client):
+        r = await client.get("/settings")
         assert r.status_code == 200
-        assert r.json() == {}
-
-        # Save config
-        r = await client.post(
-            "/api/newsletter/config",
-            json={
-                "enabled": True,
-                "schedule": "weekly",
-                "day_of_week": 1,
-                "hour": 10,
-                "recently_added_days": 7,
-                "recently_added_limit": 15,
-                "include_stats": True,
-                "smtp_host": "smtp.example.com",
-                "smtp_port": 587,
-                "smtp_user": "user@example.com",
-                "smtp_pass": "pass",
-                "smtp_tls": True,
-                "from_addr": "empulse@example.com",
-                "to_addrs": "admin@example.com",
-            },
-        )
-        assert r.status_code == 200
-
-        # Read back
-        r = await client.get("/api/newsletter/config")
-        assert r.status_code == 200
-        config = r.json()
-        assert config["enabled"] == 1
-        assert config["schedule"] == "weekly"
-        assert config["smtp_host"] == "smtp.example.com"
-
-        # Update
-        r = await client.post(
-            "/api/newsletter/config",
-            json={
-                "enabled": False,
-                "schedule": "daily",
-                "day_of_week": 0,
-                "hour": 8,
-                "recently_added_days": 3,
-                "recently_added_limit": 10,
-                "include_stats": False,
-                "smtp_host": "mail.example.com",
-                "smtp_port": 465,
-                "smtp_user": "",
-                "smtp_pass": "",
-                "smtp_tls": False,
-                "from_addr": "",
-                "to_addrs": "",
-            },
-        )
-        assert r.status_code == 200
-        r = await client.get("/api/newsletter/config")
-        assert r.json()["schedule"] == "daily"
-
-    @pytest.mark.asyncio
-    async def test_newsletter_preview(self, client):
-        r = await client.get("/api/newsletter/preview")
-        assert r.status_code == 200
-        assert "Empulse Newsletter" in r.text
-
-    @pytest.mark.asyncio
-    async def test_newsletter_send_not_configured(self, client):
-        r = await client.post("/api/newsletter/send")
-        assert r.status_code == 400
-
-    @pytest.mark.asyncio
-    async def test_settings_newsletter_page(self, client):
-        r = await client.get("/settings/newsletter")
-        assert r.status_code == 200
-        assert "Newsletter" in r.text
+        assert "newsletter" not in r.text.lower()
 
     @pytest.mark.asyncio
     async def test_static_css(self, client):
@@ -1636,8 +1564,13 @@ class TestEmbyUrlValidation:
         ("DELETE", "/api/notification-channels/1"),
         ("POST", "/api/notification-channels/1/test"),
         ("GET", "/api/notification-log"),
+        ("GET", "/settings/newsletter"),
+        ("GET", "/api/newsletter/config"),
+        ("POST", "/api/newsletter/config"),
+        ("GET", "/api/newsletter/preview"),
+        ("POST", "/api/newsletter/send"),
     ],
 )
-async def test_removed_notification_routes_return_404(client, method, path):
+async def test_removed_feature_routes_return_404(client, method, path):
     response = await client.request(method, path)
     assert response.status_code == 404

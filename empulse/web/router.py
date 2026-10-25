@@ -461,7 +461,7 @@ async def logout(request: Request):
 class SettingsView:
     """Whitelist of settings safe to expose to the settings template (I-2).
 
-    Never carries secrets (secret_key, emby_api_key, auth_password, SMTP creds) —
+    Never carries secrets (secret_key, emby_api_key, auth_password) —
     the API key is reduced to a boolean so the template can show a mask without
     the value ever reaching the render context."""
     emby_url: str
@@ -488,17 +488,4 @@ async def settings_page(request: Request):
         "settings": SettingsView.from_settings(), "server_info": server_info,
         "update_info": update_info,
         "update_check_enabled": bool(update_checker),
-    })
-
-
-@router.get("/settings/newsletter", dependencies=[Depends(admin_only)])
-async def settings_newsletter(request: Request):
-    db = get_db()
-    from empulse.newsletter import get_newsletter_config
-    config = await get_newsletter_config(db)
-    if config and config.get("smtp_pass"):
-        config = {**config, "smtp_pass": "***"}
-    return templates.TemplateResponse(request, "settings_newsletter.html", {
-        "active": "settings",
-        "config": config or {},
     })

@@ -409,12 +409,7 @@ class TestMiddleware:
                     # blocked by AuthMiddleware or the per-handler admin_only dep.
                     admin_routes = [
                         ("GET", "/settings"),
-                        ("GET", "/settings/newsletter"),
                         ("POST", "/api/update-check"),
-                        ("GET", "/api/newsletter/config"),
-                        ("POST", "/api/newsletter/config"),
-                        ("GET", "/api/newsletter/preview"),
-                        ("POST", "/api/newsletter/send"),
                         ("GET", "/api/backup"),
                         ("POST", "/api/restore"),
                         ("POST", "/api/test-connection"),

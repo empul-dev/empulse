@@ -6,9 +6,8 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
-from cryptography.fernet import Fernet
 
-from empulse import crypto, database
+from empulse import database
 
 
 @pytest_asyncio.fixture
@@ -144,35 +143,22 @@ async def test_failed_migration_rolls_back_and_reuses_backup(
     assert len(snapshots(database_file)) == 1
 
 
-async def test_snapshot_contains_key_needed_for_newsletter_password(
-    database_file, monkeypatch
-):
+async def test_snapshot_keeps_key_and_retired_newsletter_password(database_file, monkeypatch):
+    # Restoring to 0.2.19 or earlier needs both to decrypt the SMTP password.
     create_legacy(database_file)
     secret = "persistent-local-test-secret"
     monkeypatch.setattr(database.settings, "secret_key", secret)
     (database_file.parent / ".empulse_secret").write_text(secret + "\n")
-    encrypted = (
-        crypto.ENC_PREFIX
-        + Fernet(crypto._derive_key(secret)).encrypt(b"smtp-password").decode()
-    )
     with sqlite3.connect(database_file) as conn:
-        conn.execute(
-            "INSERT INTO newsletter_config (id, smtp_pass) VALUES (1, ?)",
-            (encrypted,),
-        )
+        conn.execute("CREATE TABLE newsletter_config (id INTEGER PRIMARY KEY, smtp_pass TEXT)")
+        conn.execute("INSERT INTO newsletter_config VALUES (1, 'enc:v1:smtp-password')")
     await database.init_db()
     backup = snapshots(database_file)[0]
-    saved_key = (backup.parent / ".empulse_secret").read_text().strip()
+    assert (backup.parent / ".empulse_secret").read_text().strip() == secret
     with sqlite3.connect(backup) as conn:
-        saved_password = conn.execute(
-            "SELECT smtp_pass FROM newsletter_config WHERE id = 1"
-        ).fetchone()[0]
-    assert (
-        Fernet(crypto._derive_key(saved_key)).decrypt(
-            saved_password.removeprefix(crypto.ENC_PREFIX).encode()
+        assert conn.execute("SELECT smtp_pass FROM newsletter_config").fetchone() == (
+            "enc:v1:smtp-password",
         )
-        == b"smtp-password"
-    )
     assert backup.stat().st_mode & 0o077 == 0
     assert (backup.parent / ".empulse_secret").stat().st_mode & 0o077 == 0
 

@@ -79,7 +79,6 @@ logger = logging.getLogger("empulse.api")
 router = APIRouter()
 
 VALID_ID = re.compile(r"^[a-zA-Z0-9_-]+$")
-MASKED_SECRET = "***"
 
 
 def _get_tz_offset(request: Request) -> float:
@@ -841,59 +840,6 @@ async def chart_watch_heatmap(request: Request, days: int = 30):
         db, days=days, tz_offset_hours=_get_tz_offset(request)
     )
     return JSONResponse(rows)
-
-
-@router.get("/newsletter/config", dependencies=[Depends(admin_only)])
-async def get_newsletter_config_api():
-    db = get_db()
-    from empulse.newsletter import get_newsletter_config
-
-    config = await get_newsletter_config(db)
-    if config and config.get("smtp_pass"):
-        config = {**config, "smtp_pass": MASKED_SECRET}
-    return JSONResponse(config or {})
-
-
-@router.post("/newsletter/config", dependencies=[Depends(admin_only)])
-async def save_newsletter_config_api(request: Request):
-    data = await request.json()
-    db = get_db()
-    from empulse.newsletter import save_newsletter_config
-
-    await save_newsletter_config(db, data)
-    return JSONResponse({"status": "saved"})
-
-
-@router.get("/newsletter/preview", dependencies=[Depends(admin_only)])
-async def newsletter_preview(request: Request):
-    db = get_db()
-    from empulse.newsletter import get_newsletter_config, build_newsletter_html
-
-    config = await get_newsletter_config(db)
-    if not config:
-        config = {
-            "recently_added_days": 7,
-            "recently_added_limit": 20,
-            "include_stats": 1,
-        }
-    emby_client = getattr(request.app.state, "emby_client", None)
-    html = await build_newsletter_html(db, config, emby_client)
-    return Response(content=html, media_type="text/html")
-
-
-@router.post("/newsletter/send", dependencies=[Depends(admin_only)])
-async def send_newsletter_now(request: Request):
-    db = get_db()
-    from empulse.newsletter import get_newsletter_config, send_newsletter
-
-    config = await get_newsletter_config(db)
-    if not config:
-        return JSONResponse(
-            {"success": False, "message": "Newsletter not configured"}, status_code=400
-        )
-    emby_client = getattr(request.app.state, "emby_client", None)
-    success, message = await send_newsletter(db, config, emby_client)
-    return JSONResponse({"success": success, "message": message})
 
 
 @router.get("/backup", dependencies=[Depends(admin_only)])
