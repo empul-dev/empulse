@@ -14,6 +14,7 @@ dependencies = [
     "python-dotenv~=1.0",
     "python-multipart~=0.0.18",
     "cryptography~=50.0",
+    "tzdata",  # zoneinfo fallback when the OS lacks tz data (e.g. US/* on Ubuntu 24.04)
 ]
 
 [project.optional-dependencies]
