@@ -345,6 +345,43 @@ class TestUsersCRUD:
         assert users[0]["username"] == "Bob"
 
     @pytest.mark.asyncio
+    async def test_get_all_sort_options(self, db):
+        # Plays and duration deliberately disagree so the sort column matters.
+        for name, durations, last_seen in [
+            ("bob", [700] * 3, "2024-01-03"),
+            ("Alice", [7200], None),
+            ("Charlie", [700] * 2, "2024-01-05"),
+        ]:
+            await users_db.upsert_user(db, {
+                "emby_user_id": name.lower(), "username": name,
+                "is_admin": 0, "thumb_url": None, "last_seen": last_seen,
+            })
+            for i, dur in enumerate(durations):
+                await history_db.insert_history(db, {
+                    "session_key": f"{name}-{i}", "user_id": name.lower(),
+                    "user_name": name, "item_name": f"Item{i}",
+                    "started_at": "2024-01-01T12:00:00",
+                    "stopped_at": "2024-01-01T14:00:00",
+                    "duration_seconds": dur,
+                })
+
+        async def names(sort_by, sort_order):
+            users = await users_db.get_all_users(db, sort_by, sort_order)
+            return [u["username"] for u in users]
+
+        assert await names("duration", "desc") == ["Alice", "bob", "Charlie"]
+        assert await names("duration", "asc") == ["Charlie", "bob", "Alice"]
+        assert await names("plays", "desc") == ["bob", "Charlie", "Alice"]
+        assert await names("user", "asc") == ["Alice", "bob", "Charlie"]
+        assert await names("last_seen", "desc") == ["Charlie", "bob", "Alice"]
+        # last_seen mixes ISO login stamps and SQLite datetime('now') stamps.
+        await db.execute("UPDATE users SET last_seen = '2024-01-05T10:00:00+00:00' WHERE emby_user_id = 'charlie'")
+        await db.execute("UPDATE users SET last_seen = '2024-01-05 12:00:00' WHERE emby_user_id = 'bob'")
+        assert await names("last_seen", "desc") == ["bob", "Charlie", "Alice"]
+        # Unknown values fall back to plays desc instead of reaching SQL.
+        assert await names("1; DROP TABLE users", "sideways") == ["bob", "Charlie", "Alice"]
+
+    @pytest.mark.asyncio
     async def test_get_nonexistent_user(self, db):
         user = await users_db.get_user(db, "nonexistent")
         assert user is None

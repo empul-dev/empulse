@@ -40,12 +40,17 @@ async def history_page(request: Request):
 
 
 @router.get("/users")
-async def users_page(request: Request):
+async def users_page(request: Request, sort_by: str = "plays", sort_order: str = "desc"):
+    if sort_by not in users_db.USER_SORT_COLUMNS:
+        sort_by = "plays"
+    if sort_order != "asc":
+        sort_order = "desc"
     db = get_db()
-    all_users = await users_db.get_all_users(db)
+    all_users = await users_db.get_all_users(db, sort_by, sort_order)
     user_list = [UserInfo(**u) for u in all_users]
     return templates.TemplateResponse(request, "users.html", {
         "active": "users", "users": user_list,
+        "sort_by": sort_by, "sort_order": sort_order,
     })
 
 
