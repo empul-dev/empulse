@@ -25,23 +25,20 @@
     <h2>Watch Statistics</h2>
     <div class="stat-controls">
         <div class="toggle-group" id="metric-toggle">
-            <button class="toggle-btn active" data-value="plays"
-                    hx-get="/api/stats-cards?metric=plays"
-                    hx-target="#stats-cards" hx-swap="innerHTML"
-                    hx-include="#days-input">Play Count</button>
-            <button class="toggle-btn" data-value="duration"
-                    hx-get="/api/stats-cards?metric=duration"
-                    hx-target="#stats-cards" hx-swap="innerHTML"
-                    hx-include="#days-input">Play Duration</button>
+            <button class="toggle-btn active" data-value="plays">Play Count</button>
+            <button class="toggle-btn" data-value="duration">Play Duration</button>
         </div>
+        <input type="hidden" id="metric-input" name="metric" value="plays">
         <span class="stat-controls-label">Last</span>
         <input type="number" id="days-input" name="days" value="30" min="1" max="365"
-               class="days-input"
-               hx-get="/api/stats-cards"
-               hx-trigger="change"
-               hx-target="#stats-cards" hx-swap="innerHTML"
-               hx-include="#metric-toggle .active">
+               class="days-input">
         <span class="stat-controls-label">days</span>
+        <div class="preset-btns">
+            <button class="preset-btn" data-days="7">7d</button>
+            <button class="preset-btn" data-days="30">30d</button>
+            <button class="preset-btn" data-days="90">90d</button>
+            <button class="preset-btn" data-days="365">1y</button>
+        </div>
     </div>
 </div>
 
@@ -65,6 +62,7 @@
 <div id="stats-cards" aria-live="polite"
      hx-get="/api/stats-cards"
      hx-trigger="load, refresh-stats from:body"
+     hx-include="#days-input, #metric-input"
      hx-swap="innerHTML">
 </div>
 
@@ -91,9 +89,28 @@ function setToggle(btn) {
     btn.classList.add('active');
 }
 
+// All stat controls reload #stats-cards, which includes the current days + metric;
+// its afterSwap then reloads the charts (app.js).
+function refreshStats() {
+    window.empulseCharts.clampDays(document.getElementById('days-input'));
+    htmx.trigger(document.body, 'refresh-stats');
+}
+
 document.getElementById('metric-toggle').addEventListener('click', function(e) {
     var btn = e.target.closest('.toggle-btn');
-    if (btn) setToggle(btn);
+    if (!btn) return;
+    setToggle(btn);
+    document.getElementById('metric-input').value = btn.dataset.value;
+    refreshStats();
+});
+
+document.getElementById('days-input').addEventListener('change', refreshStats);
+
+document.querySelector('.preset-btns').addEventListener('click', function(e) {
+    var btn = e.target.closest('.preset-btn');
+    if (!btn) return;
+    document.getElementById('days-input').value = btn.dataset.days;
+    refreshStats();
 });
 
 document.querySelector('.recently-added-filters').addEventListener('click', function(e) {

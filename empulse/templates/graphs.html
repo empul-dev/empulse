@@ -229,7 +229,7 @@ function soften(hex) {
     return 'rgba(' + r + ',' + g + ',' + b + ',0.7)';
 }
 
-function getDays() { return parseInt(document.getElementById('graph-days').value) || 30; }
+function getDays() { return C.clampDays(document.getElementById('graph-days')); }
 function destroy(key) { if (gCharts[key]) { gCharts[key].destroy(); gCharts[key] = null; } }
 
 function getGraphMetric() {

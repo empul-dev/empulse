@@ -1641,3 +1641,20 @@ class TestEmbyUrlValidation:
 async def test_removed_notification_routes_return_404(client, method, path):
     response = await client.request(method, path)
     assert response.status_code == 404
+
+
+def test_fill_date_gaps_ends_on_today_in_display_timezone(monkeypatch):
+    from datetime import datetime, timezone
+
+    from empulse.web import api
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 25, 7, 0, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(api, "datetime", FixedDatetime)
+    # UTC-10: it is still Oct 24 for the viewer
+    assert [r["date"] for r in api._fill_date_gaps([], 2, -10)] == ["2026-10-23", "2026-10-24"]
+    # UTC+20 would be Oct 26 (exercise the other direction)
+    assert api._fill_date_gaps([], 1, 20)[0]["date"] == "2026-10-26"
