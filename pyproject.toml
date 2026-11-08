@@ -4,15 +4,15 @@ version = "0.2.21"
 description = "Activity monitoring for Emby Server"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi~=0.160",
+    "fastapi~=0.162",
     "uvicorn[standard]~=0.54",
     "aiosqlite~=0.22",
     "httpx~=0.28",
-    "websockets~=17.3",
+    "websockets~=17.4",
     "pydantic-settings~=2.16",
     "jinja2~=3.1",
     "python-dotenv~=1.2",
-    "python-multipart~=0.0.32",
+    "python-multipart~=0.0.33",
     "tzdata",  # zoneinfo fallback when the OS lacks tz data (e.g. US/* on Ubuntu 24.04)
 ]
 
